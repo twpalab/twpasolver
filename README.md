@@ -6,7 +6,7 @@ Coupled Mode Equations solver for Traveling Wave Parametric Amplifiers.
 Clone the repository with:
 
 ```bash
-git clone https://github.com/biqute/twpasolver
+git clone https://github.com/twpalab/twpasolver
 ```
 
 then to install it in normal mode:

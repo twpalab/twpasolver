@@ -7,7 +7,7 @@ Clone the repository with:
 
 .. code-block:: bash
 
-  git clone https://github.com/biqute/twpasolver 
+  git clone https://github.com/twpalab/twpasolver
 
 then to install it in normal mode:
 
