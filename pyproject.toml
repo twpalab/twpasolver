@@ -42,3 +42,7 @@ sphinx-markdown-tables = "^0.0.17"
 nbsphinx = "^0.9.1"
 sphinx-copybutton = "^0.5.1"
 sphinx-last-updated-by-git = "^0.3.5"
+
+[[tool.mypy.overrides]]
+module=["numba"]
+ignore_missing_imports = true
