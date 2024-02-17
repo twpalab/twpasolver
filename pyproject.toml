@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "project_name"
+name = "twpasolver"
 version = "0.0.1"
-description = "project_description"
-authors = ["author_name"]
+description = "Project twpasolver created by biqute"
+authors = ["biqute"]
 license = "Apache License 2.0"
 readme = "README.md"
-repository = "project_url"
+repository = "https://github.com/biqute/twpasolver"
 keywords = []
 classifiers = [
   "Programming Language :: Python :: 3",

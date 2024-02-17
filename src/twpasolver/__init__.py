@@ -1,4 +1,4 @@
-"""project_name module."""
+"""twpasolver module."""
 
 import importlib.metadata as im
 
