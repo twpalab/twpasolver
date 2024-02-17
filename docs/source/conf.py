@@ -1,8 +1,8 @@
 """Configuration file for sphinx documentation."""
 
 import shutil
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from recommonmark.transform import AutoStructify
 from sphinx.ext import apidoc
@@ -38,7 +38,7 @@ exclude_patterns = []
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
-# html_favicon = "favicon.ico"
+html_favicon = "favicon.ico"
 
 html_title = "twpasolver · " + release
 
@@ -47,8 +47,8 @@ html_theme_options = {
     "source_repository": "https://github.com/biqute/twpasolver/",
     "source_branch": "main",
     "source_directory": "docs/source/",
-    # "light_logo": "project_logo.png",
-    # "dark_logo": "project_logo.png",
+    "light_logo": "project_logo.png",
+    "dark_logo": "project_logo.png",
     "light_css_variables": {
         "color-brand-primary": "#6400FF",
         "color-brand-secondary": "#6400FF",

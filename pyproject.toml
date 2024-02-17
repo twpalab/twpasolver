@@ -12,7 +12,9 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10, <=3.12"
+python = ">=3.10, <3.13"
+numpy = ">=1.26"
+numba = ">=0.59.0"
 
 [build-system]
 requires = ["poetry-core"]

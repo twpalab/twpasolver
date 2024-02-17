@@ -1,12 +1,12 @@
-# twpasolver 
-Project twpasolver created by biqute
+# twpasolver
+Coupled Mode Equations solver for Traveling Wave Parametric Amplifiers.
 
 ## Installation
 
 Clone the repository with:
 
 ```bash
-git clone https://github.com/biqute/twpasolver 
+git clone https://github.com/biqute/twpasolver
 ```
 
 then to install it in normal mode:
@@ -26,4 +26,3 @@ pre-commit install
 ## License
 
 twpasolver is licensed under the [Apache License 2.0](LICENSE). See the [LICENSE](LICENSE) file for details.
-
