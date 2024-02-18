@@ -40,3 +40,64 @@ def matpow_2x2(matrices_a: np.ndarray, exponent: int) -> np.ndarray:
                     )
             result_matrices[k, :, :] = partial_exp
     return result_matrices
+
+
+@nb.njit("(float64[:,:,:], int32)")
+def matpow_2x2_recursive(matrices_a: np.ndarray, exponent: int) -> np.ndarray:
+    """Fast exponentiation of list of 2x2 matrices with recursion."""
+    assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
+    if exponent == 1:
+        return matrices_a
+    n_mat = matrices_a.shape[0]
+    if exponent % 2 == 0:
+        result_matrices = matpow_2x2_recursive(matrices_a, int(exponent / 2))
+        return matmul_2x2(result_matrices, result_matrices)
+    result_matrices = matrices_a.copy()
+    partial_exp = np.empty((2, 2))
+    for k in range(n_mat):
+        for _ in range(1, exponent):
+            for i in range(2):
+                for j in range(2):
+                    partial_exp[i, j] = (
+                        matrices_a[k, i, 0] * result_matrices[k, 0, j]
+                        + matrices_a[k, i, 1] * result_matrices[k, 1, j]
+                    )
+            result_matrices[k, :, :] = partial_exp
+    return result_matrices
+
+
+@nb.njit("(float64[:,:,:], float64)")
+def a2s(abcd: np.ndarray, Z0: float) -> np.ndarray:
+    """Convert list of ABCD matrices to list of S parameters."""
+    assert abcd.shape[1] == 2 and abcd.shape[2] == 2
+    assert Z0 > 0
+    n_mat = abcd.shape[0]
+    spar_mat = np.empty((n_mat, 2, 2))
+    for i in range(n_mat):
+        A = abcd[i, 0, 0]
+        B = abcd[i, 0, 1]
+        C = abcd[i, 1, 0]
+        D = abcd[i, 1, 1]
+        spar_mat[i, 0, 0] = (A + B / Z0 - C * Z0 - D) / (A + B / Z0 + C * Z0 + D)
+        spar_mat[i, 0, 1] = 2.0 * (A * D - B * C) / (A + B / Z0 + C * Z0 + D)
+        spar_mat[i, 1, 0] = 2.0 / (A + B / Z0 + C * Z0 + D)
+        spar_mat[i, 1, 1] = (-A + B / Z0 - C * Z0 + D) / (A + B / Z0 + C * Z0 + D)
+    return spar_mat
+
+
+def s2a(spar: np.ndarray, Z0: float) -> np.ndarray:
+    """Convert list of S parameters to list of ABCD matrices."""
+    assert spar.shape[1] == 2 and spar.shape[2] == 2
+    assert Z0 > 0
+    n_mat = spar.shape[0]
+    abcd = np.empty((n_mat, 2, 2))
+    for i in range(n_mat):
+        S11 = spar[i, 0, 0]
+        S12 = spar[i, 0, 1]
+        S21 = spar[i, 1, 0]
+        S22 = spar[i, 1, 1]
+        abcd[i, 0, 0] = ((1 + S11) * (1 - S22) + S12 * S21) / (2 * S21)
+        abcd[i, 0, 1] = ((1 + S11) * (1 + S22) - S12 * S21) / (2 * S21) * Z0
+        abcd[i, 1, 0] = ((1 - S11) * (1 - S22) - S12 * S21) / (2 * S21) * 1 / Z0
+        abcd[i, 1, 1] = ((1 - S11) * (1 + S22) + S12 * S21) / (2 * S21)
+    return abcd
