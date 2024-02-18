@@ -36,7 +36,7 @@ def matpow_2x2(matrices_a: complex_array, exponent: int) -> complex_array:
     assert exponent > 0
     if exponent == 1:
         return matrices_a.astype(np.complex128)
-    elif exponent % 2 == 0:
+    if exponent % 2 == 0:
         result_matrices = matpow_2x2(matrices_a, int(exponent / 2))
         return matmul_2x2(result_matrices, result_matrices)
     result_matrices = matrices_a.astype(np.complex128)
@@ -87,6 +87,6 @@ def s2a(spar: complex_array, Z0: float) -> complex_array:
         S22 = spar[i, 1, 1]
         abcd[i, 0, 0] = ((1 + S11) * (1 - S22) + S12 * S21) / (2 * S21)
         abcd[i, 0, 1] = ((1 + S11) * (1 + S22) - S12 * S21) / (2 * S21) * Z0
-        abcd[i, 1, 0] = ((1 - S11) * (1 - S22) - S12 * S21) / (2 * S21) * 1 / 0
+        abcd[i, 1, 0] = ((1 - S11) * (1 - S22) - S12 * S21) / (2 * S21) * 1 / Z0
         abcd[i, 1, 1] = ((1 - S11) * (1 + S22) + S12 * S21) / (2 * S21)
     return abcd
