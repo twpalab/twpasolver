@@ -1,13 +1,13 @@
 """ABCD matrices array module."""
 import numpy as np
 
-from twpasolver.mathutils import a2s, matmul_2x2, matpow_2x2_recursive, s2a
+from twpasolver.mathutils import matmul_2x2, matpow_2x2
 
 
 class ABCDArray:
     """A class representing an array of ABCD matrices."""
 
-    def __init__(self, mat: np.ndarray, Z0: float | int = 50):
+    def __init__(self, mat: np.ndarray):
         """
         Initialize the ABCDArray instance.
 
@@ -18,14 +18,7 @@ class ABCDArray:
         mat = np.asarray(mat)
         if len(mat.shape) != 3 or mat.shape[-2:] != (2, 2):
             raise ValueError("Input must be array of 2x2 matrices.")
-        self._mat = mat
-        self.Z0 = Z0
-
-    @classmethod
-    def from_s(cls, s_mat: np.ndarray, Z0: float | int = 50):
-        """Instantiate from array of S-parameters."""
-        abcd_mat = s2a(s_mat, Z0)
-        return cls(abcd_mat, Z0=Z0)
+        self._abcd = mat
 
     def __repr__(self):
         """
@@ -34,11 +27,11 @@ class ABCDArray:
         Returns:
         - str: String representation of the ABCDArray.
         """
-        return f"{self.__class__.__name__}({self._mat}, Z0={self.Z0})"
+        return f"{self.__class__.__name__}({self._abcd})"
 
     def __array__(self):
         """Convert the ABCDArray to a numpy array."""
-        return self._mat
+        return self._abcd
 
     def __matmul__(self, other: "ABCDArray") -> "ABCDArray":
         """
@@ -50,7 +43,7 @@ class ABCDArray:
         Returns:
         - ABCDArray: Result of the matrix multiplication.
         """
-        return self.__class__(matmul_2x2(self._mat, other._mat))
+        return self.__class__(matmul_2x2(self._abcd, other._abcd))
 
     def __pow__(self, exponent: int) -> "ABCDArray":
         """
@@ -62,41 +55,27 @@ class ABCDArray:
         Returns:
         - ABCDArray: Result of raising the ABCDArray to the specified power.
         """
-        return self.__class__(matpow_2x2_recursive(self._mat, exponent))
+        return self.__class__(matpow_2x2(self._abcd, exponent))
 
-    def __getitem__(self, *indices):
+    def __getitem__(self, indices) -> "ABCDArray | np.ndarray":
         """Get value at indices."""
-        return self._mat[indices]
+        if isinstance(indices, slice):
+            return self.__class__(self._abcd[indices])
+        return self._abcd[indices]
 
     def __setitem__(self, val: float | int, *indices):
         """Set value at indices."""
-        self._mat[indices] = val
+        self._abcd[indices] = val
 
     @property
     def shape(self):
         """Shape of the internal array."""
-        return self._mat.shape
+        return self._abcd.shape
 
     @property
     def len(self):
         """Length of the internal array."""
-        return self._mat.shape[0]
-
-    @property
-    def Z0(self) -> float | int:
-        """Line impedance getter."""
-        return self._Z0
-
-    @Z0.setter
-    def Z0(self, value: float | int):
-        """Line impoedance setter."""
-        if value <= 0:
-            raise ValueError("Line impedance must be positive.")
-        self._Z0 = value
-
-    def a2s(self):
-        """Convert to S-parameter matrix."""
-        return a2s(self._mat, self.Z0)
+        return self._abcd.shape[0]
 
     def _get_parameter(self, i: int, k: int):
         """
@@ -109,7 +88,7 @@ class ABCDArray:
         Returns:
         - numpy.ndarray: The specified parameter of the 2x2 matrices.
         """
-        return self._mat[:, i, k]
+        return self._abcd[:, i, k]
 
     def _set_parameter(self, i: int, k: int, values: np.ndarray):
         """
@@ -122,7 +101,7 @@ class ABCDArray:
         """
         if values.ndim != 1 and len(values) != self.len:
             raise ValueError(f"Must provide a 1-D array of length {self.len}")
-        self._mat[:, i, k] = np.asarray(values)
+        self._abcd[:, i, k] = np.asarray(values)
 
     @property
     def A(self):
