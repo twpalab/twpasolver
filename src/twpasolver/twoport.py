@@ -1,5 +1,10 @@
 """Twoport network module."""
 
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
 import numpy as np
 
 from twpasolver.abcd_matrices import ABCDArray
@@ -10,18 +15,20 @@ class TwoPortCell:
     """Class representing a two-port RF cell."""
 
     def __init__(
-        self, freqs: np.ndarray, abcd: np.ndarray | ABCDArray, Z0: float | int = 50
+        self, freqs: np.ndarray, abcd: np.ndarray | ABCDArray, Z0: complex | float = 50
     ):
         """
         Initialize the TwoPortCell instance.
 
         Parameters:
-        - freqs (np.ndarray): Frequencies of the network.
+        - freqs (numpy.ndarray): Frequencies of the network.
         - mat (numpy.ndarray): Input array of 2x2 matrices.
         - Z0 (float or int): Line impedance.
         """
         if not isinstance(abcd, ABCDArray):
             abcd = ABCDArray(abcd)
+        if freqs.shape[0] != abcd.shape[0]:
+            raise ValueError("Frequencies and abcd matrices must have same length.")
         self.abcd = abcd
         self.freqs = freqs
         self.Z0 = Z0
@@ -48,14 +55,14 @@ class TwoPortCell:
         self._freqs = np.asarray(freqs)
 
     @property
-    def Z0(self) -> float | int:
+    def Z0(self) -> complex | float:
         """Line impedance getter."""
         return self._Z0
 
     @Z0.setter
-    def Z0(self, value: float | int):
-        if value <= 0:
-            raise ValueError("Line impedance must be positive.")
+    def Z0(self, value: complex | float):
+        if np.real(value) <= 0:
+            raise ValueError("Resistive component of line impedance must be positive.")
         self._Z0 = value
 
     def get_s_par(self):
@@ -64,32 +71,27 @@ class TwoPortCell:
 
     def __repr__(self):
         """Return a string representation of the TwoPortCell."""
-        return f"{self.__class__.__name__}(freqs={self.freqs}, ABCD={self.abcd},Z0={self.Z0})"
-
-    def __matmul__(self, other: "TwoPortCell") -> "TwoPortCell":
-        """
-        Efficient matrix multiplication with another TwoPortCell.
-
-        Parameters:
-        - other (TwoPortCell): Another TwoPortCell for matrix multiplication.
-        """
-        if not np.allclose(self.freqs, other.freqs) or not np.isclose(
-            self.Z0, other.Z0
-        ):
-            raise ValueError("""Cells must have same frequencies and line impedance.""")
-        return self.__class__(self.freqs, self.abcd @ other.abcd, self.Z0)
-
-    def __pow__(self, exponent: int) -> "TwoPortCell":
-        """
-        Efficient matrix exponentiation of the TwoPortCell.
-
-        Parameters:
-        - exponent (int): The exponent to raise the TwoPortCell to.
-        """
-        return self.__class__(self.freqs, self.abcd**exponent, self.Z0)
+        return f"{self.__class__.__name__}(freqs={self.freqs},\nabcd={self.abcd},\nZ0={self.Z0})"
 
     def __getitem__(self, idxs):
         """Get slice of TwoPortCell."""
         if not isinstance(idxs, slice):
             raise ValueError("Only slicing of TwoPortCell is allowed")
         return self.__class__(self.freqs[idxs], self.abcd[idxs], self.Z0)
+
+
+@dataclass
+class TwoPortModel(ABC):
+    """Base class for models of two-port networks."""
+
+    def update(self, **kwargs) -> None:
+        """Update multiple attributes of the model."""
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise RuntimeError(f"The cell model does not have the {key} attribute.")
+
+    @abstractmethod
+    def get_abcd(self, freqs: np.ndarray) -> TwoPortCell:
+        """Compute the abcd matrix of the model."""

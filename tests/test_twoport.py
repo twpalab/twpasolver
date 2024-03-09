@@ -1,10 +1,27 @@
 """Tests for twoport module."""
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
 
 from twpasolver.abcd_matrices import ABCDArray
 from twpasolver.mathutils import s2a
-from twpasolver.twoport import TwoPortCell
+from twpasolver.twoport import TwoPortCell, TwoPortModel
+
+
+@dataclass
+class RandomModel(TwoPortModel):
+    """Generate random normal ABCD matrices."""
+
+    mu: float = 0
+    sigma: float = 1
+
+    def get_abcd(self, freqs: np.ndarray) -> TwoPortCell:
+        """Generate random abcd."""
+        return TwoPortCell(
+            freqs,
+            np.random.normal(loc=self.mu, scale=self.sigma, size=(len(freqs), 2, 2)),
+        )
 
 
 def test_init():
@@ -51,24 +68,6 @@ def test_freq_setter(twoport_cell):
         twoport_cell.freqs = np.array([[1], [2], [3]])
 
 
-def test_matmul(twoport_cell):
-    """Test TwoPortCell matrix multiplication."""
-    result_cell = twoport_cell @ twoport_cell
-    abcd_mat = np.asarray(twoport_cell.abcd)
-    expected_abcd = abcd_mat @ abcd_mat
-    assert np.allclose(np.asarray(result_cell.abcd), expected_abcd)
-    assert result_cell.Z0 == 50
-
-
-def test_pow(twoport_cell):
-    """Test TwoPortCell matrix exponentiation."""
-    result_cell = twoport_cell**2
-    abcd_mat = np.asarray(twoport_cell.abcd)
-    expected_abcd = abcd_mat @ abcd_mat
-    assert np.allclose(np.asarray(result_cell.abcd), expected_abcd)
-    assert result_cell.Z0 == 50
-
-
 def test_getitem():
     """Test TwoPortCell slicing."""
     freqs = np.array([1e9, 2e9, 3e9])
@@ -80,3 +79,23 @@ def test_getitem():
     assert np.array_equal(sliced_cell.freqs, freqs[1:])
     assert np.array_equal(sliced_cell.abcd, abcd_mat[1:])
     assert sliced_cell.Z0 == 50
+
+
+def test_model_update():
+    """Test generation of random cell from model."""
+    mod = RandomModel()
+    mod.update(mu=2, sigma=5)
+    assert mod.mu == 2
+    assert mod.sigma == 5
+    with pytest.raises(RuntimeError):
+        mod.update(Z0=10)
+
+
+def test_model_get_abcd():
+    """Test generation of random cell from model."""
+    mod = RandomModel()
+    f = np.arange(10, 20, 0.01)
+    cell = mod.get_abcd(f)
+    assert np.array_equal(cell.freqs, f)
+    assert np.isclose(np.mean(cell.abcd), mod.mu, atol=0.1)
+    assert np.isclose(np.std(cell.abcd), mod.sigma, atol=0.1)

@@ -55,10 +55,10 @@ def matpow_2x2(matrices_a: complex_array, exponent: int) -> complex_array:
 
 
 @nb.njit
-def a2s(abcd: complex_array, Z0: float) -> complex_array:
+def a2s(abcd: complex_array, Z0: complex | float) -> complex_array:
     """Convert list of ABCD matrices to list of S parameters."""
     assert abcd.shape[1] == 2 and abcd.shape[2] == 2
-    assert Z0 > 0
+    assert np.real(Z0) > 0
     n_mat = abcd.shape[0]
     spar_mat = np.empty((n_mat, 2, 2), dtype=np.complex128)
     for i in range(n_mat):
@@ -74,10 +74,10 @@ def a2s(abcd: complex_array, Z0: float) -> complex_array:
 
 
 @nb.njit
-def s2a(spar: complex_array, Z0: float) -> complex_array:
+def s2a(spar: complex_array, Z0: complex | float) -> complex_array:
     """Convert list of S parameters to list of ABCD matrices."""
     assert spar.shape[1] == 2 and spar.shape[2] == 2
-    assert Z0 > 0
+    assert np.real(Z0) > 0
     n_mat = spar.shape[0]
     abcd = np.empty((n_mat, 2, 2), dtype=np.complex128)
     for i in range(n_mat):
