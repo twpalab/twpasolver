@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 
 import numpy as np
+import skrf as rf
+from pydantic import BaseModel, ConfigDict
 
 from twpasolver.abcd_matrices import ABCDArray
 from twpasolver.mathutils import a2s, s2a
+from twpasolver.typing import Impedance
+
+# from dataclasses import dataclass
 
 
 class TwoPortCell:
@@ -65,6 +69,11 @@ class TwoPortCell:
             raise ValueError("Resistive component of line impedance must be positive.")
         self._Z0 = value
 
+    def to_rf(self):
+        """Convert to scikit-rf Network."""
+        f = rf.Frequency.from_f(self.freqs * 1e-9, "ghz")
+        return rf.Network(frequency=f, a=np.asarray(self.abcd))
+
     def get_s_par(self):
         """Return S-parameter matrix."""
         return a2s(np.asarray(self.abcd), self.Z0)
@@ -80,9 +89,11 @@ class TwoPortCell:
         return self.__class__(self.freqs[idxs], self.abcd[idxs], self.Z0)
 
 
-@dataclass
-class TwoPortModel(ABC):
+class TwoPortModel(BaseModel, ABC):
     """Base class for models of two-port networks."""
+
+    model_config = ConfigDict(validate_assignment=True, revalidate_instances="always")
+    Z0: Impedance = 50.0
 
     def update(self, **kwargs) -> None:
         """Update multiple attributes of the model."""
@@ -93,5 +104,13 @@ class TwoPortModel(ABC):
                 raise RuntimeError(f"The cell model does not have the {key} attribute.")
 
     @abstractmethod
-    def get_abcd(self, freqs: np.ndarray) -> TwoPortCell:
+    def get_abcd(self, freqs: np.ndarray) -> np.ndarray | ABCDArray:
         """Compute the abcd matrix of the model."""
+
+    def get_cell(self, freqs: np.ndarray) -> TwoPortCell:
+        """Return the two-port cell of the model."""
+        return TwoPortCell(freqs, self.get_abcd(freqs), Z0=self.Z0)
+
+    def get_network(self, freqs: np.ndarray) -> rf.Network:
+        """Return the two-port cell of the model as a scikit-rf Network."""
+        return self.get_cell(freqs).to_rf()
