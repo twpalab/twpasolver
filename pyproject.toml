@@ -48,5 +48,5 @@ sphinx-copybutton = "^0.5.1"
 sphinx-last-updated-by-git = "^0.3.5"
 
 [[tool.mypy.overrides]]
-module=["numba", "h5py", "skrf"]
+module=["numba.*", "h5pyi.*", "skrf"]
 ignore_missing_imports = true

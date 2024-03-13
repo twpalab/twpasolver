@@ -17,6 +17,14 @@ twpasolver.abcd\_matrices module
    :undoc-members:
    :show-inheritance:
 
+twpasolver.file\_utils module
+-----------------------------
+
+.. automodule:: twpasolver.file_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 twpasolver.mathutils module
 ---------------------------
 
@@ -25,10 +33,26 @@ twpasolver.mathutils module
    :undoc-members:
    :show-inheritance:
 
+twpasolver.models module
+------------------------
+
+.. automodule:: twpasolver.models
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 twpasolver.twoport module
 -------------------------
 
 .. automodule:: twpasolver.twoport
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+twpasolver.typing module
+------------------------
+
+.. automodule:: twpasolver.typing
    :members:
    :undoc-members:
    :show-inheritance:

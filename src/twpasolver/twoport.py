@@ -9,17 +9,16 @@ import skrf as rf
 from pydantic import BaseModel, ConfigDict
 
 from twpasolver.abcd_matrices import ABCDArray
+from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.mathutils import a2s, s2a
 from twpasolver.typing import Impedance
-
-# from dataclasses import dataclass
 
 
 class TwoPortCell:
     """Class representing a two-port RF cell."""
 
     def __init__(
-        self, freqs: np.ndarray, abcd: np.ndarray | ABCDArray, Z0: complex | float = 50
+        self, freqs: np.ndarray, abcd: np.ndarray | ABCDArray, Z0: Impedance = 50
     ):
         """
         Initialize the TwoPortCell instance.
@@ -42,6 +41,12 @@ class TwoPortCell:
         """Instantiate from array of S-parameters."""
         abcd_mat = s2a(s_mat, Z0)
         return cls(freqs, abcd_mat, Z0=Z0)
+
+    @classmethod
+    def from_file(cls, filename: str, writer="hdf5"):
+        """Load model from file."""
+        model_dict = read_file(filename, writer=writer)
+        return cls(model_dict["freqs"], model_dict["abcd"], model_dict["Z0"])
 
     @property
     def freqs(self) -> np.ndarray:
@@ -69,7 +74,7 @@ class TwoPortCell:
             raise ValueError("Resistive component of line impedance must be positive.")
         self._Z0 = value
 
-    def to_rf(self):
+    def to_network(self):
         """Convert to scikit-rf Network."""
         f = rf.Frequency.from_f(self.freqs * 1e-9, "ghz")
         return rf.Network(frequency=f, a=np.asarray(self.abcd))
@@ -88,12 +93,26 @@ class TwoPortCell:
             raise ValueError("Only slicing of TwoPortCell is allowed")
         return self.__class__(self.freqs[idxs], self.abcd[idxs], self.Z0)
 
+    def dump_to_file(self, filename: str, writer="hdf5"):
+        """Dump cell to file."""
+        model_dict = {"freqs": self.freqs, "abcd": np.asarray(self.abcd), "Z0": self.Z0}
+        save_to_file(filename, model_dict, writer=writer)
+
 
 class TwoPortModel(BaseModel, ABC):
     """Base class for models of two-port networks."""
 
-    model_config = ConfigDict(validate_assignment=True, revalidate_instances="always")
+    model_config = ConfigDict(
+        validate_assignment=True,
+        revalidate_instances="always",
+    )
     Z0: Impedance = 50.0
+
+    @classmethod
+    def from_file(cls, filename: str, writer="json"):
+        """Load model from file."""
+        model_dict = read_file(filename, writer=writer)
+        return cls(**model_dict)
 
     def update(self, **kwargs) -> None:
         """Update multiple attributes of the model."""
@@ -113,4 +132,9 @@ class TwoPortModel(BaseModel, ABC):
 
     def get_network(self, freqs: np.ndarray) -> rf.Network:
         """Return the two-port cell of the model as a scikit-rf Network."""
-        return self.get_cell(freqs).to_rf()
+        return self.get_cell(freqs).to_network()
+
+    def dump_to_file(self, filename: str, writer="json"):
+        """Dump model to file."""
+        model_dict = self.model_dump()
+        save_to_file(filename, model_dict, writer=writer)
