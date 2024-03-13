@@ -93,10 +93,13 @@ class TwoPortCell:
             raise ValueError("Only slicing of TwoPortCell is allowed")
         return self.__class__(self.freqs[idxs], self.abcd[idxs], self.Z0)
 
+    def as_dict(self):
+        """Return cell contents as dictionary."""
+        return {"freqs": self.freqs, "abcd": np.asarray(self.abcd), "Z0": self.Z0}
+
     def dump_to_file(self, filename: str, writer="hdf5"):
         """Dump cell to file."""
-        model_dict = {"freqs": self.freqs, "abcd": np.asarray(self.abcd), "Z0": self.Z0}
-        save_to_file(filename, model_dict, writer=writer)
+        save_to_file(filename, self.as_dict(), writer=writer)
 
 
 class TwoPortModel(BaseModel, ABC):
