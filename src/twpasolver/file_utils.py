@@ -85,20 +85,19 @@ def recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> None
     for key, item in d.items():
         key = str(key)
 
-        if isinstance(item, list):
-            item = np.array(item)
-
         if isinstance(item, dict):
             subgroup = f.create_group(key)
             recursively_save_dict_contents_to_group(subgroup, item)
         else:
-            dtype = (
-                h5py.special_dtype(vlen=str)
-                if isinstance(item, str)
-                else item.dtype
-                if isinstance(item, np.ndarray)
-                else type(item)
-            )
+            if isinstance(item, str):
+                dtype = h5py.special_dtype(vlen=str)
+            elif isinstance(item, list):
+                dtype = h5py.special_dtype(vlen=list)
+            elif isinstance(item, np.ndarray):
+                dtype = item.dtype
+            else:
+                dtype = type(item)
+            print(item, dtype)
             f.create_dataset(key, data=item, dtype=dtype)
 
 
@@ -118,12 +117,14 @@ def recursively_load_dict_contents_from_group(f: Group) -> Dict[str, Any]:
 class NpEncoder(json.JSONEncoder):
     """JSON encoder for handling NumPy types."""
 
-    def default(self, obj: Any) -> int | float | List[Any]:
+    def default(self, o: Any) -> int | float | List[Any] | str:
         """Return default encoding."""
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
+        if isinstance(o, np.integer):
+            return int(o)
+        if isinstance(o, np.floating):
+            return float(o)
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        if isinstance(o, np.complexfloating):
+            return str(o)
+        return json.JSONEncoder.default(self, o)

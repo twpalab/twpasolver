@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import skrf as rf
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, NonNegativeInt
 
 from twpasolver.abcd_matrices import ABCDArray
 from twpasolver.file_utils import read_file, save_to_file
@@ -109,12 +109,14 @@ class TwoPortModel(BaseModel, ABC):
         validate_assignment=True,
         revalidate_instances="always",
     )
+    name: str | None = None
     Z0: Impedance = 50.0
+    N: NonNegativeInt = 1
 
     @classmethod
-    def from_file(cls, filename: str, writer="json"):
+    def from_file(cls, filename: str):
         """Load model from file."""
-        model_dict = read_file(filename, writer=writer)
+        model_dict = read_file(filename, writer="json")
         return cls(**model_dict)
 
     def update(self, **kwargs) -> None:
@@ -126,8 +128,14 @@ class TwoPortModel(BaseModel, ABC):
                 raise RuntimeError(f"The cell model does not have the {key} attribute.")
 
     @abstractmethod
-    def get_abcd(self, freqs: np.ndarray) -> np.ndarray | ABCDArray:
+    def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
+        """Compute the abcd matrix of a single iteration of the model."""
+
+    def get_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute the abcd matrix of the model."""
+        if self.N == 1:
+            return self.single_abcd(freqs)
+        return self.single_abcd(freqs) ** self.N
 
     def get_cell(self, freqs: np.ndarray) -> TwoPortCell:
         """Return the two-port cell of the model."""
@@ -137,7 +145,7 @@ class TwoPortModel(BaseModel, ABC):
         """Return the two-port cell of the model as a scikit-rf Network."""
         return self.get_cell(freqs).to_network()
 
-    def dump_to_file(self, filename: str, writer="json"):
+    def dump_to_file(self, filename: str):
         """Dump model to file."""
         model_dict = self.model_dump()
-        save_to_file(filename, model_dict, writer=writer)
+        save_to_file(filename, model_dict, writer="json")

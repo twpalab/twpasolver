@@ -53,3 +53,4 @@ Impedance = Annotated[
 ]
 
 complex_array: TypeAlias = np.ndarray[Any, np.dtype[np.complex128]]
+float_array: TypeAlias = np.ndarray[Any, np.dtype[np.float64]]
