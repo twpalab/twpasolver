@@ -1,6 +1,6 @@
 """Models for TWPAS."""
 
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from pydantic import NonNegativeFloat
@@ -28,8 +28,8 @@ class StubBaseCell(TwoPortModel):
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute abcd matrix."""
-        stub_Y = self.n_stub * stub(freqs, self.Lf, self.C, 1)
-        stub_abcd = ABCDArray(parallel_admittance_abcd(stub_Y))
+        stub_Z = stub(freqs, self.Lf, self.C, 1)
+        stub_abcd = ABCDArray(parallel_admittance_abcd(self.n_stub / stub_Z))
         half_line_abcd = ABCDArray(series_impedance_abcd(inductance(freqs, self.L / 2)))
         return half_line_abcd @ stub_abcd @ half_line_abcd
 
@@ -50,6 +50,10 @@ class TWPA(TwoPortModel):
     """Simple model for TWPAs."""
 
     cells: List[LCLfBaseCell | StubBaseCell]
+    Istar: Optional[NonNegativeFloat] = None
+    Ic: Optional[NonNegativeFloat] = None
+    Ip0: Optional[NonNegativeFloat] = None
+    Is0: Optional[NonNegativeFloat] = None
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute abcd of supercell."""
