@@ -1,18 +1,23 @@
 """Type annotations module."""
+
 from typing import Any, Callable, TypeAlias
 
 import numpy as np
-from pydantic import GetJsonSchemaHandler, ValidationError
-from pydantic.functional_validators import AfterValidator
+from pydantic import GetJsonSchemaHandler
+from pydantic.functional_validators import BeforeValidator
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 from typing_extensions import Annotated
 
 
-def validate_impedance(Z: complex | float) -> complex | float:
+def validate_impedance(Z: complex | float | str) -> complex | float:
     """Validate impedance value."""
+    try:
+        Z = complex(Z)
+    except:
+        raise ValueError(f"Cannot convert {type(Z)} {Z} to complex number.")
     if np.real(Z) < 0:
-        raise ValidationError("Real part of impedance {Z} must be non-negative.")
+        raise ValueError("Real part of impedance {Z} must be non-negative.")
     return Z
 
 
@@ -49,7 +54,7 @@ class _Impedance2PydanticAnnotation:
 
 
 Impedance = Annotated[
-    complex | float, _Impedance2PydanticAnnotation, AfterValidator(validate_impedance)
+    complex | float, _Impedance2PydanticAnnotation, BeforeValidator(validate_impedance)
 ]
 
 complex_array: TypeAlias = np.ndarray[Any, np.dtype[np.complex128]]

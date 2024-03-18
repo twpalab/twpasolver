@@ -121,10 +121,12 @@ class NpEncoder(json.JSONEncoder):
         """Return default encoding."""
         if isinstance(o, np.integer):
             return int(o)
-        if isinstance(o, np.floating):
+        elif isinstance(o, np.floating):
             return float(o)
-        if isinstance(o, np.ndarray):
+        elif isinstance(o, np.ndarray):
             return o.tolist()
-        if isinstance(o, np.complexfloating):
+        elif isinstance(o, np.complexfloating):
+            return str(o)
+        elif isinstance(o, complex):
             return str(o)
         return json.JSONEncoder.default(self, o)
