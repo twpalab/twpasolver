@@ -106,8 +106,7 @@ class TwoPortModel(BaseModel, ABC):
     """Base class for models of two-port networks."""
 
     model_config = ConfigDict(
-        validate_assignment=True,
-        revalidate_instances="always",
+        validate_assignment=True, revalidate_instances="always", protected_namespaces=()
     )
     name: str | None = None
     Z0: Impedance = 50.0

@@ -6,6 +6,14 @@ twpasolver package
    :undoc-members:
    :show-inheritance:
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   twpasolver.models
+
 Submodules
 ----------
 
@@ -29,14 +37,6 @@ twpasolver.mathutils module
 ---------------------------
 
 .. automodule:: twpasolver.mathutils
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-twpasolver.models module
-------------------------
-
-.. automodule:: twpasolver.models
    :members:
    :undoc-members:
    :show-inheritance:

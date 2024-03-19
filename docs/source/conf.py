@@ -28,10 +28,14 @@ extensions = [
     "sphinx_copybutton",
     "sphinx.ext.viewcode",
     "sphinx_last_updated_by_git",
+    "sphinxcontrib.autodoc_pydantic",
 ]
 
 templates_path = ["_templates"]
 exclude_patterns = []
+# autodoc_pydantic_model_show_json = True
+autodoc_pydantic_model_show_config_summary = False
+autodoc_pydantic_model_show_fields_summary = False
 
 
 # -- Options for HTML output -------------------------------------------------
