@@ -1,4 +1,5 @@
 """Tests for twoport module."""
+
 import numpy as np
 import pytest
 
@@ -13,7 +14,7 @@ class RandomModel(TwoPortModel):
     mu: float = 0
     sigma: float = 1
 
-    def get_abcd(self, freqs: np.ndarray) -> ABCDArray:
+    def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Generate random abcd."""
         return ABCDArray(
             np.random.normal(loc=self.mu, scale=self.sigma, size=(len(freqs), 2, 2))
