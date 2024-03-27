@@ -6,12 +6,12 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import skrf as rf
-from pydantic import BaseModel, ConfigDict, NonNegativeInt
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt
 
 from twpasolver.abcd_matrices import ABCDArray
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.mathutils import a2s, s2a
-from twpasolver.typing import Impedance
+from twpasolver.typing import Impedance, validate_impedance
 
 
 class TwoPortCell:
@@ -26,7 +26,7 @@ class TwoPortCell:
         Parameters:
         - freqs (numpy.ndarray): Frequencies of the network.
         - mat (numpy.ndarray): Input array of 2x2 matrices.
-        - Z0 (float or int): Line impedance.
+        - Z0 (complex | float): Line impedance.
         """
         if not isinstance(abcd, ABCDArray):
             abcd = ABCDArray(abcd)
@@ -64,14 +64,13 @@ class TwoPortCell:
         self._freqs = np.asarray(freqs)
 
     @property
-    def Z0(self) -> complex | float:
+    def Z0(self) -> Impedance:
         """Line impedance getter."""
         return self._Z0
 
     @Z0.setter
-    def Z0(self, value: complex | float):
-        if np.real(value) <= 0:
-            raise ValueError("Resistive component of line impedance must be positive.")
+    def Z0(self, value: Impedance):
+        validate_impedance(value)
         self._Z0 = value
 
     def to_network(self):
@@ -108,9 +107,11 @@ class TwoPortModel(BaseModel, ABC):
     model_config = ConfigDict(
         validate_assignment=True, revalidate_instances="always", protected_namespaces=()
     )
-    name: str | None = None
-    Z0: Impedance = 50.0
-    N: NonNegativeInt = 1
+    name: str | None = Field(None, description="Name of the model.")
+    Z0: Impedance = Field(50.0, description="Line impedance of the two-port component.")
+    N: NonNegativeInt = Field(
+        1, description="Number of repetitions of the model in the computed abcd matrix."
+    )
 
     @classmethod
     def from_file(cls, filename: str):

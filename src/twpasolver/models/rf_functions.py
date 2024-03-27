@@ -1,6 +1,5 @@
 """Compiled functions for components impedance and abcd matrices."""
 
-
 import numpy as np
 from numba import njit
 
@@ -53,9 +52,7 @@ def series_impedance_abcd(Z: complex_array):
 
 @njit
 def lossless_line_abcd(
-    freqs: float_array,
-    C: float,
-    L: float,
+    freqs: float_array, C: float, L: float, l: float
 ) -> complex_array:
     """Get base abcd matrix of lossless line."""
     assert C >= 0
@@ -64,8 +61,7 @@ def lossless_line_abcd(
     n_mat = len(freqs)
     abcd = np.empty((n_mat, 2, 2), dtype=np.complex128)
     for i in range(n_mat):
-        w = 2 * np.pi * freqs[i]
-        beta = w * np.sqrt(L * C)
+        beta = 2 * np.pi * freqs[i] * np.sqrt(L * C) * l
         abcd[i, 0, 0] = np.cos(beta)
 
         abcd[i, 0, 1] = 1j * Z0 * np.sin(beta)

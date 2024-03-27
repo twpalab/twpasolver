@@ -52,7 +52,7 @@ def test_Z0_setter(twoport_cell):
     assert twoport_cell.Z0 == 75
 
     with pytest.raises(ValueError):
-        twoport_cell.Z0 = 0
+        twoport_cell.Z0 = -1.1
 
 
 def test_freq_setter(twoport_cell):
