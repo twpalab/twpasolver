@@ -1,5 +1,5 @@
 Welcome to twpasolver's documentation!
-=================================
+======================================
 
 .. toctree::
    :maxdepth: 2

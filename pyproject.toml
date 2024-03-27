@@ -15,6 +15,10 @@ classifiers = [
 python = ">=3.10, <3.13"
 numpy = ">=1.26"
 numba = ">=0.59.0"
+pydantic =">=2.6.3"
+scikit-rf=">=0.32.0"
+h5py = "^3.10.0"
+
 
 [build-system]
 requires = ["poetry-core"]
@@ -39,10 +43,10 @@ furo = "^2023.3.27"
 recommonmark = "^0.7.1"
 sphinxcontrib-bibtex = "^2.5.0"
 sphinx-markdown-tables = "^0.0.17"
-nbsphinx = "^0.9.1"
 sphinx-copybutton = "^0.5.1"
 sphinx-last-updated-by-git = "^0.3.5"
+autodoc_pydantic = ">=2.1.0"
 
 [[tool.mypy.overrides]]
-module=["numba"]
+module=["numba.*", "h5py.*", "skrf"]
 ignore_missing_imports = true

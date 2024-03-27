@@ -32,3 +32,15 @@ repos:
     rev: 6.3.0  # pick a git hash / tag to point to
     hooks:
       - id: pydocstyle
+  - repo: https://github.com/nbQA-dev/nbQA
+    rev: 1.7.1
+    hooks:
+     - id: nbqa-black
+     - id: nbqa-pyupgrade
+       additional_dependencies: [pyupgrade==2.7.3]
+     - id: nbqa-isort
+       additional_dependencies: [isort==5.6.4]
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.7.1
+    hooks:
+      - id: nbstripout

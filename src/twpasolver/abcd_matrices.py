@@ -1,4 +1,5 @@
 """ABCD matrices array module."""
+
 import numpy as np
 
 from twpasolver.mathutils import matmul_2x2, matpow_2x2
@@ -142,3 +143,8 @@ class ABCDArray:
     def D(self, value: np.ndarray):
         """Setter for the D parameter."""
         self._set_parameter(1, 1, value)
+
+
+def abcd_identity(N_abcd: int) -> ABCDArray:
+    """Get abcd array of identity matrices."""
+    return ABCDArray(np.array([[[1, 0], [0, 1]]] * N_abcd))
