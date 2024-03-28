@@ -1,10 +1,11 @@
 """Utility function for mathematic expressions."""
-from typing import Any, TypeAlias
+
+from typing import Tuple
 
 import numba as nb
 import numpy as np
 
-complex_array: TypeAlias = np.ndarray[Any, np.dtype[np.complex128]]
+from twpasolver.typing import complex_array, float_array
 
 
 @nb.njit
@@ -90,3 +91,46 @@ def s2a(spar: complex_array, Z0: complex | float) -> complex_array:
         abcd[i, 1, 0] = ((1 - S11) * (1 - S22) - S12 * S21) / (2 * S21) * 1 / Z0
         abcd[i, 1, 1] = ((1 - S11) * (1 + S22) + S12 * S21) / (2 * S21)
     return abcd
+
+
+@nb.njit
+def compute_phase_matching(
+    freqs: float_array,
+    pump_freqs: float_array,
+    k_signal_array: float_array,
+    k_pump_array: float_array,
+    chi: float,
+) -> Tuple[float_array, float_array, float_array]:
+    """Compute phase matching profile and triplets."""
+    num_freqs = len(freqs)
+    num_pumps = len(pump_freqs)
+
+    delta_k = np.empty(shape=(num_freqs, num_pumps))
+    freq_triplets = np.empty((num_pumps, 3))
+    k_triplets = np.empty((num_pumps, 3))
+
+    for i, p_f in enumerate(pump_freqs):
+        k_pump = k_pump_array[i]
+        k_idler = np.interp(p_f - freqs, freqs, k_signal_array)
+
+        deltas = (
+            k_pump
+            - k_signal_array
+            - k_idler
+            + chi * (k_pump - 2 * k_idler - 2 * k_signal_array)
+        )
+        delta_k[:, i] = deltas
+
+        half_pump_idx = np.searchsorted(freqs, p_f / 2)
+
+        max_delta_idx = np.argmax(deltas[:half_pump_idx])
+        min_k_idx = (
+            np.argmin(np.abs(deltas[max_delta_idx:half_pump_idx])) + max_delta_idx
+        )
+
+        freq_triplets[i] = np.array([p_f, freqs[min_k_idx], p_f - freqs[min_k_idx]])
+        k_triplets[i] = np.array(
+            [k_pump, k_signal_array[min_k_idx], k_idler[min_k_idx]]
+        )
+
+    return delta_k, freq_triplets, k_triplets
