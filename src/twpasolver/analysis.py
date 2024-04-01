@@ -14,6 +14,7 @@ from pydantic import (
     field_validator,
 )
 from scipy.integrate import solve_ivp
+from scipy.optimize import minimize
 
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.mathutils import (
@@ -30,6 +31,7 @@ def analysis_function(func):
     def wrapper(self, *args, **kwargs):
         self.update_base_data()
         function_name = func.__name__
+        logging.info(f"Running {function_name}")
         if function_name in self.data.keys():
             logging.warning(
                 f"Data for '{function_name}' output already present in analysis data, will be overwritten."
@@ -105,11 +107,13 @@ class TWPAnalysis(Analyzer):
 
     model_config = ConfigDict(validate_assignment=True)
     twpa: TWPA
-    _previous_state: Dict[str, Any] = PrivateAttr()
     freqs_arange: Tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat] = Field(
         frozen=True
     )
+    freqs_unit: Literal["Hz", "kHz", "MHz", "GHz"] = "GHz"
+    _previous_state: Dict[str, Any] = PrivateAttr()
     _allowed_functions = PrivateAttr(["phase_matching", "gain", "bandwidth"])
+    _unit_multipliers = PrivateAttr({"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9})
 
     @field_validator("twpa", mode="before", check_fields=True)
     @classmethod
@@ -130,9 +134,11 @@ class TWPAnalysis(Analyzer):
             or current_state != self._previous_state
         ):
             print("Computing base parameters.")
+            unit_multiplier = self._unit_multipliers[self.freqs_unit]
             freqs = np.arange(*self.freqs_arange)
-            cell = self.twpa.get_cell(freqs)
-            self.data.update(**cell.as_dict())
+            cell = self.twpa.get_cell(freqs * unit_multiplier)
+            self.data["freqs"] = freqs
+            self.data["abcd"] = cell.abcd
             self.data["S21"] = cell.get_s_par()[:, 1, 0]
             self.data["k"] = np.unwrap(np.angle(self.data["S21"])) / self.twpa.N_tot
             s21_db = np.log(np.abs(self.data["S21"]))
@@ -235,4 +241,47 @@ class TWPAnalysis(Analyzer):
             "gain": gains_arr,
             "gain_db": gains_db,
         }
-        # for pump.
+
+    @analysis_function
+    def bandwidth(
+        self,
+        signal_arange: Tuple[float, float, float],
+        gain_reduction: float = 3,
+        **gain_kwargs,
+    ):
+        """Compute frequency bandwidth."""
+        if gain_kwargs or "gain" not in self.data.keys():
+            self.gain(signal_arange, **gain_kwargs)
+        pump_freq = self.data["gain"]["pump_freq"]
+        gains_db = self.data["gain"]["gain_db"][:, -1]
+        signal_freqs = self.data["gain"]["signal_freqs"]
+        max_g_idx = np.argmax(gains_db)
+        max_g = gains_db[max_g_idx]
+        interp_fn = lambda x: np.abs(
+            np.interp(x, signal_freqs, gains_db) - max_g + gain_reduction
+        )
+        triplets = self.data["phase_matching"]["triplets"]["f"]
+        matched_triplet = triplets[np.searchsorted(triplets[:, 0], pump_freq)]
+        dx = signal_freqs[1] - signal_freqs[0]
+
+        root_left = minimize(
+            interp_fn,
+            matched_triplet[1] - dx,
+            method="Powell",
+            bounds=[(0, matched_triplet[1])],
+        )["x"][0]
+
+        root_right = minimize(
+            interp_fn,
+            matched_triplet[2] + dx,
+            method="Powell",
+            bounds=[(matched_triplet[2], pump_freq)],
+        )["x"][0]
+
+        return {
+            "pump_freq": pump_freq,
+            "signal_freqs": (root_left, root_right),
+            "bw": root_left + root_right,
+            "max_gain": max_g,
+            "reduced_gain": max_g - gain_reduction,
+        }
