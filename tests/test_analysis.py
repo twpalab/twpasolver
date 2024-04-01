@@ -28,6 +28,9 @@ class SimpleAnalyzer(Analyzer):
     def test_function(self, x):
         return x
 
+    def update_base_data(self):
+        pass
+
 
 @pytest.fixture
 def test_analyzer_class(analyzer_data):
@@ -62,6 +65,9 @@ def test_analyzer_dump_and_load_file(analyzer_data, tmpdir):
     assert analyzer == analyzer_from_file
 
 
-def test_analyzer_execute(test_analyzer_class):
-    test_analyzer_class.execute()
-    assert test_analyzer_class.data == {"test_function": 2}
+def test_analyzer_execute(analyzer_data):
+    executed_class = SimpleAnalyzer(**analyzer_data)
+    assert executed_class.data == {"test_function": 2}
+    analyzer_data["run"] = []
+    not_executed_class = SimpleAnalyzer(**analyzer_data)
+    assert not_executed_class.data == {}

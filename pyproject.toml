@@ -17,6 +17,7 @@ numpy = ">=1.26"
 numba = ">=0.59.0"
 pydantic =">=2.6.3"
 scikit-rf=">=0.32.0"
+scipy=">=1.12.0"
 h5py = "^3.10.0"
 
 
@@ -48,5 +49,5 @@ sphinx-last-updated-by-git = "^0.3.5"
 autodoc_pydantic = ">=2.1.0"
 
 [[tool.mypy.overrides]]
-module=["numba.*", "h5py.*", "skrf"]
+module=["numba.*", "h5py.*", "skrf", "scipy.*"]
 ignore_missing_imports = true

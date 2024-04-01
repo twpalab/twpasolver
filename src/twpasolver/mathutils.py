@@ -64,13 +64,14 @@ def a2s(abcd: complex_array, Z0: complex | float) -> complex_array:
     spar_mat = np.empty((n_mat, 2, 2), dtype=np.complex128)
     for i in range(n_mat):
         A = abcd[i, 0, 0]
-        B = abcd[i, 0, 1]
-        C = abcd[i, 1, 0]
+        BZ = abcd[i, 0, 1] / Z0
+        CZ = abcd[i, 1, 0] * Z0
         D = abcd[i, 1, 1]
-        spar_mat[i, 0, 0] = (A + B / Z0 - C * Z0 - D) / (A + B / Z0 + C * Z0 + D)
-        spar_mat[i, 0, 1] = 2.0 * (A * D - B * C) / (A + B / Z0 + C * Z0 + D)
-        spar_mat[i, 1, 0] = 2.0 / (A + B / Z0 + C * Z0 + D)
-        spar_mat[i, 1, 1] = (-A + B / Z0 - C * Z0 + D) / (A + B / Z0 + C * Z0 + D)
+        norm = A + BZ + CZ + D
+        spar_mat[i, 0, 0] = (A + BZ - CZ - D) / norm
+        spar_mat[i, 0, 1] = 2.0 * (A * D - BZ * CZ) / norm
+        spar_mat[i, 1, 0] = 2.0 / norm
+        spar_mat[i, 1, 1] = (-A + BZ - CZ + D) / norm
     return spar_mat
 
 
@@ -91,6 +92,12 @@ def s2a(spar: complex_array, Z0: complex | float) -> complex_array:
         abcd[i, 1, 0] = ((1 - S11) * (1 - S22) - S12 * S21) / (2 * S21) * 1 / Z0
         abcd[i, 1, 1] = ((1 - S11) * (1 + S22) + S12 * S21) / (2 * S21)
     return abcd
+
+
+@nb.njit
+def to_dB(values: float_array | complex_array):
+    """Convert array of values to dB."""
+    return np.log10(np.abs(values))
 
 
 @nb.njit
@@ -134,3 +141,84 @@ def compute_phase_matching(
         )
 
     return delta_k, freq_triplets, k_triplets
+
+
+@nb.njit
+def CMEode_complete(
+    t: float,
+    y: complex_array,
+    kp: float,
+    ks: float,
+    ki: float,
+    xi: float,
+    epsi: float,
+) -> complex_array:
+    """
+    Complete coupled mode equation model.
+
+    y[0] = Ip # pump current
+    y[1] = Is # signal current
+    y[2] = Ii # idler current
+    t    = x  #
+
+    Equations A5a, A5b and A5c from
+    PRX Quantum 2, 010302 (2021)
+    https://doi.org/10.1103/PRXQuantum.2.010302
+
+    """
+    dk = kp - ks - ki
+
+    a = 1j * epsi / 4
+    b = 1j * xi / 8
+
+    pp = abs(y[0]) ** 2 + 2 * abs(y[1]) ** 2 + 2 * abs(y[2]) ** 2
+    ss = 2 * abs(y[0]) ** 2 + abs(y[1]) ** 2 + 2 * abs(y[2]) ** 2
+    ii = 2 * abs(y[0]) ** 2 + 2 * abs(y[1]) ** 2 + abs(y[2]) ** 2
+
+    return np.array(
+        [
+            a * kp * y[1] * y[2] * np.exp(-1j * dk * t) + b * kp * y[0] * pp,
+            a * ks * y[0] * np.conj(y[2]) * np.exp(1j * dk * t) + b * ks * y[1] * ss,
+            a * ki * y[0] * np.conj(y[1]) * np.exp(1j * dk * t) + b * ki * y[2] * ii,
+        ],
+        dtype=np.complex128,
+    )
+
+
+@nb.njit
+def CMEode_undepleted(
+    t: float_array,
+    y: complex_array,
+    kp: float,
+    ks: float,
+    ki: float,
+    xi: float,
+    epsi: float,
+) -> complex_array:
+    """
+    Undepleted pump coupled mode equation model.
+
+    y[0] = Ip # pump current
+    y[1] = Is # signal current
+    y[2] = Ii # idler current
+    t    = x  #
+
+    undepleted pump: Ip~=Ip0
+
+    Equations A6a, A6b and A6c from
+    PRX Quantum 2, 010302 (2021)
+    https://doi.org/10.1103/PRXQuantum.2.010302
+
+    """
+    dk = kp - ks - ki
+
+    return np.array(
+        [
+            1j * xi * kp / 8 * abs(y[0]) ** 2 * y[0],
+            1j * epsi * ks / 4 * y[0] * np.conj(y[2]) * np.exp(1j * dk * t)
+            + 1j * xi * ks / 4 * abs(y[0]) ** 2 * y[1],
+            1j * epsi * ki / 4 * y[0] * np.conj(y[1]) * np.exp(1j * dk * t)
+            + 1j * xi * ki / 4 * abs(y[0]) ** 2 * y[2],
+        ],
+        dtype=np.complex128,
+    )

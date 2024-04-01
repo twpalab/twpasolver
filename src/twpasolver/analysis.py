@@ -1,9 +1,8 @@
 """Analysis classes."""
 
 import logging
-from abc import ABC
-from functools import cached_property
-from typing import Any, Dict, List, Optional, Tuple
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
 from pydantic import (
@@ -13,24 +12,27 @@ from pydantic import (
     NonNegativeFloat,
     PrivateAttr,
     field_validator,
-    model_validator,
 )
-from skrf import Network
+from scipy.integrate import solve_ivp
 
 from twpasolver.file_utils import read_file, save_to_file
-from twpasolver.mathutils import compute_phase_matching
-from twpasolver.models import TWPA
-from twpasolver.typing import float_array
+from twpasolver.mathutils import (
+    CMEode_complete,
+    CMEode_undepleted,
+    compute_phase_matching,
+)
+from twpasolver.models import TWPA, twpa
 
 
 def analysis_function(func):
     """Wrap functions for analysis."""
 
     def wrapper(self, *args, **kwargs):
+        self.update_base_data()
         function_name = func.__name__
         if function_name in self.data.keys():
             logging.warning(
-                "Data for {function_name} output already present in analysis data, will be overwritten."
+                f"Data for '{function_name}' output already present in analysis data, will be overwritten."
             )
         result = func(self, *args, **kwargs)
         self.data[function_name] = result
@@ -54,6 +56,15 @@ class Analyzer(BaseModel, ABC):
     run: List[ExecutionRequest] = Field(default_factory=list)
     _allowed_functions: List[str] = PrivateAttr(default_factory=list)
     data: Dict[str, Any] = Field(default_factory=dict, exclude=True)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Run analysis if list of ExecutionRequest is not empty."""
+        if self.run:
+            self.execute()
+
+    @abstractmethod
+    def update_base_data(self):
+        """Check and update base data of the class if necessary."""
 
     @classmethod
     def from_file(cls, filename: str):
@@ -85,15 +96,16 @@ class Analyzer(BaseModel, ABC):
             function = getattr(self, function_name)
             _ = function(**request.parameters)
 
-        # if self.data_file:
-        self.save_data()
+        if self.data_file:
+            self.save_data()
 
 
 class TWPAnalysis(Analyzer):
     """Runner for standard analysis routines for twpa models."""
 
     model_config = ConfigDict(validate_assignment=True)
-    twpa: TWPA = Field(frozen=True)
+    twpa: TWPA
+    _previous_state: Dict[str, Any] = PrivateAttr()
     freqs_arange: Tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat] = Field(
         frozen=True
     )
@@ -108,40 +120,119 @@ class TWPAnalysis(Analyzer):
                 twpa = TWPA.from_file(twpa)
             except:
                 raise ValueError("Input string mut be valid path to model file.")
-        return twpa
+        return twpa  # type: ignore[return-value]
 
-    @model_validator(mode="after")
     def update_base_data(self):
         """Update data from twpa model."""
-        freqs = np.arange(*self.freqs_arange)
-        cell = self.twpa.get_cell(freqs)
-        self.data.update(**cell.as_dict())
-        self.data["S21"] = cell.get_s_par()[:, 1, 0]
-        self.data["k"] = np.unwrap(np.angle(self.data["S21"])) / self.twpa.N_tot
-        return self
-
-    @cached_property
-    def network(self) -> Network:
-        """Network object of model."""
-        return self.twpa.get_network(np.arange(*self.freqs_arange))
+        current_state = self.model_dump()
+        if (
+            not hasattr(self, "_previous_state")
+            or current_state != self._previous_state
+        ):
+            print("Computing base parameters.")
+            freqs = np.arange(*self.freqs_arange)
+            cell = self.twpa.get_cell(freqs)
+            self.data.update(**cell.as_dict())
+            self.data["S21"] = cell.get_s_par()[:, 1, 0]
+            self.data["k"] = np.unwrap(np.angle(self.data["S21"])) / self.twpa.N_tot
+            s21_db = np.log(np.abs(self.data["S21"]))
+            s21_db_diff = s21_db[1:] - s21_db[:-1]
+            self.data["stopband_freqs"] = (
+                freqs[np.argmin(s21_db_diff)],
+                freqs[np.argmax(s21_db_diff)],
+            )
+            self._previous_state = current_state
 
     @analysis_function
-    def phase_matching(self, min_pump_f, max_pump_f) -> Dict[str, float_array]:
+    def phase_matching(self) -> Dict[str, Any]:
         """Build phase matching graph and triplets."""
         freqs = self.data["freqs"]
         ks = self.data["k"]
-        min_p_idx = np.searchsorted(freqs, min_pump_f)
-        max_p_idx = np.searchsorted(freqs, max_pump_f)
-        signal_f = freqs[:min_p_idx]
-        signal_k = ks[:min_p_idx]
+        min_p_idx = np.where(freqs == self.data["stopband_freqs"][1])[0][0]
+        max_p_idx = -1
+        min_s_idx = np.where(freqs == self.data["stopband_freqs"][0])[0][0]
+        print(min_s_idx, min_p_idx)
+        signal_f = freqs[:min_s_idx]
+        signal_k = ks[:min_s_idx]
         pump_f = freqs[min_p_idx:max_p_idx]
         pump_k = ks[min_p_idx:max_p_idx]
         print(min_p_idx, max_p_idx)
         deltas, f_triplets, k_triplets = compute_phase_matching(
             signal_f, pump_f, signal_k, pump_k, self.twpa.chi
         )
-        return {"delta": deltas, "f_trip": f_triplets, "k_trip": k_triplets}
+        optimal_pump_idx = np.argmin(f_triplets[1:, 1] - f_triplets[:-1, 1])
+        return {
+            "delta": deltas,
+            "triplets": {"f": f_triplets, "k": k_triplets},
+            "pump_freqs": pump_f,
+            "signal_freqs": signal_f,
+            "optimal_pump_freq": f_triplets[optimal_pump_idx, 0],
+        }
 
-    def gain(self):
+    @analysis_function
+    def gain(
+        self,
+        signal_arange: Tuple[float, float, float],
+        pump: Optional[float] = None,
+        model: Literal["complete", "undepleted"] = "complete",
+        Is0: float = 1e-6,
+    ):
         """Compute expected gain."""
-        pass
+        if pump is None:
+            if "phase_matching" not in self.data.keys():
+                self.phase_matching()
+            pump = self.data["phase_matching"]["optimal_pump_freq"]
+        freqs = self.data["freqs"]
+        ks = self.data["k"]
+        signal_freqs = np.arange(*signal_arange)
+        idler_freqs = pump - signal_freqs
+        pump_k = np.interp(pump, freqs, ks)
+        signal_k = np.interp(signal_freqs, freqs, ks)
+        idler_k = np.interp(idler_freqs, freqs, ks)
+        N_tot = self.twpa.N_tot
+        x_span = (0, N_tot)
+        x = np.linspace(0, N_tot, N_tot + 1)
+        y0 = np.array([self.twpa.Ip0, Is0, 0], dtype=np.complex128)
+        model_func = {"complete": CMEode_complete, "undepleted": CMEode_undepleted}.get(
+            model, "complete"
+        )
+        gains = []
+        Iss = []
+        Iis = []
+        Ips = []
+        xs = 0
+        for i, _ in enumerate(signal_freqs):
+            sol = solve_ivp(
+                model_func,
+                x_span,
+                y0,
+                args=(
+                    pump_k,
+                    signal_k[i],
+                    idler_k[i],
+                    self.twpa.xi,
+                    self.twpa.epsilon,
+                ),
+                t_eval=x,
+                method="RK45",
+                first_step=1,
+                max_step=1000,
+            )
+            xs, Ip, Is, Ii = sol.t, sol.y[0, :], sol.y[1, :], sol.y[2, :]
+            gains.append(np.abs(Is / complex(Is0)) ** 2)
+            Ips.append(Ip)
+            Iss.append(Is)
+            Iis.append(Ii)
+        gains_arr = np.asarray(gains)
+        gains_db = 10 * np.log10(gains_arr)
+        return {
+            "pump_freq": pump,
+            "signal_freqs": signal_freqs,
+            "x": np.asarray(xs),
+            "Ip": np.array(Ips),
+            "Ii": np.array(Iss),
+            "Ii": np.array(Iis),
+            "gain": gains_arr,
+            "gain_db": gains_db,
+        }
+        # for pump.
