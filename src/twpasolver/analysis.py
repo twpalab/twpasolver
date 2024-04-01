@@ -85,21 +85,21 @@ class Analyzer(BaseModel, ABC):
             function = getattr(self, function_name)
             _ = function(**request.parameters)
 
-        if self.data_file:
-            self.save_data()
+        # if self.data_file:
+        self.save_data()
 
 
 class TWPAnalysis(Analyzer):
     """Runner for standard analysis routines for twpa models."""
 
-    # model_config = ConfigDict(ignored_types=[Network])
+    model_config = ConfigDict(validate_assignment=True)
     twpa: TWPA = Field(frozen=True)
     freqs_arange: Tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat] = Field(
         frozen=True
     )
     _allowed_functions = PrivateAttr(["phase_matching", "gain", "bandwidth"])
 
-    @field_validator("twpa", mode="before")
+    @field_validator("twpa", mode="before", check_fields=True)
     @classmethod
     def load_model_from_file(cls, twpa: str | TWPA) -> TWPA:
         """Try loading twpa model from file."""

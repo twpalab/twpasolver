@@ -1,4 +1,6 @@
 """Definition of shared fixtures."""
+
+
 import numpy as np
 import pytest
 
