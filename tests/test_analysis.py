@@ -1,7 +1,13 @@
+import numpy as np
 import pytest
 from pydantic import PrivateAttr
 
-from twpasolver.analysis import Analyzer, ExecutionRequest, analysis_function
+from twpasolver.analysis import (
+    Analyzer,
+    ExecutionRequest,
+    TWPAnalysis,
+    analysis_function,
+)
 from twpasolver.file_utils import read_file
 
 
@@ -9,7 +15,7 @@ from twpasolver.file_utils import read_file
 def execution_request_data():
     return {
         "name": "test_function",
-        "parameters": {"x": 2},
+        "kwargs": {"x": 2},
     }
 
 
@@ -33,27 +39,32 @@ class SimpleAnalyzer(Analyzer):
 
 
 @pytest.fixture
-def test_analyzer_class(analyzer_data):
+def analyzer_instance(analyzer_data):
     return SimpleAnalyzer(**analyzer_data)
+
+
+@pytest.fixture
+def twpanalysis_instance(twpa_model):
+    return TWPAnalysis(twpa=twpa_model, freqs_arange=(0, 9, 1e-3))
 
 
 def test_execution_request(execution_request_data):
     request = ExecutionRequest(**execution_request_data)
     assert request.name == "test_function"
-    assert request.parameters == {"x": 2}
+    assert request.kwargs == {"x": 2}
 
 
-def test_analysis_function(test_analyzer_class):
-    test_instance = test_analyzer_class
+def test_analysis_function(analyzer_instance):
+    test_instance = analyzer_instance
     assert test_instance.test_function(2) == 2
     assert test_instance.data == {"test_function": 2}
 
 
-def test_analyzer_save_data(test_analyzer_class):
+def test_analyzer_save_data(analyzer_instance):
     writer = "hdf5"
-    _ = test_analyzer_class.test_function(2)
-    test_analyzer_class.save_data(writer=writer)
-    data = read_file(test_analyzer_class.data_file, writer=writer)
+    _ = analyzer_instance.test_function(2)
+    analyzer_instance.save_data(writer=writer)
+    data = read_file(analyzer_instance.data_file, writer=writer)
     assert data == {"test_function": 2}
 
 
@@ -71,3 +82,19 @@ def test_analyzer_execute(analyzer_data):
     analyzer_data["run"] = []
     not_executed_class = SimpleAnalyzer(**analyzer_data)
     assert not_executed_class.data == {}
+
+
+def test_analyzer_parameter_sweep(analyzer_instance):
+    x_sweep = np.arange(0, 10, 1)
+    analyzer_instance.data = {}
+    _ = analyzer_instance.parameter_sweep("test_function", "x", x_sweep)
+    assert "test_function" not in analyzer_instance.data.keys()
+    assert "test_function_sweep" in analyzer_instance.data.keys()
+    assert all(
+        np.array(list(analyzer_instance.data["test_function_sweep"]["x"].keys()))
+        == x_sweep
+    )
+    assert all(
+        np.array(list(analyzer_instance.data["test_function_sweep"]["x"].values()))
+        == x_sweep
+    )

@@ -22,7 +22,7 @@ from twpasolver.mathutils import (
     CMEode_undepleted,
     compute_phase_matching,
 )
-from twpasolver.models import TWPA, twpa
+from twpasolver.models import TWPA
 
 
 def analysis_function(
@@ -30,18 +30,19 @@ def analysis_function(
 ):
     """Wrap functions for analysis."""
 
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self, *args, save=True, **kwargs):
         self.update_base_data()
         function_name = func.__name__
+        if function_name == "parameter_sweep":
+            function_name = args[0] + "_sweep"
         log.info(f"Running {function_name}")
-        if function_name in self.data.keys():
-            log.info(
-                f"Data for '{function_name}' output already present in analysis data, will be overwritten."
-            )
         result = func(self, *args, **kwargs)
-        self.data[function_name] = result
-        self.data[function_name]["args"] = args
-        self.data[function_name]["kwargs"] = kwargs
+        if save:
+            if function_name in self.data.keys():
+                log.info(
+                    f"Data for '{function_name}' output already present in analysis data, will be overwritten."
+                )
+            self.data[function_name] = result
         return result
 
     return wrapper
@@ -52,7 +53,8 @@ class ExecutionRequest(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str
-    parameters: Optional[Dict[str, Any]]
+    args: List[Any] = Field(default_factory=list)
+    kwargs: Dict[str, Any] = Field(default_factory=dict)
 
 
 class Analyzer(BaseModel, ABC):
@@ -100,10 +102,22 @@ class Analyzer(BaseModel, ABC):
                     f"Function '{function_name}' is not supported, choose between {self._allowed_functions}."
                 )
             function = getattr(self, function_name)
-            _ = function(**request.parameters)
+            _ = function(*request.args, **request.kwargs)
 
         if self.data_file:
             self.save_data()
+
+    @analysis_function
+    def parameter_sweep(
+        self, function: str, target: str, values: List, *args, **kwargs
+    ):
+        """Run an analysis function multiple times for different values of a parameter."""
+        results = {}
+        for value in values:
+            fn = getattr(self, function)
+            kwargs.update({target: value})
+            results[value] = fn(*args, save=False, **kwargs)
+        return {target: results}
 
 
 class TWPAnalysis(Analyzer):
@@ -264,7 +278,6 @@ class TWPAnalysis(Analyzer):
         )
         triplets = self.data["phase_matching"]["triplets"]["f"]
         matched_triplet = triplets[np.searchsorted(triplets[:, 0], pump_freq)]
-        dx = signal_freqs[1] - signal_freqs[0]
 
         root_left = minimize(
             interp_fn,
@@ -290,15 +303,3 @@ class TWPAnalysis(Analyzer):
                 gains_db[(signal_freqs >= root_left) & (signal_freqs <= root_right)]
             ),
         }
-
-    @analysis_function
-    def parameter_sweep(
-        self, function: str, target: str, values: List, *args, **kwargs
-    ):
-        """Run an analysis function multiple times for different values of a parameter."""
-        results = {}
-        for value in values:
-            fn = getattr(self, function)
-            kwargs.update({target: value})
-            results[value] = fn(*args, **kwargs)
-        return {target: results}
