@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
+from CyRK import nbrk_ode
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -198,6 +199,7 @@ class TWPAnalysis(Analyzer):
         pump: Optional[float] = None,
         model: Literal["complete", "undepleted"] = "complete",
         Is0: float = 1e-6,
+        scipy: bool = False,
     ):
         """Compute expected gain."""
         if pump is None:
@@ -224,23 +226,43 @@ class TWPAnalysis(Analyzer):
         Ips = []
         xs = 0
         for i, _ in enumerate(signal_freqs):
-            sol = solve_ivp(
-                model_func,
-                x_span,
-                y0,
-                args=(
-                    pump_k,
-                    signal_k[i],
-                    idler_k[i],
-                    self.twpa.xi,
-                    self.twpa.epsilon,
-                ),
-                t_eval=x,
-                method="RK45",
-                first_step=1,
-                max_step=1000,
-            )
-            xs, Ip, Is, Ii = sol.t, sol.y[0, :], sol.y[1, :], sol.y[2, :]
+            if scipy:
+                sol = solve_ivp(
+                    model_func,
+                    x_span,
+                    y0,
+                    args=(
+                        pump_k,
+                        signal_k[i],
+                        idler_k[i],
+                        self.twpa.xi,
+                        self.twpa.epsilon,
+                    ),
+                    t_eval=x,
+                    method="RK45",
+                    first_step=1,
+                    max_step=1000,
+                )
+                xs, Ip, Is, Ii = sol.t, sol.y[0, :], sol.y[1, :], sol.y[2, :]
+            else:
+                xs, y_sol, _, _ = nbrk_ode(
+                    model_func,
+                    x_span,
+                    y0,
+                    args=(
+                        pump_k,
+                        signal_k[i],
+                        idler_k[i],
+                        self.twpa.xi,
+                        self.twpa.epsilon,
+                    ),
+                    atol=1e-16,
+                    max_num_steps=1000,
+                    first_step=1,
+                    t_eval=x,
+                    rk_method=1,
+                )
+                Ip, Is, Ii = y_sol[0, :], y_sol[1, :], y_sol[2, :]
             gains.append(np.abs(Is / complex(Is0)) ** 2)
             Ips.append(Ip)
             Iss.append(Is)

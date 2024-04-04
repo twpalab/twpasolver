@@ -171,18 +171,23 @@ def CMEode_complete(
     a = 1j * epsi / 4
     b = 1j * xi / 8
 
-    pp = abs(y[0]) ** 2 + 2 * abs(y[1]) ** 2 + 2 * abs(y[2]) ** 2
-    ss = 2 * abs(y[0]) ** 2 + abs(y[1]) ** 2 + 2 * abs(y[2]) ** 2
-    ii = 2 * abs(y[0]) ** 2 + 2 * abs(y[1]) ** 2 + abs(y[2]) ** 2
+    # Compute the magnitudes of currents
+    abs_y0_sq = abs(y[0]) ** 2
+    abs_y1_sq = abs(y[1]) ** 2
+    abs_y2_sq = abs(y[2]) ** 2
 
-    return np.array(
-        [
-            a * kp * y[1] * y[2] * np.exp(-1j * dk * t) + b * kp * y[0] * pp,
-            a * ks * y[0] * np.conj(y[2]) * np.exp(1j * dk * t) + b * ks * y[1] * ss,
-            a * ki * y[0] * np.conj(y[1]) * np.exp(1j * dk * t) + b * ki * y[2] * ii,
-        ],
-        dtype=np.complex128,
-    )
+    # Compute intermediate values
+    pp = abs_y0_sq + 2 * abs_y1_sq + 2 * abs_y2_sq
+    ss = 2 * abs_y0_sq + abs_y1_sq + 2 * abs_y2_sq
+    ii = 2 * abs_y0_sq + 2 * abs_y1_sq + abs_y2_sq
+
+    # Compute derivatives
+    derivs = np.empty(3, dtype=np.complex128)
+    derivs[0] = a * kp * y[1] * y[2] * np.exp(-1j * dk * t) + b * kp * y[0] * pp
+    derivs[1] = a * ks * y[0] * np.conj(y[2]) * np.exp(1j * dk * t) + b * ks * y[1] * ss
+    derivs[2] = a * ki * y[0] * np.conj(y[1]) * np.exp(1j * dk * t) + b * ki * y[2] * ii
+
+    return derivs
 
 
 @nb.njit
@@ -221,4 +226,94 @@ def CMEode_undepleted(
             + 1j * xi * ki / 4 * abs(y[0]) ** 2 * y[2],
         ],
         dtype=np.complex128,
+    )
+
+
+@nb.njit
+def CMEode_complete_explicit(
+    t: float,
+    y: float_array,
+    kp: float,
+    ks: float,
+    ki: float,
+    xi: float,
+    epsi: float,
+) -> float_array:
+    """
+    Complete coupled mode equation model.
+
+    y[0] = Ip # pump current
+    y[1] = Is # signal current
+    y[2] = Ii # idler current
+    t    = x  #
+
+    Equations A5a, A5b and A5c from
+    PRX Quantum 2, 010302 (2021)
+    https://doi.org/10.1103/PRXQuantum.2.010302
+
+    """
+    dk = kp - ks - ki
+
+    a_real = epsi / 4
+    a_imag = xi / 8
+
+    # Extract real and imaginary parts of y
+    Ip_real, Is_real, Ii_real = y[:3]
+    Ip_imag, Is_imag, Ii_imag = y[3:]
+
+    # Compute magnitudes of currents
+    abs_Ip_sq = Ip_real**2 + Ip_imag**2
+    abs_Is_sq = Is_real**2 + Is_imag**2
+    abs_Ii_sq = Ii_real**2 + Ii_imag**2
+
+    # Compute intermediate values
+    pp = abs_Ip_sq + 2 * abs_Is_sq + 2 * abs_Ii_sq
+    ss = 2 * abs_Ip_sq + abs_Is_sq + 2 * abs_Ii_sq
+    ii = 2 * abs_Ip_sq + 2 * abs_Is_sq + abs_Ii_sq
+
+    # Compute derivatives
+    dIp_dt_real = (
+        a_real * kp * (Is_real * Ii_real + Is_imag * Ii_imag) * np.cos(-dk * t)
+        - a_imag * kp * (Is_real * Ii_imag - Is_imag * Ii_real) * np.sin(-dk * t)
+        + a_real * xi * Ip_real * pp
+        - a_imag * xi * Ip_imag * pp
+    )
+
+    dIp_dt_imag = (
+        a_real * kp * (Is_real * Ii_imag - Is_imag * Ii_real) * np.cos(-dk * t)
+        + a_imag * kp * (Is_real * Ii_real + Is_imag * Ii_imag) * np.sin(-dk * t)
+        + a_real * xi * Ip_imag * pp
+        + a_imag * xi * Ip_real * pp
+    )
+
+    dIs_dt_real = (
+        a_real * ks * (Ip_real * Ii_imag - Ip_imag * Ii_real) * np.cos(dk * t)
+        - a_imag * ks * (Ip_real * Ii_real + Ip_imag * Ii_imag) * np.sin(dk * t)
+        + a_real * xi * Is_real * ss
+        - a_imag * xi * Is_imag * ss
+    )
+
+    dIs_dt_imag = (
+        a_real * ks * (Ip_real * Ii_real + Ip_imag * Ii_imag) * np.cos(dk * t)
+        + a_imag * ks * (Ip_real * Ii_imag - Ip_imag * Ii_real) * np.sin(dk * t)
+        + a_real * xi * Is_imag * ss
+        + a_imag * xi * Is_real * ss
+    )
+
+    dIi_dt_real = (
+        a_real * ki * (Ip_real * Is_imag - Ip_imag * Is_real) * np.cos(dk * t)
+        - a_imag * ki * (Ip_real * Is_real + Ip_imag * Is_imag) * np.sin(dk * t)
+        + a_real * xi * Ii_real * ii
+        - a_imag * xi * Ii_imag * ii
+    )
+
+    dIi_dt_imag = (
+        a_real * ki * (Ip_real * Is_real + Ip_imag * Is_imag) * np.cos(dk * t)
+        + a_imag * ki * (Ip_real * Is_imag - Ip_imag * Is_real) * np.sin(dk * t)
+        + a_real * xi * Ii_imag * ii
+        + a_imag * xi * Ii_real * ii
+    )
+
+    return np.array(
+        [dIp_dt_real, dIs_dt_real, dIi_dt_real, dIp_dt_imag, dIs_dt_imag, dIi_dt_imag]
     )
