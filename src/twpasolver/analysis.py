@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
-from CyRK import nbrk_ode
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -13,16 +12,11 @@ from pydantic import (
     PrivateAttr,
     field_validator,
 )
-from scipy.integrate import solve_ivp
 from scipy.optimize import minimize
 
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.logging import log
-from twpasolver.mathutils import (
-    CMEode_complete,
-    CMEode_undepleted,
-    compute_phase_matching,
-)
+from twpasolver.mathutils import cme_solve, compute_phase_matching
 from twpasolver.models import TWPA
 
 
@@ -166,7 +160,20 @@ class TWPAnalysis(Analyzer):
                 freqs[np.argmin(s21_db_diff)],
                 freqs[np.argmax(s21_db_diff)],
             )
+            self.data["optimal_pump_freq"] = self.estimate_optimal_pump()
             self._previous_state = current_state
+
+    def estimate_optimal_pump(self):
+        """Estimate optimal pump frequency."""
+        freqs = self.data["freqs"]
+        ks = self.data["k"]
+        min_p_idx = np.where(freqs == self.data["stopband_freqs"][1])[0][0]
+        pump_f = freqs[min_p_idx:-1]
+        pump_k = ks[min_p_idx:-1]
+        signal_f = pump_f / 2
+        signal_k = np.interp(signal_f, freqs, ks)
+        deltas = np.abs(pump_k - 2 * signal_k + self.twpa.chi * (pump_k - 4 * signal_k))
+        return pump_f[np.argmin(deltas)]
 
     @analysis_function
     def phase_matching(self) -> Dict[str, Any]:
@@ -197,15 +204,14 @@ class TWPAnalysis(Analyzer):
         self,
         signal_arange: Tuple[float, float, float],
         pump: Optional[float] = None,
-        model: Literal["complete", "undepleted"] = "complete",
         Is0: float = 1e-6,
-        scipy: bool = False,
     ):
         """Compute expected gain."""
         if pump is None:
-            if "phase_matching" not in self.data.keys():
-                self.phase_matching()
-            pump = self.data["phase_matching"]["optimal_pump_freq"]
+            # if "phase_matching" not in self.data.keys():
+            #     self.phase_matching()
+            # pump = self.data["phase_matching"]["optimal_pump_freq"]
+            pump = self.data["optimal_pump_freq"]
         freqs = self.data["freqs"]
         ks = self.data["k"]
         signal_freqs = np.arange(*signal_arange)
@@ -214,69 +220,21 @@ class TWPAnalysis(Analyzer):
         signal_k = np.interp(signal_freqs, freqs, ks)
         idler_k = np.interp(idler_freqs, freqs, ks)
         N_tot = self.twpa.N_tot
-        x_span = (0, N_tot)
         x = np.linspace(0, N_tot, N_tot + 1)
         y0 = np.array([self.twpa.Ip0, Is0, 0], dtype=np.complex128)
-        model_func = {"complete": CMEode_complete, "undepleted": CMEode_undepleted}.get(
-            model, "complete"
+
+        I_triplets = cme_solve(
+            signal_k, idler_k, x, y0, pump_k, self.twpa.xi, self.twpa.epsilon
         )
-        gains = []
-        Iss = []
-        Iis = []
-        Ips = []
-        xs = 0
-        for i, _ in enumerate(signal_freqs):
-            if scipy:
-                sol = solve_ivp(
-                    model_func,
-                    x_span,
-                    y0,
-                    args=(
-                        pump_k,
-                        signal_k[i],
-                        idler_k[i],
-                        self.twpa.xi,
-                        self.twpa.epsilon,
-                    ),
-                    t_eval=x,
-                    method="RK45",
-                    first_step=1,
-                    max_step=1000,
-                )
-                xs, Ip, Is, Ii = sol.t, sol.y[0, :], sol.y[1, :], sol.y[2, :]
-            else:
-                xs, y_sol, _, _ = nbrk_ode(
-                    model_func,
-                    x_span,
-                    y0,
-                    args=(
-                        pump_k,
-                        signal_k[i],
-                        idler_k[i],
-                        self.twpa.xi,
-                        self.twpa.epsilon,
-                    ),
-                    atol=1e-16,
-                    max_num_steps=1000,
-                    first_step=1,
-                    t_eval=x,
-                    rk_method=1,
-                )
-                Ip, Is, Ii = y_sol[0, :], y_sol[1, :], y_sol[2, :]
-            gains.append(np.abs(Is / complex(Is0)) ** 2)
-            Ips.append(Ip)
-            Iss.append(Is)
-            Iis.append(Ii)
-        gains_arr = np.asarray(gains)
-        gains_db = 10 * np.log10(gains_arr)
+        gains = np.abs(I_triplets[:, 1, :] / y0[1]) ** 2
+        gains_db = 10 * np.log10(gains)
+
         return {
             "pump_freq": pump,
             "signal_freqs": signal_freqs,
-            "x": np.asarray(xs),
-            "Ip": np.array(Ips),
-            "Ii": np.array(Iss),
-            "Ii": np.array(Iis),
-            "gain": gains_arr,
+            "x": x,
+            "I_triplets": I_triplets,
+            "gain": gains,
             "gain_db": gains_db,
         }
 

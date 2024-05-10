@@ -4,8 +4,13 @@ from typing import Tuple
 
 import numba as nb
 import numpy as np
+from CyRK import nbrk_ode
 
 from twpasolver.typing import complex_array, float_array
+
+nb_complex3d = nb.complex128[:, :, :]
+nb_complex1d = nb.complex128[:]
+nb_float1d = nb.float64[:]
 
 
 @nb.njit
@@ -101,6 +106,20 @@ def to_dB(values: float_array | complex_array):
 
 
 @nb.njit
+def dBm_to_I(power: float, Z0: float = 50):
+    """Convert from dBm to A."""
+    pw = 10 ** (power / 10) / 1000  # power in W
+    return np.sqrt(pw / Z0 * 2)  # current amplitude, in A
+
+
+@nb.njit
+def I_to_dBm(curr: float, Z0: float = 50):
+    """Convert from A to dBm."""
+    pw = curr**2 / 2 * Z0
+    return 10 * np.log10(pw * 1000)
+
+
+@nb.njit(parallel=True)
 def compute_phase_matching(
     freqs: float_array,
     pump_freqs: float_array,
@@ -116,7 +135,8 @@ def compute_phase_matching(
     freq_triplets = np.empty((num_pumps, 3))
     k_triplets = np.empty((num_pumps, 3))
 
-    for i, p_f in enumerate(pump_freqs):
+    for i in nb.prange(num_pumps):
+        p_f = pump_freqs[i]
         k_pump = k_pump_array[i]
         k_idler = np.interp(p_f - freqs, freqs, k_signal_array)
 
@@ -143,7 +163,17 @@ def compute_phase_matching(
     return delta_k, freq_triplets, k_triplets
 
 
-@nb.njit
+@nb.njit(
+    nb_complex1d(
+        nb.float32,
+        nb_complex1d,
+        nb.float32,
+        nb.float32,
+        nb.float32,
+        nb.float32,
+        nb.float32,
+    )
+)
 def CMEode_complete(
     t: float,
     y: complex_array,
@@ -190,130 +220,50 @@ def CMEode_complete(
     return derivs
 
 
-@nb.njit
-def CMEode_undepleted(
-    t: float_array,
-    y: complex_array,
-    kp: float,
-    ks: float,
-    ki: float,
+@nb.njit(
+    nb_complex3d(
+        nb_float1d,
+        nb_float1d,
+        nb_float1d,
+        nb_complex1d,
+        nb.float32,
+        nb.float32,
+        nb.float32,
+    ),
+    parallel=True,
+)
+def cme_solve(
+    k_signal: float_array,
+    k_idler: float_array,
+    x_array: float_array,
+    y0: complex_array,
+    k_pump: float,
     xi: float,
     epsi: float,
 ) -> complex_array:
-    """
-    Undepleted pump coupled mode equation model.
+    """Fast cme solver for multiple frequencies."""
+    len_k = len(k_signal)
 
-    y[0] = Ip # pump current
-    y[1] = Is # signal current
-    y[2] = Ii # idler current
-    t    = x  #
-
-    undepleted pump: Ip~=Ip0
-
-    Equations A6a, A6b and A6c from
-    PRX Quantum 2, 010302 (2021)
-    https://doi.org/10.1103/PRXQuantum.2.010302
-
-    """
-    dk = kp - ks - ki
-
-    return np.array(
-        [
-            1j * xi * kp / 8 * abs(y[0]) ** 2 * y[0],
-            1j * epsi * ks / 4 * y[0] * np.conj(y[2]) * np.exp(1j * dk * t)
-            + 1j * xi * ks / 4 * abs(y[0]) ** 2 * y[1],
-            1j * epsi * ki / 4 * y[0] * np.conj(y[1]) * np.exp(1j * dk * t)
-            + 1j * xi * ki / 4 * abs(y[0]) ** 2 * y[2],
-        ],
-        dtype=np.complex128,
-    )
-
-
-@nb.njit
-def CMEode_complete_explicit(
-    t: float,
-    y: float_array,
-    kp: float,
-    ks: float,
-    ki: float,
-    xi: float,
-    epsi: float,
-) -> float_array:
-    """
-    Complete coupled mode equation model.
-
-    y[0] = Ip # pump current
-    y[1] = Is # signal current
-    y[2] = Ii # idler current
-    t    = x  #
-
-    Equations A5a, A5b and A5c from
-    PRX Quantum 2, 010302 (2021)
-    https://doi.org/10.1103/PRXQuantum.2.010302
-
-    """
-    dk = kp - ks - ki
-
-    a_real = epsi / 4
-    a_imag = xi / 8
-
-    # Extract real and imaginary parts of y
-    Ip_real, Is_real, Ii_real = y[:3]
-    Ip_imag, Is_imag, Ii_imag = y[3:]
-
-    # Compute magnitudes of currents
-    abs_Ip_sq = Ip_real**2 + Ip_imag**2
-    abs_Is_sq = Is_real**2 + Is_imag**2
-    abs_Ii_sq = Ii_real**2 + Ii_imag**2
-
-    # Compute intermediate values
-    pp = abs_Ip_sq + 2 * abs_Is_sq + 2 * abs_Ii_sq
-    ss = 2 * abs_Ip_sq + abs_Is_sq + 2 * abs_Ii_sq
-    ii = 2 * abs_Ip_sq + 2 * abs_Is_sq + abs_Ii_sq
-
-    # Compute derivatives
-    dIp_dt_real = (
-        a_real * kp * (Is_real * Ii_real + Is_imag * Ii_imag) * np.cos(-dk * t)
-        - a_imag * kp * (Is_real * Ii_imag - Is_imag * Ii_real) * np.sin(-dk * t)
-        + a_real * xi * Ip_real * pp
-        - a_imag * xi * Ip_imag * pp
-    )
-
-    dIp_dt_imag = (
-        a_real * kp * (Is_real * Ii_imag - Is_imag * Ii_real) * np.cos(-dk * t)
-        + a_imag * kp * (Is_real * Ii_real + Is_imag * Ii_imag) * np.sin(-dk * t)
-        + a_real * xi * Ip_imag * pp
-        + a_imag * xi * Ip_real * pp
-    )
-
-    dIs_dt_real = (
-        a_real * ks * (Ip_real * Ii_imag - Ip_imag * Ii_real) * np.cos(dk * t)
-        - a_imag * ks * (Ip_real * Ii_real + Ip_imag * Ii_imag) * np.sin(dk * t)
-        + a_real * xi * Is_real * ss
-        - a_imag * xi * Is_imag * ss
-    )
-
-    dIs_dt_imag = (
-        a_real * ks * (Ip_real * Ii_real + Ip_imag * Ii_imag) * np.cos(dk * t)
-        + a_imag * ks * (Ip_real * Ii_imag - Ip_imag * Ii_real) * np.sin(dk * t)
-        + a_real * xi * Is_imag * ss
-        + a_imag * xi * Is_real * ss
-    )
-
-    dIi_dt_real = (
-        a_real * ki * (Ip_real * Is_imag - Ip_imag * Is_real) * np.cos(dk * t)
-        - a_imag * ki * (Ip_real * Is_real + Ip_imag * Is_imag) * np.sin(dk * t)
-        + a_real * xi * Ii_real * ii
-        - a_imag * xi * Ii_imag * ii
-    )
-
-    dIi_dt_imag = (
-        a_real * ki * (Ip_real * Is_real + Ip_imag * Is_imag) * np.cos(dk * t)
-        + a_imag * ki * (Ip_real * Is_imag - Ip_imag * Is_real) * np.sin(dk * t)
-        + a_real * xi * Ii_imag * ii
-        + a_imag * xi * Ii_real * ii
-    )
-
-    return np.array(
-        [dIp_dt_real, dIs_dt_real, dIi_dt_real, dIp_dt_imag, dIs_dt_imag, dIi_dt_imag]
-    )
+    x_span = (x_array[0], x_array[-1])
+    I_triplets = np.empty((len_k, 3, len(x_array)), dtype=np.complex128)
+    for i in nb.prange(len_k):
+        k = k_signal[i]
+        _, I_triplets[i], _, _ = nbrk_ode(
+            CMEode_complete,
+            x_span,
+            y0,
+            args=(
+                k_pump,
+                k,
+                k_idler[i],
+                xi,
+                epsi,
+            ),
+            atol=1e-16,
+            rtol=1e-10,
+            max_num_steps=1000,
+            first_step=1,
+            t_eval=x_array,
+            rk_method=1,
+        )
+    return I_triplets
