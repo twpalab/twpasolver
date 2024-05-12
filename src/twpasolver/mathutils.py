@@ -13,7 +13,7 @@ nb_complex1d = nb.complex128[:]
 nb_float1d = nb.float64[:]
 
 
-@nb.njit
+@nb.njit(cache=True)
 def matmul_2x2(
     matrices_a: complex_array,
     matrices_b: complex_array,
@@ -35,7 +35,7 @@ def matmul_2x2(
     return result_matrices
 
 
-@nb.njit
+@nb.njit(cache=True)
 def matpow_2x2(matrices_a: complex_array, exponent: int) -> complex_array:
     """Fast exponentiation of list of 2x2 matrices with recursion."""
     assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
@@ -60,7 +60,7 @@ def matpow_2x2(matrices_a: complex_array, exponent: int) -> complex_array:
     return result_matrices
 
 
-@nb.njit
+@nb.njit(cache=True)
 def a2s(abcd: complex_array, Z0: complex | float) -> complex_array:
     """Convert list of ABCD matrices to list of S parameters."""
     assert abcd.shape[1] == 2 and abcd.shape[2] == 2
@@ -80,7 +80,7 @@ def a2s(abcd: complex_array, Z0: complex | float) -> complex_array:
     return spar_mat
 
 
-@nb.njit
+@nb.njit(cache=True)
 def s2a(spar: complex_array, Z0: complex | float) -> complex_array:
     """Convert list of S parameters to list of ABCD matrices."""
     assert spar.shape[1] == 2 and spar.shape[2] == 2
@@ -99,27 +99,27 @@ def s2a(spar: complex_array, Z0: complex | float) -> complex_array:
     return abcd
 
 
-@nb.njit
+@nb.njit(cache=True)
 def to_dB(values: float_array | complex_array):
     """Convert array of values to dB."""
     return np.log10(np.abs(values))
 
 
-@nb.njit
+@nb.njit(cache=True)
 def dBm_to_I(power: float, Z0: float = 50):
     """Convert from dBm to A."""
     pw = 10 ** (power / 10) / 1000  # power in W
     return np.sqrt(pw / Z0 * 2)  # current amplitude, in A
 
 
-@nb.njit
+@nb.njit(cache=True)
 def I_to_dBm(curr: float, Z0: float = 50):
     """Convert from A to dBm."""
     pw = curr**2 / 2 * Z0
     return 10 * np.log10(pw * 1000)
 
 
-@nb.njit(parallel=True)
+@nb.njit(cache=True)
 def compute_phase_matching(
     freqs: float_array,
     pump_freqs: float_array,
@@ -135,7 +135,7 @@ def compute_phase_matching(
     freq_triplets = np.empty((num_pumps, 3))
     k_triplets = np.empty((num_pumps, 3))
 
-    for i in nb.prange(num_pumps):
+    for i in range(num_pumps):
         p_f = pump_freqs[i]
         k_pump = k_pump_array[i]
         k_idler = np.interp(p_f - freqs, freqs, k_signal_array)
@@ -172,7 +172,8 @@ def compute_phase_matching(
         nb.float32,
         nb.float32,
         nb.float32,
-    )
+    ),
+    cache=True,
 )
 def CMEode_complete(
     t: float,
@@ -220,18 +221,6 @@ def CMEode_complete(
     return derivs
 
 
-@nb.njit(
-    nb_complex3d(
-        nb_float1d,
-        nb_float1d,
-        nb_float1d,
-        nb_complex1d,
-        nb.float32,
-        nb.float32,
-        nb.float32,
-    ),
-    parallel=True,
-)
 def cme_solve(
     k_signal: float_array,
     k_idler: float_array,

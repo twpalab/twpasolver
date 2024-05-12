@@ -1,6 +1,8 @@
 """Analysis classes."""
 
 from abc import ABC, abstractmethod
+from functools import partial
+from time import strftime
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
@@ -12,7 +14,6 @@ from pydantic import (
     PrivateAttr,
     field_validator,
 )
-from scipy.optimize import minimize
 
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.logging import log
@@ -55,7 +56,7 @@ class ExecutionRequest(BaseModel):
 class Analyzer(BaseModel, ABC):
     """Base class for structured analysis."""
 
-    data_file: Optional[str] = None
+    data_file: str = Field(default_factory=partial(strftime, "data_%m_%d_%H_%M_%S"))
     run: List[ExecutionRequest] = Field(default_factory=list)
     _allowed_functions: List[str] = PrivateAttr(default_factory=list)
     data: Dict[str, Any] = Field(default_factory=dict, exclude=True)
@@ -82,11 +83,7 @@ class Analyzer(BaseModel, ABC):
 
     def save_data(self, writer="hdf5"):
         """Save data to file."""
-        if self.data_file is None:
-            data_file = "data"
-        else:
-            data_file = self.data_file
-        save_to_file(data_file, self.data, writer=writer)
+        save_to_file(self.data_file, self.data, writer=writer)
 
     def execute(self):
         """Run analysis."""
@@ -108,8 +105,8 @@ class Analyzer(BaseModel, ABC):
     ):
         """Run an analysis function multiple times for different values of a parameter."""
         results = {}
+        fn = getattr(self, function)
         for value in values:
-            fn = getattr(self, function)
             kwargs.update({target: value})
             results[value] = fn(*args, save=False, **kwargs)
         return {target: results}
@@ -153,17 +150,31 @@ class TWPAnalysis(Analyzer):
             self.data["freqs"] = freqs
             self.data["abcd"] = cell.abcd
             self.data["S21"] = cell.get_s_par()[:, 1, 0]
-            self.data["k"] = np.unwrap(np.angle(self.data["S21"])) / self.twpa.N_tot
             s21_db = np.log(np.abs(self.data["S21"]))
             s21_db_diff = s21_db[1:] - s21_db[:-1]
+            stopband_start_idx = np.argmin(s21_db_diff)
             self.data["stopband_freqs"] = (
-                freqs[np.argmin(s21_db_diff)],
+                freqs[stopband_start_idx],
                 freqs[np.argmax(s21_db_diff)],
             )
-            self.data["optimal_pump_freq"] = self.estimate_optimal_pump()
+
+            # Fit low frequency phase response to correctly unrwap at f=0 Hz
+            if self.freqs_arange[0] > freqs[stopband_start_idx] / 10:
+                log.warn(
+                    "Starting frequency is too high, unwrap of phase response might be imprecise."
+                )
+            k_full = np.unwrap(np.angle(self.data["S21"])) / self.twpa.N_tot
+            k_lin_pars = np.polyfit(
+                freqs[: int(stopband_start_idx / 10)],
+                k_full[: int(stopband_start_idx / 10)],
+                1,
+            )
+            self.data["k"] = k_full - k_lin_pars[-1]
+            self.data["k_linear"] = np.polyval(k_lin_pars, freqs) - k_lin_pars[-1]
+            self.data["optimal_pump_freq"] = self._estimate_optimal_pump()
             self._previous_state = current_state
 
-    def estimate_optimal_pump(self):
+    def _estimate_optimal_pump(self):
         """Estimate optimal pump frequency."""
         freqs = self.data["freqs"]
         ks = self.data["k"]
@@ -176,27 +187,25 @@ class TWPAnalysis(Analyzer):
         return pump_f[np.argmin(deltas)]
 
     @analysis_function
-    def phase_matching(self) -> Dict[str, Any]:
+    def phase_matching(self, thin: int = 20) -> Dict[str, Any]:
         """Build phase matching graph and triplets."""
         freqs = self.data["freqs"]
         ks = self.data["k"]
         min_p_idx = np.where(freqs == self.data["stopband_freqs"][1])[0][0]
         max_p_idx = -1
         min_s_idx = np.where(freqs == self.data["stopband_freqs"][0])[0][0]
-        signal_f = freqs[:min_s_idx]
-        signal_k = ks[:min_s_idx]
-        pump_f = freqs[min_p_idx:max_p_idx]
-        pump_k = ks[min_p_idx:max_p_idx]
+        signal_f = freqs[:min_s_idx:thin]
+        signal_k = ks[:min_s_idx:thin]
+        pump_f = freqs[min_p_idx:max_p_idx:thin]
+        pump_k = ks[min_p_idx:max_p_idx:thin]
         deltas, f_triplets, k_triplets = compute_phase_matching(
             signal_f, pump_f, signal_k, pump_k, self.twpa.chi
         )
-        optimal_pump_idx = np.argmin(f_triplets[1:, 1] - f_triplets[:-1, 1])
         return {
             "delta": deltas,
             "triplets": {"f": f_triplets, "k": k_triplets},
             "pump_freqs": pump_f,
             "signal_freqs": signal_f,
-            "optimal_pump_freq": f_triplets[optimal_pump_idx, 0],
         }
 
     @analysis_function
@@ -205,12 +214,13 @@ class TWPAnalysis(Analyzer):
         signal_arange: Tuple[float, float, float],
         pump: Optional[float] = None,
         Is0: float = 1e-6,
+        Ip0: Optional[float] = None,
+        thin: int = 10,
     ):
-        """Compute expected gain."""
+        """Compute expected gain as a function of position in the TWPA."""
+        if Ip0 is not None:
+            self.twpa.Ip0 = Ip0
         if pump is None:
-            # if "phase_matching" not in self.data.keys():
-            #     self.phase_matching()
-            # pump = self.data["phase_matching"]["optimal_pump_freq"]
             pump = self.data["optimal_pump_freq"]
         freqs = self.data["freqs"]
         ks = self.data["k"]
@@ -220,7 +230,7 @@ class TWPAnalysis(Analyzer):
         signal_k = np.interp(signal_freqs, freqs, ks)
         idler_k = np.interp(idler_freqs, freqs, ks)
         N_tot = self.twpa.N_tot
-        x = np.linspace(0, N_tot, N_tot + 1)
+        x = np.linspace(0, N_tot, int(N_tot / thin), endpoint=True)
         y0 = np.array([self.twpa.Ip0, Is0, 0], dtype=np.complex128)
 
         I_triplets = cme_solve(
@@ -234,8 +244,7 @@ class TWPAnalysis(Analyzer):
             "signal_freqs": signal_freqs,
             "x": x,
             "I_triplets": I_triplets,
-            "gain": gains,
-            "gain_db": gains_db,
+            "gains_db": gains_db,
         }
 
     @analysis_function
@@ -249,37 +258,27 @@ class TWPAnalysis(Analyzer):
         if gain_kwargs or "gain" not in self.data.keys():
             self.gain(signal_arange, **gain_kwargs)
         pump_freq = self.data["gain"]["pump_freq"]
-        gains_db = self.data["gain"]["gain_db"][:, -1]
+        gains_db = self.data["gain"]["gains_db"][:, -1]
         signal_freqs = self.data["gain"]["signal_freqs"]
         max_g_idx = np.argmax(gains_db)
         max_g = gains_db[max_g_idx]
-        interp_fn = lambda x: np.abs(
-            np.interp(x, signal_freqs, gains_db) - max_g + gain_reduction
-        )
-        triplets = self.data["phase_matching"]["triplets"]["f"]
-        matched_triplet = triplets[np.searchsorted(triplets[:, 0], pump_freq)]
+        ok_idx = np.where(gains_db > max_g - gain_reduction)[0]
+        ok_freqs = signal_freqs[ok_idx]
+        df = signal_freqs[1] - signal_freqs[0]
+        freq_diff = np.diff(ok_freqs)
 
-        root_left = minimize(
-            interp_fn,
-            matched_triplet[1],
-            method="Powell",
-            bounds=[(0, matched_triplet[1])],
-        )["x"][0]
-
-        root_right = minimize(
-            interp_fn,
-            matched_triplet[2],
-            method="Powell",
-            bounds=[(matched_triplet[2], pump_freq)],
-        )["x"][0]
+        extremes_indices = np.where(freq_diff > 2 * df)[0]
+        all_roots = [ok_freqs[0]]
+        for idx in extremes_indices:
+            all_roots.extend([ok_freqs[idx], ok_freqs[idx + 1]])
+        all_roots.append(ok_freqs[-1])
 
         return {
             "pump_freq": pump_freq,
-            "signal_freqs": (root_left, root_right),
-            "bw": root_left + root_right,
+            "bandwidth_edges": all_roots,
+            "total_bw": len(ok_freqs) * df,
             "max_gain": max_g,
             "reduced_gain": max_g - gain_reduction,
-            "mean_gain": np.mean(
-                gains_db[(signal_freqs >= root_left) & (signal_freqs <= root_right)]
-            ),
+            "mean_gain": np.mean(gains_db[ok_idx]),
+            "ok_idx": ok_idx,
         }
