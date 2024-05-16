@@ -104,12 +104,19 @@ class Analyzer(BaseModel, ABC):
         self, function: str, target: str, values: List, *args, **kwargs
     ):
         """Run an analysis function multiple times for different values of a parameter."""
-        results = {}
+        results = {target: []}
+        kwargs.update({"save": False})
         fn = getattr(self, function)
-        for value in values:
+        for i, value in enumerate(values):
             kwargs.update({target: value})
-            results[value] = fn(*args, save=False, **kwargs)
-        return {target: results}
+            fn_res = fn(*args, **kwargs)
+            if i == 0:
+                results.update({key: [item] for key, item in fn_res.items()})
+            else:
+                for key, item in fn_res.items():
+                    results[key].append(item)
+            results[target].append(value)
+        return results
 
 
 class TWPAnalysis(Analyzer):
@@ -236,15 +243,14 @@ class TWPAnalysis(Analyzer):
         I_triplets = cme_solve(
             signal_k, idler_k, x, y0, pump_k, self.twpa.xi, self.twpa.epsilon
         )
-        gains = np.abs(I_triplets[:, 1, :] / y0[1]) ** 2
-        gains_db = 10 * np.log10(gains)
+        gain_db = 10 * np.log10(np.abs(I_triplets[:, 1, -1] / y0[1]) ** 2)
 
         return {
             "pump_freq": pump,
             "signal_freqs": signal_freqs,
             "x": x,
             "I_triplets": I_triplets,
-            "gains_db": gains_db,
+            "gain_db": gain_db,
         }
 
     @analysis_function
@@ -258,11 +264,11 @@ class TWPAnalysis(Analyzer):
         if gain_kwargs or "gain" not in self.data.keys():
             self.gain(signal_arange, **gain_kwargs)
         pump_freq = self.data["gain"]["pump_freq"]
-        gains_db = self.data["gain"]["gains_db"][:, -1]
+        gain_db = self.data["gain"]["gain_db"]
         signal_freqs = self.data["gain"]["signal_freqs"]
-        max_g_idx = np.argmax(gains_db)
-        max_g = gains_db[max_g_idx]
-        ok_idx = np.where(gains_db > max_g - gain_reduction)[0]
+        max_g_idx = np.argmax(gain_db)
+        max_g = gain_db[max_g_idx]
+        ok_idx = np.where(gain_db > max_g - gain_reduction)[0]
         ok_freqs = signal_freqs[ok_idx]
         df = signal_freqs[1] - signal_freqs[0]
         freq_diff = np.diff(ok_freqs)
@@ -279,6 +285,6 @@ class TWPAnalysis(Analyzer):
             "total_bw": len(ok_freqs) * df,
             "max_gain": max_g,
             "reduced_gain": max_g - gain_reduction,
-            "mean_gain": np.mean(gains_db[ok_idx]),
+            "mean_gain": np.mean(gain_db[ok_idx]),
             "ok_idx": ok_idx,
         }
