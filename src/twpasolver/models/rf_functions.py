@@ -100,24 +100,27 @@ def get_stub_cell(
     freqs: float_array,
     C: float,
     L: float,
-    Lf: float,
+    l1: float,
+    l2: float,
 ) -> complex_array:
     """Get abcd matrix of stub cell model."""
     assert C >= 0
     assert L >= 0
-    assert Lf >= 0
-    Z0 = np.sqrt(Lf / C)
+    Z0 = np.sqrt(L / C)
+    v = np.sqrt(L * C) * l1
     n_mat = len(freqs)
     abcd = np.empty((n_mat, 2, 2), dtype=np.complex128)
     for i in range(n_mat):
         w = 2 * np.pi * freqs[i]
-        beta = w * np.sqrt(Lf * C)
+        beta = w * v
+        Z2 = 1j * L * l2 * w
+        Z3_inv = 2 * 1j * np.tan(beta) / Z0
 
         abcd[i, 0, 0] = 1
 
-        abcd[i, 0, 1] = 1j * L * w
+        abcd[i, 0, 1] = Z2
 
-        abcd[i, 1, 0] = 0.5 * 1j * np.tan(beta) / Z0
-        abcd[i, 1, 1] = 1 - 0.5 * L * w * np.tan(beta) / Z0
+        abcd[i, 1, 0] = Z3_inv
+        abcd[i, 1, 1] = 1 + Z2 * Z3_inv
 
     return abcd

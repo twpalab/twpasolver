@@ -89,15 +89,14 @@ def recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> None
             subgroup = f.create_group(key)
             recursively_save_dict_contents_to_group(subgroup, item)
         else:
+            if isinstance(item, list | tuple):
+                item = np.array(item)
             if isinstance(item, str):
                 dtype = h5py.special_dtype(vlen=str)
-            elif isinstance(item, list):
-                dtype = h5py.special_dtype(vlen=list)
             elif isinstance(item, np.ndarray):
                 dtype = item.dtype
             else:
                 dtype = type(item)
-            print(item, dtype)
             f.create_dataset(key, data=item, dtype=dtype)
 
 

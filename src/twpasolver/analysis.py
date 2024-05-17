@@ -3,22 +3,17 @@
 from abc import ABC, abstractmethod
 from functools import partial
 from time import strftime
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional
 
 import numpy as np
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    NonNegativeFloat,
-    PrivateAttr,
-    field_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.logging import log
 from twpasolver.mathutils import cme_solve, compute_phase_matching
 from twpasolver.models import TWPA
+from twpasolver.plotting import plot_gain, plot_phase_matching, plot_response
+from twpasolver.typing import FrequencyArange
 
 
 def analysis_function(
@@ -26,11 +21,9 @@ def analysis_function(
 ):
     """Wrap functions for analysis."""
 
-    def wrapper(self, *args, save=True, **kwargs):
+    def wrapper(self, *args, save=True, save_name: Optional[str] = None, **kwargs):
         self.update_base_data()
         function_name = func.__name__
-        if function_name == "parameter_sweep":
-            function_name = args[0] + "_sweep"
         log.info(f"Running {function_name}")
         result = func(self, *args, **kwargs)
         if save:
@@ -38,7 +31,10 @@ def analysis_function(
                 log.info(
                     f"Data for '{function_name}' output already present in analysis data, will be overwritten."
                 )
-            self.data[function_name] = result
+            if save_name is None:
+                save_name = function_name
+                kwargs.update({"save_name": save_name})
+            self.data[save_name] = result
         return result
 
     return wrapper
@@ -58,7 +54,6 @@ class Analyzer(BaseModel, ABC):
 
     data_file: str = Field(default_factory=partial(strftime, "data_%m_%d_%H_%M_%S"))
     run: List[ExecutionRequest] = Field(default_factory=list)
-    _allowed_functions: List[str] = PrivateAttr(default_factory=list)
     data: Dict[str, Any] = Field(default_factory=dict, exclude=True)
 
     def model_post_init(self, __context: Any) -> None:
@@ -88,16 +83,8 @@ class Analyzer(BaseModel, ABC):
     def execute(self):
         """Run analysis."""
         for request in self.run:
-            function_name = request.name
-            if function_name not in self._allowed_functions:
-                raise ValueError(
-                    f"Function '{function_name}' is not supported, choose between {self._allowed_functions}."
-                )
-            function = getattr(self, function_name)
+            function = getattr(self, request.name)
             _ = function(*request.args, **request.kwargs)
-
-        if self.data_file:
-            self.save_data()
 
     @analysis_function
     def parameter_sweep(
@@ -124,12 +111,9 @@ class TWPAnalysis(Analyzer):
 
     model_config = ConfigDict(validate_assignment=True)
     twpa: TWPA
-    freqs_arange: Tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat] = Field(
-        frozen=True
-    )
+    freqs_arange: FrequencyArange
     freqs_unit: Literal["Hz", "kHz", "MHz", "GHz"] = "GHz"
     _previous_state: Dict[str, Any] = PrivateAttr()
-    _allowed_functions = PrivateAttr(["phase_matching", "gain", "bandwidth"])
     _unit_multipliers = PrivateAttr({"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9})
 
     @field_validator("twpa", mode="before", check_fields=True)
@@ -155,29 +139,30 @@ class TWPAnalysis(Analyzer):
             freqs = np.arange(*self.freqs_arange)
             cell = self.twpa.get_cell(freqs * unit_multiplier)
             self.data["freqs"] = freqs
-            self.data["abcd"] = cell.abcd
+            self.data["abcd"] = np.asarray(cell.abcd)
             self.data["S21"] = cell.get_s_par()[:, 1, 0]
-            s21_db = np.log(np.abs(self.data["S21"]))
+            s21_db = 20 * np.log(np.abs(self.data["S21"]))
+            self.data["S21_db"] = s21_db
             s21_db_diff = s21_db[1:] - s21_db[:-1]
             stopband_start_idx = np.argmin(s21_db_diff)
-            self.data["stopband_freqs"] = (
+            self.data["stopband_freqs"] = [
                 freqs[stopband_start_idx],
                 freqs[np.argmax(s21_db_diff)],
-            )
+            ]
 
             # Fit low frequency phase response to correctly unrwap at f=0 Hz
             if self.freqs_arange[0] > freqs[stopband_start_idx] / 10:
                 log.warn(
                     "Starting frequency is too high, unwrap of phase response might be imprecise."
                 )
-            k_full = np.unwrap(np.angle(self.data["S21"])) / self.twpa.N_tot
-            k_lin_pars = np.polyfit(
+            k_full = -np.unwrap(np.angle(self.data["S21"])) / self.twpa.N_tot
+            k_pars = np.polyfit(
                 freqs[: int(stopband_start_idx / 10)],
                 k_full[: int(stopband_start_idx / 10)],
-                1,
+                2,
             )
-            self.data["k"] = k_full - k_lin_pars[-1]
-            self.data["k_linear"] = np.polyval(k_lin_pars, freqs) - k_lin_pars[-1]
+            self.data["k"] = k_full - k_pars[-1]
+            self.data["k_star"] = k_full - np.polyval(k_pars[1:], freqs)
             self.data["optimal_pump_freq"] = self._estimate_optimal_pump()
             self._previous_state = current_state
 
@@ -218,13 +203,16 @@ class TWPAnalysis(Analyzer):
     @analysis_function
     def gain(
         self,
-        signal_arange: Tuple[float, float, float],
+        signal_arange: FrequencyArange,
         pump: Optional[float] = None,
         Is0: float = 1e-6,
         Ip0: Optional[float] = None,
-        thin: int = 10,
+        thin: int = 100,
     ):
         """Compute expected gain as a function of position in the TWPA."""
+        N_tot = self.twpa.N_tot
+        if thin > N_tot:
+            thin = N_tot
         if Ip0 is not None:
             self.twpa.Ip0 = Ip0
         if pump is None:
@@ -236,7 +224,6 @@ class TWPAnalysis(Analyzer):
         pump_k = np.interp(pump, freqs, ks)
         signal_k = np.interp(signal_freqs, freqs, ks)
         idler_k = np.interp(idler_freqs, freqs, ks)
-        N_tot = self.twpa.N_tot
         x = np.linspace(0, N_tot, int(N_tot / thin), endpoint=True)
         y0 = np.array([self.twpa.Ip0, Is0, 0], dtype=np.complex128)
 
@@ -256,24 +243,23 @@ class TWPAnalysis(Analyzer):
     @analysis_function
     def bandwidth(
         self,
-        signal_arange: Tuple[float, float, float],
         gain_reduction: float = 3,
         **gain_kwargs,
     ):
         """Compute frequency bandwidth."""
         if gain_kwargs or "gain" not in self.data.keys():
-            self.gain(signal_arange, **gain_kwargs)
+            self.gain(**gain_kwargs)
         pump_freq = self.data["gain"]["pump_freq"]
         gain_db = self.data["gain"]["gain_db"]
         signal_freqs = self.data["gain"]["signal_freqs"]
         max_g_idx = np.argmax(gain_db)
         max_g = gain_db[max_g_idx]
-        ok_idx = np.where(gain_db > max_g - gain_reduction)[0]
+        ok_idx = np.where(gain_db >= max_g - gain_reduction)[0]
         ok_freqs = signal_freqs[ok_idx]
         df = signal_freqs[1] - signal_freqs[0]
         freq_diff = np.diff(ok_freqs)
 
-        extremes_indices = np.where(freq_diff > 2 * df)[0]
+        extremes_indices = np.where(freq_diff >= 2 * df)[0]
         all_roots = [ok_freqs[0]]
         for idx in extremes_indices:
             all_roots.extend([ok_freqs[idx], ok_freqs[idx + 1]])
@@ -288,3 +274,42 @@ class TWPAnalysis(Analyzer):
             "mean_gain": np.mean(gain_db[ok_idx]),
             "ok_idx": ok_idx,
         }
+
+    def plot_response(self, **kwargs):
+        """Plot response of twpa."""
+        if "k_star" not in self.data:
+            self.update_base_data()
+        return plot_response(
+            self.data["freqs"],
+            self.data["S21_db"],
+            self.data["k_star"],
+            freqs_unit=self.freqs_unit,
+            **kwargs,
+        )
+
+    def plot_gain(self, **kwargs):
+        """Plot gain of twpa."""
+        if "gain" not in self.data:
+            raise RuntimeError("Gain data not found, please run analysis function.")
+        gain_data = self.data["gain"]
+        return plot_gain(
+            gain_data["signal_freqs"],
+            gain_data["gain_db"],
+            freqs_unit=self.freqs_unit,
+            **kwargs,
+        )
+
+    def plot_phase_matching(self, **kwargs):
+        """Plot phase matching profile of twpa."""
+        if "phase_matching" not in self.data:
+            raise RuntimeError(
+                "Phase matching data not found, please run analysis function."
+            )
+        phase_matching_data = self.data["phase_matching"]
+        return plot_phase_matching(
+            phase_matching_data["pump_freqs"],
+            phase_matching_data["signal_freqs"],
+            phase_matching_data["delta"],
+            freqs_unit=self.freqs_unit,
+            **kwargs,
+        )

@@ -8,14 +8,7 @@ import numpy as np
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 
 from twpasolver.abcd_matrices import ABCDArray, abcd_identity
-from twpasolver.models.rf_functions import (
-    LCLf_abcd,
-    inductance,
-    lossless_line_abcd,
-    parallel_admittance_abcd,
-    series_impedance_abcd,
-    stub,
-)
+from twpasolver.models.rf_functions import LCLf_abcd, get_stub_cell
 from twpasolver.twoport import TwoPortModel
 
 required = partial(Field, ...)
@@ -25,11 +18,9 @@ class StubBaseCell(TwoPortModel):
     """Base cell of twpa stub filter model."""
 
     L: NonNegativeFloat = required(description="Inductance of the straight line.")
-    C: NonNegativeFloat = required(description="Capacitance of the stub finger.")
-    Lf: NonNegativeFloat = required(description="Capacitance of the stub finger.")
+    C: NonNegativeFloat = required(description="Capacitance of the line.")
     l1: NonNegativeFloat = required(description="Length of the stub finger.")
     l2: NonNegativeFloat = required(description="Length of the straight line.")
-    n_stub: int = Field(2, description="Number of parallel stub fingers.")
     line: bool = Field(
         False,
         description="Model line as distributed element instead of lumped inductance.",
@@ -37,17 +28,7 @@ class StubBaseCell(TwoPortModel):
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute abcd matrix."""
-        stub_Z = stub(freqs, self.Lf, self.C, 1)
-        stub_abcd = ABCDArray(parallel_admittance_abcd(self.n_stub / stub_Z))
-        if self.line:
-            half_line_abcd = ABCDArray(
-                lossless_line_abcd(freqs, self.C / self.l1, self.Lf / self.l1, self.l2)
-            )
-        else:
-            half_line_abcd = ABCDArray(
-                series_impedance_abcd(inductance(freqs, self.L / 2))
-            )
-        return half_line_abcd @ stub_abcd @ half_line_abcd
+        return ABCDArray(get_stub_cell(freqs, self.C, self.L, self.l1, self.l2))
 
 
 class LCLfBaseCell(TwoPortModel):
@@ -68,11 +49,11 @@ class TWPA(TwoPortModel):
     cells: list[LCLfBaseCell | StubBaseCell] = required(
         description="List of TwoPortModels representing the basic cells."
     )
-    Istar: NonNegativeFloat = required(
-        description="Nonlinearity scale current parameter."
+    Istar: NonNegativeFloat = Field(
+        6.5e-3, description="Nonlinearity scale current parameter."
     )
-    Idc: NonNegativeFloat = required(description="Bias dc current.")
-    Ip0: NonNegativeFloat = required(description="Rf pump amplitude.")
+    Idc: NonNegativeFloat = Field(1e-3, description="Bias dc current.")
+    Ip0: NonNegativeFloat = Field(2e-4, description="Rf pump amplitude.")
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute abcd of supercell."""
