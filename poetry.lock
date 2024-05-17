@@ -297,6 +297,59 @@ tomli = {version = "*", optional = true, markers = "python_full_version <= \"3.1
 toml = ["tomli"]
 
 [[package]]
+name = "cyrk"
+version = "0.8.8"
+description = "Runge-Kutta ODE Integrator Implemented in Cython and Numba."
+optional = false
+python-versions = "<3.13,>=3.8"
+files = [
+    {file = "CyRK-0.8.8-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:132a7782f680bf31f1bc135888c2e5fd5bd499a2edf8b218d2673f9cdf031253"},
+    {file = "CyRK-0.8.8-cp310-cp310-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:b515059b43a813cf90ca9a9a4a566c4f16e25d2723d92c8aa1987ee5372d66f2"},
+    {file = "CyRK-0.8.8-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1e7b082147d4b198f127ae7b1abbe87e3db271e5015623005faaac455a5e3835"},
+    {file = "CyRK-0.8.8-cp310-cp310-musllinux_1_1_i686.whl", hash = "sha256:e313d330087aa893828717b39a6d3d825f2880efde7826ce53686321d436fbfd"},
+    {file = "CyRK-0.8.8-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:d6c5fa2a86fb72719b1e63345b4c280d577f22117fe27ff29cf8d7a9420aa96b"},
+    {file = "CyRK-0.8.8-cp310-cp310-win32.whl", hash = "sha256:cea4294c22e1e85a93c403eec67c20f272ce5c713b46f8f4d1693a626792ea9e"},
+    {file = "CyRK-0.8.8-cp310-cp310-win_amd64.whl", hash = "sha256:738ef462041d53c800dc14fee8aba45a640464b0080f68e6d56a3711ae365282"},
+    {file = "CyRK-0.8.8-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:a4d81fe3198fdf13fbd0e455b6a21ad09e3c84dece74cc63a1d7da50c68a2727"},
+    {file = "CyRK-0.8.8-cp311-cp311-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:83b2694d5137a094989615e2c2a6164713d4091a654fa15af869b065fb3f467f"},
+    {file = "CyRK-0.8.8-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:36c999863fc253d14a74ea980e0b18a7d46a10cfa997b56faeff2101462f8c71"},
+    {file = "CyRK-0.8.8-cp311-cp311-musllinux_1_1_i686.whl", hash = "sha256:71d2ecd0b2090281d45b1ae9c87e2df43d607ec3a32bebc3156e01708078f380"},
+    {file = "CyRK-0.8.8-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:351701caefc509cb6b5f64bef4cb4201ae3800f3376a0a2f31b94b3feb85aeec"},
+    {file = "CyRK-0.8.8-cp311-cp311-win32.whl", hash = "sha256:4938be030ca1c24b7db6ce154a2ea75a012d85f539bb9e1f4f18b357d5e7f318"},
+    {file = "CyRK-0.8.8-cp311-cp311-win_amd64.whl", hash = "sha256:e5f319f5df75aa3e7cf6432138629f46fe8b8239c5266d7eef1bbbf773d1feaf"},
+    {file = "CyRK-0.8.8-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f39f9b155e964e8c0371d3f8ef8060f43a23d1007071045921eea8ae0804d67d"},
+    {file = "CyRK-0.8.8-cp312-cp312-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:f15cacb58d7ff8764e4c15e9e13131b3b64f2042ea2ea283d116477e78ae48e0"},
+    {file = "CyRK-0.8.8-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:96beb62e2aeecf39012350c0ec65d4af6409bb14e3117f30e9fbcbad5f34b75f"},
+    {file = "CyRK-0.8.8-cp312-cp312-musllinux_1_1_i686.whl", hash = "sha256:c83442c4589a56b17c89e50dff52ccdf3b90c6c66d95847629d90913ac07caef"},
+    {file = "CyRK-0.8.8-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:10e11eef95f00e1c7d8748e8ebe8381ed046e73d9ccf99f17d64d4d05c2f316b"},
+    {file = "CyRK-0.8.8-cp312-cp312-win32.whl", hash = "sha256:2abf3a3344bd787847126174aeae00f623838b95c8832f6920c76cee85ada518"},
+    {file = "CyRK-0.8.8-cp312-cp312-win_amd64.whl", hash = "sha256:acf2bb9da283d36d4172ef8370fb7e429bff43094c17bd4679aba5fd86847985"},
+    {file = "CyRK-0.8.8-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:c5ada5d38cbf2b62ab6be4ef4f46e380561fa82d3c7a763b381cec69eb8357f0"},
+    {file = "CyRK-0.8.8-cp38-cp38-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:9086648b838c83254ac37a515916f113bb47c88390dde98dfa1c7e8dbf222532"},
+    {file = "CyRK-0.8.8-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e8d7834a0484dc0244c3b339892f60728f43aff52360845a3d6f2b912d1c18e9"},
+    {file = "CyRK-0.8.8-cp38-cp38-musllinux_1_1_i686.whl", hash = "sha256:fe2b819af77c0581a31c74b0c4778de313f751e13702c4013d1f4c2beade2418"},
+    {file = "CyRK-0.8.8-cp38-cp38-musllinux_1_1_x86_64.whl", hash = "sha256:8bd35b03a763e8bb0e4ba273f38d5fc988a1d76bfa7117dee79edf4a48f633b0"},
+    {file = "CyRK-0.8.8-cp38-cp38-win32.whl", hash = "sha256:fd8f10775d8f47f38a54df8456e284e62003e6497786232cad985920093252bb"},
+    {file = "CyRK-0.8.8-cp38-cp38-win_amd64.whl", hash = "sha256:9667080952b5a30d1f072cd3d4569e714bf2c3a008191555cd6ef04b474d8fb8"},
+    {file = "CyRK-0.8.8-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:ad721e866f7816568f2a8b6c08e29ebf3368e15dfe57b6b73390aa9bfa56d17f"},
+    {file = "CyRK-0.8.8-cp39-cp39-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:038323695b454923785f0b85ff9490e85b81011c889fc32a42356a31196188f0"},
+    {file = "CyRK-0.8.8-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a7b7dff91fed1e22bf274a02e2e8474e179c131364c727d6092d7936314699ea"},
+    {file = "CyRK-0.8.8-cp39-cp39-musllinux_1_1_i686.whl", hash = "sha256:cdfdf262e8a8be9396a524c95658eab71bbb0e6978d38a431400e8758998dbc9"},
+    {file = "CyRK-0.8.8-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:c0881eb90244536222e5fd99d784bfd847b1399f0be4a8696e8433f639f144ee"},
+    {file = "CyRK-0.8.8-cp39-cp39-win32.whl", hash = "sha256:0110998f66d45ea23e07d12adfccf93002a0affdc4de912e41b7f459d81ddf5a"},
+    {file = "CyRK-0.8.8-cp39-cp39-win_amd64.whl", hash = "sha256:1843da1d4a622e39c916223e5b17f247200f63eacdc4a22252ad659429d8a7db"},
+    {file = "cyrk-0.8.8.tar.gz", hash = "sha256:6d60b873546fcee86202224453172b78157e83ab0716f4fde31a65ba02596229"},
+]
+
+[package.dependencies]
+numba = ">=0.54.1"
+numpy = ">=1.22,<1.27"
+scipy = ">=1.9.3"
+
+[package.extras]
+dev = ["jupyter", "line-profiler (==3.5.1)", "matplotlib", "pytest", "timeit"]
+
+[[package]]
 name = "dill"
 version = "0.3.8"
 description = "serialize all of Python"
@@ -1601,4 +1654,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <3.13"
-content-hash = "aaa91e38cff9251606661eae5d42fbacd24e9acec1e648c587c6c114ef2fc6fc"
+content-hash = "34bfd8ece6f354682a34aac8de98c518cf83f16364f32d77c018ef53d6a7bc51"
