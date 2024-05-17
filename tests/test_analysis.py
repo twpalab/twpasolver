@@ -32,7 +32,7 @@ class SimpleAnalyzer(Analyzer):
 
     @analysis_function
     def test_function(self, x):
-        return x
+        return {"fn_x": x}
 
     def update_base_data(self):
         pass
@@ -56,8 +56,8 @@ def test_execution_request(execution_request_data):
 
 def test_analysis_function(analyzer_instance):
     test_instance = analyzer_instance
-    assert test_instance.test_function(2) == 2
-    assert test_instance.data == {"test_function": 2}
+    assert test_instance.test_function(2) == {"fn_x": 2}
+    assert test_instance.data == {"test_function": {"fn_x": 2}}
 
 
 def test_analyzer_save_data(analyzer_instance):
@@ -65,7 +65,7 @@ def test_analyzer_save_data(analyzer_instance):
     _ = analyzer_instance.test_function(2)
     analyzer_instance.save_data(writer=writer)
     data = read_file(analyzer_instance.data_file, writer=writer)
-    assert data == {"test_function": 2}
+    assert data == {"test_function": {"fn_x": 2}}
 
 
 def test_analyzer_dump_and_load_file(analyzer_data, tmpdir):
@@ -78,7 +78,7 @@ def test_analyzer_dump_and_load_file(analyzer_data, tmpdir):
 
 def test_analyzer_execute(analyzer_data):
     executed_class = SimpleAnalyzer(**analyzer_data)
-    assert executed_class.data == {"test_function": 2}
+    assert executed_class.data == {"test_function": {"fn_x": 2}}
     analyzer_data["run"] = []
     not_executed_class = SimpleAnalyzer(**analyzer_data)
     assert not_executed_class.data == {}
@@ -89,12 +89,6 @@ def test_analyzer_parameter_sweep(analyzer_instance):
     analyzer_instance.data = {}
     _ = analyzer_instance.parameter_sweep("test_function", "x", x_sweep)
     assert "test_function" not in analyzer_instance.data.keys()
-    assert "test_function_sweep" in analyzer_instance.data.keys()
-    assert all(
-        np.array(list(analyzer_instance.data["test_function_sweep"]["x"].keys()))
-        == x_sweep
-    )
-    assert all(
-        np.array(list(analyzer_instance.data["test_function_sweep"]["x"].values()))
-        == x_sweep
-    )
+    assert "parameter_sweep" in analyzer_instance.data.keys()
+    assert all(analyzer_instance.data["parameter_sweep"]["x"] == x_sweep)
+    assert all(analyzer_instance.data["parameter_sweep"]["fn_x"] == x_sweep)
