@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from functools import partial
 from time import strftime
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal, Optional
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
@@ -45,16 +45,16 @@ class ExecutionRequest(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     name: str
-    args: List[Any] = Field(default_factory=list)
-    kwargs: Dict[str, Any] = Field(default_factory=dict)
+    args: list[Any] = Field(default_factory=list)
+    kwargs: dict[str, Any] = Field(default_factory=dict)
 
 
 class Analyzer(BaseModel, ABC):
     """Base class for structured analysis."""
 
     data_file: str = Field(default_factory=partial(strftime, "data_%m_%d_%H_%M_%S"))
-    run: List[ExecutionRequest] = Field(default_factory=list)
-    data: Dict[str, Any] = Field(default_factory=dict, exclude=True)
+    run: list[ExecutionRequest] = Field(default_factory=list)
+    data: dict[str, Any] = Field(default_factory=dict, exclude=True)
 
     def model_post_init(self, __context: Any) -> None:
         """Run analysis if list of ExecutionRequest is not empty."""
@@ -88,10 +88,10 @@ class Analyzer(BaseModel, ABC):
 
     @analysis_function
     def parameter_sweep(
-        self, function: str, target: str, values: List, *args, **kwargs
-    ):
+        self, function: str, target: str, values: list, *args, **kwargs
+    ) -> dict[str, list[Any]]:
         """Run an analysis function multiple times for different values of a parameter."""
-        results = {target: []}
+        results = {target: []}  # type: dict[str, list[Any]]
         kwargs.update({"save": False})
         fn = getattr(self, function)
         for i, value in enumerate(values):
@@ -113,7 +113,7 @@ class TWPAnalysis(Analyzer):
     twpa: TWPA
     freqs_arange: FrequencyArange
     freqs_unit: Literal["Hz", "kHz", "MHz", "GHz"] = "GHz"
-    _previous_state: Dict[str, Any] = PrivateAttr()
+    _previous_state: dict[str, Any] = PrivateAttr()
     _unit_multipliers = PrivateAttr({"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9})
 
     @field_validator("twpa", mode="before", check_fields=True)
@@ -179,7 +179,7 @@ class TWPAnalysis(Analyzer):
         return pump_f[np.argmin(deltas)]
 
     @analysis_function
-    def phase_matching(self, thin: int = 20) -> Dict[str, Any]:
+    def phase_matching(self, thin: int = 20) -> dict[str, Any]:
         """Build phase matching graph and triplets."""
         freqs = self.data["freqs"]
         ks = self.data["k"]
@@ -208,7 +208,7 @@ class TWPAnalysis(Analyzer):
         Is0: float = 1e-6,
         Ip0: Optional[float] = None,
         thin: int = 100,
-    ):
+    ) -> dict[str, Any]:
         """Compute expected gain as a function of position in the TWPA."""
         N_tot = self.twpa.N_tot
         if thin > N_tot:
@@ -228,7 +228,7 @@ class TWPAnalysis(Analyzer):
         y0 = np.array([self.twpa.Ip0, Is0, 0], dtype=np.complex128)
 
         I_triplets = cme_solve(
-            signal_k, idler_k, x, y0, pump_k, self.twpa.xi, self.twpa.epsilon
+            signal_k, idler_k, x, y0, pump_k[0], self.twpa.xi, self.twpa.epsilon
         )
         gain_db = 10 * np.log10(np.abs(I_triplets[:, 1, -1] / y0[1]) ** 2)
 
@@ -245,7 +245,7 @@ class TWPAnalysis(Analyzer):
         self,
         gain_reduction: float = 3,
         **gain_kwargs,
-    ):
+    ) -> dict[str, Any]:
         """Compute frequency bandwidth."""
         if gain_kwargs or "gain" not in self.data.keys():
             self.gain(**gain_kwargs)
