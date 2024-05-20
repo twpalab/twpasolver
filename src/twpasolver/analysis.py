@@ -228,7 +228,7 @@ class TWPAnalysis(Analyzer):
         y0 = np.array([self.twpa.Ip0, Is0, 0], dtype=np.complex128)
 
         I_triplets = cme_solve(
-            signal_k, idler_k, x, y0, pump_k[0], self.twpa.xi, self.twpa.epsilon
+            signal_k, idler_k, x, y0, pump_k, self.twpa.xi, self.twpa.epsilon
         )
         gain_db = 10 * np.log10(np.abs(I_triplets[:, 1, -1] / y0[1]) ** 2)
 
