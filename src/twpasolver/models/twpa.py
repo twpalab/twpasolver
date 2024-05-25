@@ -8,7 +8,7 @@ import numpy as np
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 
 from twpasolver.abcd_matrices import ABCDArray, abcd_identity
-from twpasolver.models.rf_functions import LCLf_abcd, get_stub_cell
+from twpasolver.models.rf_functions import LCLf_abcd, get_stub_cell, lossless_line_abcd
 from twpasolver.twoport import TwoPortModel
 
 required = partial(Field, ...)
@@ -28,6 +28,11 @@ class StubBaseCell(TwoPortModel):
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute abcd matrix."""
+        if self.line:
+            parallel_stubs = ABCDArray(get_stub_cell(freqs, self.C, self.L, self.l1, 0))
+            half_line = ABCDArray(lossless_line_abcd(freqs, self.C, self.L, self.l2))
+            return parallel_stubs @ half_line
+
         return ABCDArray(get_stub_cell(freqs, self.C, self.L, self.l1, self.l2))
 
 

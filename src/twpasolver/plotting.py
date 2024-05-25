@@ -14,8 +14,18 @@ def plot_response(
     freqs_unit: str = "GHz",
     figsize: tuple[float, float] = (5.0, 6.0),
     **plot_kwargs,
-):
-    """Plot response of twpa."""
+) -> plt.Axes:
+    """Plot response of twpa.
+
+    Args:
+        freqs (np.ndarray): Array of frequency values.
+        s21_db (np.ndarray): S21 parameter in dB.
+        k_star (np.ndarray): k* parameter.
+        pump_freq (Optional[float]): Frequency of the pump signal.
+        freqs_unit (str): Unit of the frequency values.
+        figsize (tuple[float, float]): Size of the figure.
+        **plot_kwargs: Additional keyword arguments for the plot.
+    """
     _, ax = plt.subplots(2, sharex=True, figsize=figsize)
     ax[0].plot(freqs, s21_db, **plot_kwargs)
     ax[0].set_ylabel("$|S_{21}|$ [dB]")
@@ -32,13 +42,18 @@ def plot_gain(
     freqs: np.ndarray,
     gain_db: np.ndarray,
     freqs_unit: str = "GHz",
-    ax: Optional[plt.Axes] = None,
     **plot_kwargs,
 ) -> plt.Axes:
-    """Plot gain in dB."""
-    if ax is None:
-        plt.figure()
-        ax = plt.axes()
+    """Plot gain in dB.
+
+    Args:
+        freqs (np.ndarray): Array of frequency values.
+        gain_db (np.ndarray): Gain values in dB.
+        freqs_unit (str): Unit of the frequency values.
+        **plot_kwargs: Additional keyword arguments for the plot.
+    """
+    plt.figure()
+    ax = plt.axes()
     ax.plot(freqs, gain_db, **plot_kwargs)
     ax.set_xlabel("Frequency " + freqs_unit)
     ax.set_ylabel("Gain [dB]")
@@ -54,7 +69,17 @@ def plot_phase_matching(
     log_abs=True,
     **plot_kwargs,
 ) -> plt.Axes:
-    """Plot gain in dB."""
+    """Plot phase matching.
+
+    Args:
+        pump_freqs (np.ndarray): Array of pump frequency values.
+        signal_freqs (np.ndarray): Array of signal frequency values.
+        delta_pm (np.ndarray): Phase mismatch values.
+        freqs_unit (str): Unit of the frequency values.
+        thin (int): Thinning factor for plotting.
+        log_abs (bool): Whether to plot the logarithm of the absolute values.
+        **plot_kwargs: Additional keyword arguments for the plot.
+    """
     plt.figure()
     ax = plt.axes()
     z_label = r"$\Delta_\beta$"
@@ -65,7 +90,7 @@ def plot_phase_matching(
     m = ax.pcolor(
         pump_freqs[::thin],
         signal_freqs[::thin],
-        delta_pm[::thin][::thin],
+        delta_pm[::thin, ::thin],
         **plot_kwargs,
     )
     c = plt.colorbar(m, ax=ax)

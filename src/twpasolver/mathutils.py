@@ -230,7 +230,7 @@ def cme_solve(
     xi: float,
     epsi: float,
 ) -> complex_array:
-    """Fast cme solver for multiple frequencies."""
+    """Cme solver for multiple frequencies."""
     len_k = len(k_signal)
 
     x_span = (x_array[0], x_array[-1])
