@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from functools import partial, wraps
 from time import strftime
-from typing import Any, Literal, Optional, Tuple
+from typing import Any, Literal, Optional
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
@@ -13,7 +13,7 @@ from twpasolver.logging import log
 from twpasolver.mathutils import cme_solve, compute_phase_matching
 from twpasolver.models import TWPA
 from twpasolver.plotting import plot_gain, plot_phase_matching, plot_response
-from twpasolver.typing import FrequencyArange
+from twpasolver.typing import FrequencyArange, float_array
 
 
 def analysis_function(
@@ -135,7 +135,7 @@ class Analyzer(BaseModel, ABC):
 
 
 class TWPAnalysis(Analyzer):
-    """Runner for standard analysis routines for twpa models."""
+    """Runner for standard analysis routines of 3WM twpa models."""
 
     model_config = ConfigDict(validate_assignment=True)
     twpa: TWPA
@@ -215,6 +215,9 @@ class TWPAnalysis(Analyzer):
         """
         Build phase matching profile.
 
+        The phase matching condition is computed considering all signal frequencies
+        lower than the first stopband and all pump frequencies from the end of the first stopband.
+
         Args:
             thin (int): The step size to thin out the frequency and wavenumber arrays.
 
@@ -249,7 +252,7 @@ class TWPAnalysis(Analyzer):
     @analysis_function
     def gain(
         self,
-        signal_freqs: FrequencyArange | np.ndarray,
+        signal_freqs: float_array,
         pump: Optional[float] = None,
         Is0: float = 1e-6,
         Ip0: Optional[float] = None,
@@ -259,7 +262,7 @@ class TWPAnalysis(Analyzer):
         Compute expected gain with 3WM as a function of frequency and cell number in the TWPA.
 
         Args:
-            signal_freqs (FrequencyArange | np.ndarray): Start, end and step tuple or list of signal frequencies to consider.
+            signal_freqs (float_array): Array of signal frequencies to consider.
             pump (Optional[float]): The pump frequency. If None, uses the optimal pump frequency from data.
             Is0 (float): Initial signal current (in A).
             Ip0 (Optional[float]): Initial pump current (in A). If None, uses the current TWPA's Ip0.
@@ -275,8 +278,8 @@ class TWPAnalysis(Analyzer):
                                         triplets at each computed cell.
                 - "gain_db" (array): The final signal gain in dB.
         """
-        if isinstance(signal_freqs, Tuple) and len(signal_freqs) == 3:
-            signal_freqs = np.arange(*signal_freqs)
+        if isinstance(signal_freqs, list):
+            signal_freqs = np.asarray(signal_freqs)
         N_tot = self.twpa.N_tot
         if thin > N_tot:
             thin = N_tot
