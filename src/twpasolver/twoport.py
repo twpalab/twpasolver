@@ -107,10 +107,13 @@ class TwoPortModel(BaseModel, ABC):
     model_config = ConfigDict(
         validate_assignment=True, revalidate_instances="always", protected_namespaces=()
     )
-    name: str | None = Field(None, description="Name of the model.")
-    Z0: Impedance = Field(50.0, description="Line impedance of the two-port component.")
+    name: str | None = Field(default=None, description="Name of the model.")
+    Z0: Impedance = Field(
+        default=50.0, description="Line impedance of the two-port component."
+    )
     N: NonNegativeInt = Field(
-        1, description="Number of repetitions of the model in the computed abcd matrix."
+        default=1,
+        description="Number of repetitions of the model in the computed abcd matrix.",
     )
 
     @classmethod

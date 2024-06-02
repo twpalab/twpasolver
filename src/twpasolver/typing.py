@@ -1,9 +1,9 @@
 """Type annotations module."""
 
-from typing import Any, Callable, TypeAlias
+from typing import Any, Callable, Tuple, TypeAlias
 
 import numpy as np
-from pydantic import GetJsonSchemaHandler
+from pydantic import GetJsonSchemaHandler, NonNegativeFloat
 from pydantic.functional_validators import BeforeValidator
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
@@ -56,6 +56,7 @@ class _Impedance2PydanticAnnotation:
 Impedance = Annotated[
     complex | float, _Impedance2PydanticAnnotation, BeforeValidator(validate_impedance)
 ]
+FrequencyArange = Tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat]
 
 complex_array: TypeAlias = np.ndarray[Any, np.dtype[np.complex128]]
 float_array: TypeAlias = np.ndarray[Any, np.dtype[np.float64]]
