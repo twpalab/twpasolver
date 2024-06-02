@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-from pydantic import PrivateAttr
 
 from twpasolver.analysis import (
     Analyzer,
@@ -28,8 +27,6 @@ def analyzer_data(tmpdir, execution_request_data):
 
 
 class SimpleAnalyzer(Analyzer):
-    _allowed_functions = PrivateAttr(["test_function"])
-
     @analysis_function
     def test_function(self, x):
         return {"fn_x": x}
@@ -60,12 +57,15 @@ def test_analysis_function(analyzer_instance):
     assert test_instance.data == {"test_function": {"fn_x": 2}}
 
 
-def test_analyzer_save_data(analyzer_instance):
+def test_analyzer_save_load_data(analyzer_instance):
     writer = "hdf5"
     _ = analyzer_instance.test_function(2)
     analyzer_instance.save_data(writer=writer)
     data = read_file(analyzer_instance.data_file, writer=writer)
     assert data == {"test_function": {"fn_x": 2}}
+    analyzer2 = SimpleAnalyzer()
+    analyzer2.load_data(analyzer_instance.data_file)
+    assert analyzer2.data == {"test_function": {"fn_x": 2}}
 
 
 def test_analyzer_dump_and_load_file(analyzer_data, tmpdir):

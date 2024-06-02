@@ -4,6 +4,7 @@ from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
 
 
 def plot_response(
@@ -14,7 +15,7 @@ def plot_response(
     freqs_unit: str = "GHz",
     figsize: tuple[float, float] = (5.0, 6.0),
     **plot_kwargs,
-) -> plt.Axes:
+) -> Axes:
     """Plot response of twpa.
 
     Args:
@@ -43,7 +44,7 @@ def plot_gain(
     gain_db: np.ndarray,
     freqs_unit: str = "GHz",
     **plot_kwargs,
-) -> plt.Axes:
+) -> Axes:
     """Plot gain in dB.
 
     Args:
@@ -68,7 +69,7 @@ def plot_phase_matching(
     thin=1,
     log_abs=True,
     **plot_kwargs,
-) -> plt.Axes:
+) -> Axes:
     """Plot phase matching.
 
     Args:

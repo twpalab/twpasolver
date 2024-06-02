@@ -6,7 +6,9 @@ from time import strftime
 from typing import Any, Literal, Optional
 
 import numpy as np
+from matplotlib.axes import Axes
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+from typing_extensions import Self
 
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.logging import log
@@ -69,25 +71,29 @@ class Analyzer(BaseModel, ABC):
             self.execute()
 
     @abstractmethod
-    def update_base_data(self):
+    def update_base_data(self) -> None:
         """Check and update base data of the class if necessary."""
 
     @classmethod
-    def from_file(cls, filename: str):
+    def from_file(cls, filename: str) -> Self:
         """Load analysis from file."""
         analysis_dict = read_file(filename, writer="json")
         return cls(**analysis_dict)
 
-    def dump_to_file(self, filename: str):
+    def dump_to_file(self, filename: str) -> None:
         """Dump analysis to file."""
         analysis_dict = self.model_dump()
         save_to_file(filename, analysis_dict, writer="json")
 
-    def save_data(self, writer="hdf5"):
+    def save_data(self, writer: str = "hdf5") -> None:
         """Save data to file."""
         save_to_file(self.data_file, self.data, writer=writer)
 
-    def execute(self):
+    def load_data(self, filename: str, writer="hdf5") -> None:
+        """Load data from file."""
+        self.data = read_file(filename, writer=writer)
+
+    def execute(self) -> None:
         """Run analysis."""
         for request in self.run:
             function = getattr(self, request.name)
@@ -155,7 +161,7 @@ class TWPAnalysis(Analyzer):
                 raise ValueError("Input string mut be valid path to model file.")
         return twpa  # type: ignore[return-value]
 
-    def update_base_data(self):
+    def update_base_data(self) -> None:
         """
         Update data extracted from the twpa model.
 
@@ -198,7 +204,7 @@ class TWPAnalysis(Analyzer):
             self.data["optimal_pump_freq"] = self._estimate_optimal_pump()
             self._previous_state = current_state
 
-    def _estimate_optimal_pump(self):
+    def _estimate_optimal_pump(self) -> float:
         """Estimate optimal pump frequency for 3WM."""
         freqs = self.data["freqs"]
         ks = self.data["k"]
@@ -366,7 +372,7 @@ class TWPAnalysis(Analyzer):
             "bw_freqs": ok_freqs,
         }
 
-    def plot_response(self, **kwargs):
+    def plot_response(self, **kwargs) -> Axes:
         """Plot response of twpa."""
         if "k_star" not in self.data:
             self.update_base_data()
@@ -378,7 +384,7 @@ class TWPAnalysis(Analyzer):
             **kwargs,
         )
 
-    def plot_gain(self, **kwargs):
+    def plot_gain(self, **kwargs) -> Axes:
         """Plot gain of twpa."""
         if "gain" not in self.data:
             raise RuntimeError("Gain data not found, please run analysis function.")
@@ -390,7 +396,7 @@ class TWPAnalysis(Analyzer):
             **kwargs,
         )
 
-    def plot_phase_matching(self, **kwargs):
+    def plot_phase_matching(self, **kwargs) -> Axes:
         """Plot phase matching profile of twpa."""
         if "phase_matching" not in self.data:
             raise RuntimeError(

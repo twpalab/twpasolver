@@ -8,6 +8,7 @@ import numpy as np
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 
 from twpasolver.abcd_matrices import ABCDArray, abcd_identity
+from twpasolver.models.base_components import Inductance
 from twpasolver.models.rf_functions import LCLf_abcd, get_stub_cell, lossless_line_abcd
 from twpasolver.twoport import TwoPortModel
 
@@ -19,6 +20,7 @@ class StubBaseCell(TwoPortModel):
 
     L: NonNegativeFloat = required(description="Inductance of the straight line.")
     C: NonNegativeFloat = required(description="Capacitance of the line.")
+    Lf: NonNegativeFloat = required(description="Inductance of the stub finger.")
     l1: NonNegativeFloat = required(description="Length of the stub finger.")
     l2: NonNegativeFloat = required(description="Length of the straight line.")
     line: bool = Field(
@@ -29,9 +31,13 @@ class StubBaseCell(TwoPortModel):
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute abcd matrix."""
         if self.line:
-            parallel_stubs = ABCDArray(get_stub_cell(freqs, self.C, self.L, self.l1, 0))
-            half_line = ABCDArray(lossless_line_abcd(freqs, self.C, self.L, self.l2))
-            return parallel_stubs @ half_line
+            parallel_stubs = ABCDArray(
+                -1 * get_stub_cell(freqs, self.C, self.Lf, self.l1, 0)
+            )
+            half_line = ABCDArray(
+                lossless_line_abcd(freqs, self.C, self.L, self.l2 / 2)
+            )
+            return half_line @ parallel_stubs @ half_line
 
         return ABCDArray(get_stub_cell(freqs, self.C, self.L, self.l1, self.l2))
 
@@ -42,9 +48,14 @@ class LCLfBaseCell(TwoPortModel):
     L: NonNegativeFloat = required(description="Inductance of the straight line.")
     C: NonNegativeFloat = required(description="Capacitance of the stub finger.")
     Lf: NonNegativeFloat = required(description="Inductance of the stub finger.")
+    centered: bool = False
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute abcd matrix."""
+        if self.centered:
+            fingers = ABCDArray(LCLf_abcd(freqs, self.C, 0, self.Lf))
+            half_inductance = Inductance(L=self.L / 2).get_abcd(freqs)
+            return half_inductance @ fingers @ half_inductance
         return ABCDArray(LCLf_abcd(freqs, self.C, self.L, self.Lf))
 
 
@@ -55,10 +66,10 @@ class TWPA(TwoPortModel):
         description="List of TwoPortModels representing the basic cells."
     )
     Istar: NonNegativeFloat = Field(
-        6.5e-3, description="Nonlinearity scale current parameter."
+        default=6.5e-3, description="Nonlinearity scale current parameter."
     )
-    Idc: NonNegativeFloat = Field(1e-3, description="Bias dc current.")
-    Ip0: NonNegativeFloat = Field(2e-4, description="Rf pump amplitude.")
+    Idc: NonNegativeFloat = Field(default=1e-3, description="Bias dc current.")
+    Ip0: NonNegativeFloat = Field(default=2e-4, description="Rf pump amplitude.")
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute abcd of supercell."""
