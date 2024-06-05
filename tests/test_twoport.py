@@ -5,6 +5,7 @@ import pytest
 
 from twpasolver.abcd_matrices import ABCDArray
 from twpasolver.mathutils import s2a
+from twpasolver.models.rf_functions import inductance, series_impedance_abcd
 from twpasolver.twoport import TwoPortCell, TwoPortModel
 
 
@@ -76,6 +77,18 @@ def test_getitem():
     assert np.array_equal(sliced_cell.freqs, freqs[1:])
     assert np.array_equal(sliced_cell.abcd, abcd_mat[1:])
     assert sliced_cell.Z0 == 50
+
+
+def test_interpolate():
+    freqs_base = np.linspace(1, 10, 10)
+    freqs_interp = np.linspace(1, 10, 100)
+    L_abcd = series_impedance_abcd(inductance(freqs_base, 0.1))
+    L_interp = inductance(freqs_interp, 0.1)
+    cell_base = TwoPortCell(freqs_base, L_abcd)
+    cell_interp_cartesian = cell_base.interpolate(freqs_interp, polar=False)
+    cell_interp_polar = cell_base.interpolate(freqs_interp, polar=True)
+    assert np.allclose(cell_interp_cartesian.abcd.B, L_interp)
+    assert np.allclose(cell_interp_polar.abcd.B, L_interp)
 
 
 def test_model_update():

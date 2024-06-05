@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -10,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt
 
 from twpasolver.abcd_matrices import ABCDArray
 from twpasolver.file_utils import read_file, save_to_file
+from twpasolver.logging import log
 from twpasolver.mathutils import a2s, s2a
 from twpasolver.typing import Impedance, validate_impedance
 
@@ -18,7 +20,10 @@ class TwoPortCell:
     """Class representing a two-port RF cell."""
 
     def __init__(
-        self, freqs: np.ndarray, abcd: np.ndarray | ABCDArray, Z0: Impedance = 50
+        self,
+        freqs: np.ndarray,
+        abcd: np.ndarray | ABCDArray,
+        Z0: Impedance = 50,
     ):
         """
         Initialize the TwoPortCell instance.
@@ -99,6 +104,31 @@ class TwoPortCell:
     def dump_to_file(self, filename: str, writer="hdf5"):
         """Dump cell to file."""
         save_to_file(filename, self.as_dict(), writer=writer)
+
+    def interpolate(self, freqs: np.ndarray, polar: bool = True) -> TwoPortCell:
+        """
+        Return abcd matrix of internal cell interpolating the given frequencies.
+
+        Parameters:
+        - polar (bool): polar: Interpolate magnitude and phase instead of real and imaginary part
+        """
+        if np.array_equal(freqs, self.freqs):
+            return self
+        if freqs[0] < self.freqs[0] or freqs[-1] > self.freqs[-1]:
+            log.warning("Interpolation out of predefined range might be imprecise.")
+
+        abcd_interp = []
+        for i, j in itertools.product(range(2), repeat=2):
+            if polar:
+                interp_mag = np.interp(freqs, self.freqs, np.abs(self.abcd[:, i, j]))
+                interp_phase = np.interp(
+                    freqs, self.freqs, np.unwrap(np.angle(self.abcd[:, i, j]))
+                )
+
+                abcd_interp.append(interp_mag * np.exp(1j * interp_phase))
+            else:
+                abcd_interp.append(np.interp(freqs, self.freqs, self.abcd[:, i, j]))
+        return self.__class__(freqs, np.array(abcd_interp), self.Z0)
 
 
 class TwoPortModel(BaseModel, ABC):
