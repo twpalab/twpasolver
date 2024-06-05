@@ -3,16 +3,27 @@
 import numpy as np
 import pytest
 
-from twpasolver.matrices_arrays import ABCDArray
+from twpasolver.matrices_arrays import ABCDArray, TwoByTwoArray
 from twpasolver.models.twpa import TWPA
 from twpasolver.twoport import TwoPortCell
 
 
 @pytest.fixture()
-def abcd_array():
+def array2x2_numpy():
+    """Predefined data for 2x2 matrices arrays."""
+    return np.array([[[1, 2], [3, 4]], [[5, 6], [7, 8j]]])
+
+
+@pytest.fixture()
+def tbt_array(array2x2_numpy):
     """Fixture providing an ABCDArray instance with predefined data."""
-    mat = np.array([[[1, 2], [3, 4]], [[5, 6], [7, 8j]]])
-    return ABCDArray(mat)
+    return TwoByTwoArray(array2x2_numpy)
+
+
+@pytest.fixture()
+def abcd_array(array2x2_numpy):
+    """Fixture providing an ABCDArray instance with predefined data."""
+    return ABCDArray(array2x2_numpy)
 
 
 @pytest.fixture
