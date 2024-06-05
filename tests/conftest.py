@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from twpasolver.abcd_matrices import ABCDArray
+from twpasolver.matrices_arrays import ABCDArray
 from twpasolver.models.twpa import TWPA
 from twpasolver.twoport import TwoPortCell
 

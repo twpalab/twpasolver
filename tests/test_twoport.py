@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from twpasolver.abcd_matrices import ABCDArray
 from twpasolver.mathutils import s2a
+from twpasolver.matrices_arrays import ABCDArray
 from twpasolver.models.rf_functions import inductance, series_impedance_abcd
 from twpasolver.twoport import TwoPortCell, TwoPortModel
 

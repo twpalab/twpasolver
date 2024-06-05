@@ -7,7 +7,7 @@ from typing import Callable
 import numpy as np
 from pydantic import NonNegativeFloat, PrivateAttr
 
-from twpasolver.abcd_matrices import ABCDArray
+from twpasolver.matrices_arrays import ABCDArray
 from twpasolver.models.rf_functions import (
     capacitance,
     inductance,

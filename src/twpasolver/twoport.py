@@ -9,10 +9,10 @@ import numpy as np
 import skrf as rf
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt
 
-from twpasolver.abcd_matrices import ABCDArray
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.logging import log
 from twpasolver.mathutils import a2s, s2a
+from twpasolver.matrices_arrays import ABCDArray, SMatrixArray
 from twpasolver.typing import Impedance, validate_impedance
 
 
@@ -85,7 +85,7 @@ class TwoPortCell:
 
     def get_s_par(self):
         """Return S-parameter matrix."""
-        return a2s(np.asarray(self.abcd), self.Z0)
+        return SMatrixArray(a2s(np.asarray(self.abcd), self.Z0))
 
     def __repr__(self):
         """Return a string representation of the TwoPortCell."""
