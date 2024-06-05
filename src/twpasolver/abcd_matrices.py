@@ -13,12 +13,18 @@ class ABCDArray:
         Initialize the ABCDArray instance.
 
         Parameters:
-        - mat (numpy.ndarray): Input array of 2x2 matrices.
+        - mat (numpy.ndarray): Input array of 2x2 matrices or [A,B,C,D], where each element is a 1D list.
         - Z0 (float or int): Line impedance
         """
         mat = np.asarray(mat)
+        # transform the input to array of 2x2 matrices
+        if len(mat.shape) == 2 and len(mat) == 4:
+            mat = mat.reshape(2, 2, mat.shape[1]).transpose(2, 0, 1)
+        # check if the array has now the correct shape
         if len(mat.shape) != 3 or mat.shape[-2:] != (2, 2):
-            raise ValueError("Input must be array of 2x2 matrices.")
+            raise ValueError(
+                "Input must be array of 2x2 matrices or [A, B, C, D], where each element is a list."
+            )
         self._abcd = mat
 
     def __repr__(self):

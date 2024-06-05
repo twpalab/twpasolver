@@ -1,4 +1,5 @@
 """Tests for abcd_matrices module."""
+
 import numpy as np
 import pytest
 
@@ -10,6 +11,17 @@ def test_create_abcd_array():
     mat = np.array([[[1, 2], [3, 4]], [[5, 6], [7, 8j]]])
     abcd_array = ABCDArray(mat)
     assert np.array_equal(abcd_array._abcd, mat)
+
+
+def test_create_abcd_array_transposed(abcd_array):
+    """Test creating an ABCDArray instance from [A,B,C,D] structure."""
+    A = [1, 5]
+    B = [2, 6]
+    C = [3, 7]
+    D = [4, 8j]
+    mat = np.array([A, B, C, D])
+    abcd_array_from_transpose = ABCDArray(mat)
+    assert np.array_equal(abcd_array._abcd, abcd_array_from_transpose._abcd)
 
 
 def test_invalid_input_shape():
