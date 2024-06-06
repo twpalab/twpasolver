@@ -1,13 +1,19 @@
-name: Lint-Test-Mypy
+name: Docs
 
-on: [push]
+on:
+  push:
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10"]
+    permissions:
+      contents: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
