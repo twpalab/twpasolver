@@ -33,10 +33,13 @@ extensions = [
 
 templates_path = ["_templates"]
 exclude_patterns = []
-# autodoc_pydantic_model_show_json = True
+autodoc_pydantic_model_show_json = True
+autodoc_pydantic_model_show_fields_summary = True
 autodoc_pydantic_model_show_config_summary = False
-autodoc_pydantic_model_show_fields_summary = False
-
+autodoc_pydantic_model_show_undoc_members = False
+autodoc_pydantic_model_members = False
+autodoc_pydantic_field_doc_policy = "description"
+autodoc_pydantic_model_member_order = "bysource"
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
