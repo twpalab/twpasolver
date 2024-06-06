@@ -1,6 +1,7 @@
 """ABCD matrices array module."""
 
 import numpy as np
+from typing_extensions import Self
 
 from twpasolver.mathutils import matmul_2x2, matpow_2x2
 
@@ -13,14 +14,13 @@ class TwoByTwoArray:
         Initialize the TwoByTwoArray instance.
 
         Args:
-          mat (numpy.ndarray): Input array of 2x2 matrices or [x11,x12,x21,x22], where each element is a 1D list.
-          Z0 (float or int): Line impedance
+            mat (numpy.ndarray): Input array of 2x2 matrices or [x11,x12,x21,x22], where each element is a 1D list.
         """
         mat = np.asarray(mat)
-        # transform the input to array of 2x2 matrices
+        # Transform the input to array of 2x2 matrices
         if len(mat.shape) == 2 and len(mat) == 4:
             mat = mat.reshape(2, 2, mat.shape[1]).transpose(2, 0, 1)
-        # check if the array has now the correct shape
+        # Check if the array has now the correct shape
         if len(mat.shape) != 3 or mat.shape[-2:] != (2, 2):
             raise ValueError(
                 "Input must be array of 2x2 matrices or [A, B, C, D], where each element is a list."
@@ -32,7 +32,7 @@ class TwoByTwoArray:
         Return a string representation of the TwoByTwoArray.
 
         Returns:
-        - str: String representation of the TwoByTwoArray.
+            str: String representation of the TwoByTwoArray.
         """
         return f"{self.__class__.__name__}({self._matarray})"
 
@@ -40,14 +40,28 @@ class TwoByTwoArray:
         """Convert the TwoByTwoArray to a numpy array."""
         return self._matarray
 
-    def __getitem__(self, indices) -> "TwoByTwoArray | np.ndarray":
-        """Get value at indices."""
+    def __getitem__(self, indices) -> Self | np.ndarray:
+        """
+        Get value at indices.
+
+        Args:
+            indices: Indices to access the array.
+
+        Returns:
+            TwoByTwoArray | numpy.ndarray: Value at the specified indices.
+        """
         if isinstance(indices, slice):
             return self.__class__(self._matarray[indices])
         return self._matarray[indices]
 
-    def __setitem__(self, val: float | int, *indices):
-        """Set value at indices."""
+    def __setitem__(self, indices, val: float | int):
+        """
+        Set value at indices.
+
+        Args:
+            indices: Indices to set the value.
+            val (float | int): Value to set at the specified indices.
+        """
         self._matarray[indices] = val
 
     @property
@@ -64,12 +78,12 @@ class TwoByTwoArray:
         """
         Get the specified parameter of the 2x2 matrices.
 
-        Parameters:
-        - i (int): Row index (0 or 1).
-        - k (int): Column index (0 or 1).
+        Args:
+            i (int): Row index (0 or 1).
+            k (int): Column index (0 or 1).
 
         Returns:
-        - numpy.ndarray: The specified parameter of the 2x2 matrices.
+            numpy.ndarray: The specified parameter of the 2x2 matrices.
         """
         return self._matarray[:, i, k]
 
@@ -77,10 +91,10 @@ class TwoByTwoArray:
         """
         Set the specified parameter of the 2x2 matrices.
 
-        Parameters:
-        - i (int): Row index (0 or 1).
-        - k (int): Column index (0 or 1).
-        - values (numpy.ndarray): Values to set for the specified parameter.
+        Args:
+            i (int): Row index (0 or 1).
+            k (int): Column index (0 or 1).
+            values (numpy.ndarray): Values to set for the specified parameter.
         """
         if values.ndim != 1 and len(values) != self.len:
             raise ValueError(f"Must provide a 1-D array of length {self.len}")
@@ -90,27 +104,27 @@ class TwoByTwoArray:
 class ABCDArray(TwoByTwoArray):
     """A class representing an array of ABCD matrices."""
 
-    def __matmul__(self, other: "ABCDArray") -> "ABCDArray":
+    def __matmul__(self, other: Self) -> Self:
         """
         Efficient matrix multiplication with another ABCDArray.
 
-        Parameters:
-        - other (ABCDArray): Another ABCDArray for matrix multiplication.
+        Args:
+            other (ABCDArray): Another ABCDArray for matrix multiplication.
 
         Returns:
-        - ABCDArray: Result of the matrix multiplication.
+            ABCDArray: Result of the matrix multiplication.
         """
         return self.__class__(matmul_2x2(self._matarray, other._matarray))
 
-    def __pow__(self, exponent: int) -> "ABCDArray":
+    def __pow__(self, exponent: int) -> Self:
         """
         Efficient matrix exponentiation of the ABCDArray.
 
-        Parameters:
-        - exponent (int): The exponent to raise the ABCDArray to.
+        Args:
+            exponent (int): The exponent to raise the ABCDArray to.
 
         Returns:
-        - ABCDArray: Result of raising the ABCDArray to the specified power.
+            ABCDArray: Result of raising the ABCDArray to the specified power.
         """
         return self.__class__(matpow_2x2(self._matarray, exponent))
 
@@ -121,7 +135,12 @@ class ABCDArray(TwoByTwoArray):
 
     @A.setter
     def A(self, value: np.ndarray):
-        """Setter for the A parameter."""
+        """
+        Setter for the A parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the A parameter.
+        """
         self._set_parameter(0, 0, value)
 
     @property
@@ -131,7 +150,12 @@ class ABCDArray(TwoByTwoArray):
 
     @B.setter
     def B(self, value: np.ndarray):
-        """Setter for the B parameter."""
+        """
+        Setter for the B parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the B parameter.
+        """
         self._set_parameter(0, 1, value)
 
     @property
@@ -141,7 +165,12 @@ class ABCDArray(TwoByTwoArray):
 
     @C.setter
     def C(self, value: np.ndarray):
-        """Setter for the C parameter."""
+        """
+        Setter for the C parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the C parameter.
+        """
         self._set_parameter(1, 0, value)
 
     @property
@@ -151,7 +180,12 @@ class ABCDArray(TwoByTwoArray):
 
     @D.setter
     def D(self, value: np.ndarray):
-        """Setter for the D parameter."""
+        """
+        Setter for the D parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the D parameter.
+        """
         self._set_parameter(1, 1, value)
 
 
@@ -165,7 +199,12 @@ class SMatrixArray(TwoByTwoArray):
 
     @S11.setter
     def S11(self, value: np.ndarray):
-        """Setter for the S11 parameter."""
+        """
+        Setter for the S11 parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the S11 parameter.
+        """
         self._set_parameter(0, 0, value)
 
     @property
@@ -175,7 +214,12 @@ class SMatrixArray(TwoByTwoArray):
 
     @S12.setter
     def S12(self, value: np.ndarray):
-        """Setter for the S12 parameter."""
+        """
+        Setter for the S12 parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the S12 parameter.
+        """
         self._set_parameter(0, 1, value)
 
     @property
@@ -185,7 +229,12 @@ class SMatrixArray(TwoByTwoArray):
 
     @S21.setter
     def S21(self, value: np.ndarray):
-        """Setter for the S21 parameter."""
+        """
+        Setter for the S21 parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the S21 parameter.
+        """
         self._set_parameter(1, 0, value)
 
     @property
@@ -195,7 +244,12 @@ class SMatrixArray(TwoByTwoArray):
 
     @S22.setter
     def S22(self, value: np.ndarray):
-        """Setter for the S22 parameter."""
+        """
+        Setter for the S22 parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the S22 parameter.
+        """
         self._set_parameter(1, 1, value)
 
 
@@ -204,6 +258,9 @@ def abcd_identity(N_abcd: int) -> ABCDArray:
     Get abcd array of identity matrices.
 
     Args:
-        N_abcd (int): number of matrices in array.
+        N_abcd (int): Number of matrices in array.
+
+    Returns:
+        ABCDArray: Array of identity matrices.
     """
     return ABCDArray(np.array([[[1, 0], [0, 1]]] * N_abcd))

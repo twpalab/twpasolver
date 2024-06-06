@@ -1,4 +1,4 @@
-"""Utility function for mathematic expressions."""
+"""Utility functions for mathematic expressions and rf equations."""
 
 from typing import Tuple
 
@@ -18,7 +18,16 @@ def matmul_2x2(
     matrices_a: complex_array,
     matrices_b: complex_array,
 ) -> complex_array:
-    """Fast multiplication between list of 2x2 matrices."""
+    """
+    Fast multiplication between array of 2x2 matrices.
+
+    Args:
+        matrices_a (complex_array): array of 2x2 complex matrices.
+        matrices_b (complex_array): array of 2x2 complex matrices.
+
+    Returns:
+        complex_array: Resultant array of 2x2 complex matrices after multiplication.
+    """
     assert matrices_a.shape == matrices_b.shape
     assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
 
@@ -37,7 +46,16 @@ def matmul_2x2(
 
 @nb.njit(cache=True)
 def matpow_2x2(matrices_a: complex_array, exponent: int) -> complex_array:
-    """Fast exponentiation of list of 2x2 matrices with recursion."""
+    """
+    Fast exponentiation of array of 2x2 matrices with recursion.
+
+    Args:
+        matrices_a (complex_array): array of 2x2 complex matrices.
+        exponent (int): Exponent to which matrices are to be raised.
+
+    Returns:
+        complex_array: Resultant array of 2x2 complex matrices after exponentiation.
+    """
     assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
     assert exponent > 0
     if exponent == 1:
@@ -62,7 +80,16 @@ def matpow_2x2(matrices_a: complex_array, exponent: int) -> complex_array:
 
 @nb.njit(cache=True)
 def a2s(abcd: complex_array, Z0: complex | float) -> complex_array:
-    """Convert list of ABCD matrices to list of S parameters."""
+    """
+    Convert array of ABCD matrices to array of S parameters.
+
+    Args:
+        abcd (complex_array): array of 2x2 ABCD matrices.
+        Z0 (complex | float): Reference impedance.
+
+    Returns:
+        complex_array: array of 2x2 S-parameter matrices.
+    """
     assert abcd.shape[1] == 2 and abcd.shape[2] == 2
     assert np.real(Z0) > 0
     n_mat = abcd.shape[0]
@@ -82,7 +109,16 @@ def a2s(abcd: complex_array, Z0: complex | float) -> complex_array:
 
 @nb.njit(cache=True)
 def s2a(spar: complex_array, Z0: complex | float) -> complex_array:
-    """Convert list of S parameters to list of ABCD matrices."""
+    """
+    Convert array of S parameters to array of ABCD matrices.
+
+    Args:
+        spar (complex_array): array of 2x2 S-parameter matrices.
+        Z0 (complex | float): Reference impedance.
+
+    Returns:
+        complex_array: array of 2x2 ABCD matrices.
+    """
     assert spar.shape[1] == 2 and spar.shape[2] == 2
     assert np.real(Z0) > 0
     n_mat = spar.shape[0]
@@ -100,21 +136,47 @@ def s2a(spar: complex_array, Z0: complex | float) -> complex_array:
 
 
 @nb.njit(cache=True)
-def to_dB(values: float_array | complex_array):
-    """Convert array of values to dB."""
+def to_dB(values: float_array | complex_array) -> float_array:
+    """
+    Convert array of values to dB.
+
+    Args:
+        values (float_array | complex_array): Array of values to be converted to dB.
+
+    Returns:
+        float_array: Array of values in dB.
+    """
     return np.log10(np.abs(values))
 
 
 @nb.njit(cache=True)
-def dBm_to_I(power: float, Z0: float = 50):
-    """Convert from dBm to A."""
+def dBm_to_I(power: float, Z0: float = 50) -> float:
+    """
+    Convert from dBm to A.
+
+    Args:
+        power (float): Power in dBm.
+        Z0 (float, optional): Reference impedance, default is 50 ohms.
+
+    Returns:
+        float: Current amplitude in A.
+    """
     pw = 10 ** (power / 10) / 1000  # power in W
     return np.sqrt(pw / Z0 * 2)  # current amplitude, in A
 
 
 @nb.njit(cache=True)
-def I_to_dBm(curr: float, Z0: float = 50):
-    """Convert from A to dBm."""
+def I_to_dBm(curr: float, Z0: float = 50) -> float:
+    """
+    Convert from A to dBm.
+
+    Args:
+        curr (float): Current amplitude in A.
+        Z0 (float, optional): Reference impedance, default is 50 ohms.
+
+    Returns:
+        float: Power in dBm.
+    """
     pw = curr**2 / 2 * Z0
     return 10 * np.log10(pw * 1000)
 

@@ -14,9 +14,12 @@ def read_file(savename: str, writer: str = "json") -> Dict[str, Any]:
     """
     Read data from a file and return it as a dictionary.
 
-    :param savename: The name of the file to read.
-    :param writer: The file format to use (default is "json").
-    :return: Dictionary containing the read data.
+    Args:
+        savename (str): The name of the file to read.
+        writer (str): The file format to use (default is "json").
+
+    Returns:
+        Dict[str, Any]: Dictionary containing the read data.
     """
     savename = add_extension(savename, writer)
     if not os.path.exists(savename):
@@ -28,10 +31,10 @@ def save_to_file(savename: str, d: Dict[str, Any], writer: str = "json") -> None
     """
     Save data to a file in the specified format.
 
-    :param savename: The name of the file to save.
-    :param d: Dictionary containing data to be saved.
-    :param writer: The file format to use (default is "json").
-    :return: None
+    Args:
+        savename (str): The name of the file to save.
+        d (Dict[str, Any]): Dictionary containing data to be saved.
+        writer (str): The file format to use (default is "json").
     """
     savename = add_extension(savename, writer)
     ensure_directory_exists(savename)
@@ -39,14 +42,28 @@ def save_to_file(savename: str, d: Dict[str, Any], writer: str = "json") -> None
 
 
 def add_extension(filename: str, extension: str) -> str:
-    """Add the specified extension to the filename if not already present."""
+    """
+    Add the specified extension to the filename if not already present.
+
+    Args:
+        filename (str): The name of the file.
+        extension (str): The extension to add.
+
+    Returns:
+        str: Filename with the specified extension.
+    """
     if not filename.endswith(f".{extension}"):
         return f"{filename}.{extension}"
     return filename
 
 
 def ensure_directory_exists(filename: str) -> None:
-    """Ensure that the directory for the given filename exists; create it if necessary."""
+    """
+    Ensure that the directory for the given filename exists; create it if necessary.
+
+    Args:
+        filename (str): The name of the file.
+    """
     directory = os.path.dirname(filename)
     if directory:
         if not os.path.exists(directory):
@@ -54,40 +71,68 @@ def ensure_directory_exists(filename: str) -> None:
 
 
 def read_hdf5(savename: str) -> Dict[str, Any]:
-    """Read data from an HDF5 file and return it as a dictionary."""
+    """
+    Read data from an HDF5 file and return it as a dictionary.
+
+    Args:
+        savename (str): The name of the HDF5 file to read.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing the read data.
+    """
     with h5py.File(savename, "r") as f:
-        return recursively_load_dict_contents_from_group(f)
+        return _recursively_load_dict_contents_from_group(f)
 
 
 def read_json(savename: str) -> Dict[str, Any]:
-    """Read data from a JSON file and return it as a dictionary."""
+    """
+    Read data from a JSON file and return it as a dictionary.
+
+    Args:
+        savename (str): The name of the JSON file to read.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing the read data.
+    """
     with open(savename) as f:
         return json.load(f)
 
 
 def save_to_hdf5(savename: str, d: Dict[str, Any]) -> None:
-    """Save data to an HDF5 file."""
+    """
+    Save data to an HDF5 file.
+
+    Args:
+        savename (str): The name of the HDF5 file to save.
+        d (Dict[str, Any]): Dictionary containing data to be saved.
+    """
     if not isinstance(d, dict):
         return
 
     with h5py.File(savename, "w") as f:
-        recursively_save_dict_contents_to_group(f, d)
+        _recursively_save_dict_contents_to_group(f, d)
 
 
 def save_to_json(savename: str, d: Dict[str, Any]) -> None:
-    """Save data to a JSON file."""
+    """
+    Save data to a JSON file.
+
+    Args:
+        savename (str): The name of the JSON file to save.
+        d (Dict[str, Any]): Dictionary containing data to be saved.
+    """
     with open(savename, "w", encoding="utf-8") as fp:
         json.dump(d, fp, cls=NpEncoder, indent=4)
 
 
-def recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> None:
+def _recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> None:
     """Recursively save dictionary contents to an HDF5 group."""
     for key, item in d.items():
         key = str(key)
 
         if isinstance(item, dict):
             subgroup = f.create_group(key)
-            recursively_save_dict_contents_to_group(subgroup, item)
+            _recursively_save_dict_contents_to_group(subgroup, item)
         else:
             if isinstance(item, list | tuple):
                 item = np.array(item)
@@ -100,7 +145,7 @@ def recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> None
             f.create_dataset(key, data=item, dtype=dtype)
 
 
-def recursively_load_dict_contents_from_group(f: Group) -> Dict[str, Any]:
+def _recursively_load_dict_contents_from_group(f: Group) -> Dict[str, Any]:
     """Recursively load dictionary contents from an HDF5 group."""
     ans = dict()
     for key, item in f.items():
@@ -109,7 +154,7 @@ def recursively_load_dict_contents_from_group(f: Group) -> Dict[str, Any]:
                 item[()].decode("utf-8") if isinstance(item[()], bytes) else item[()]
             )
         elif isinstance(item, Group):
-            ans[key] = recursively_load_dict_contents_from_group(f[key])
+            ans[key] = _recursively_load_dict_contents_from_group(f[key])
     return ans
 
 

@@ -7,22 +7,54 @@ from twpasolver.typing import complex_array, float_array
 
 
 @njit
-def inductance(freqs: float_array, L: float):
-    """Impedance of inductance as function of frequency."""
+def inductance(freqs: float_array, L: float) -> complex_array:
+    """
+    Calculate the impedance of an inductance as a function of frequency.
+
+    Args:
+        freqs (float_array): Array of frequencies.
+        L (float): Inductance value.
+
+    Returns:
+        np.ndarray: Impedance of the inductance.
+    """
     assert L >= 0
     return 2j * np.pi * freqs * L
 
 
 @njit
-def capacitance(freqs: float_array, C: float):
-    """Impedance of capacitor as function of frequency."""
+def capacitance(freqs: float_array, C: float) -> complex_array:
+    """
+    Calculate the impedance of a capacitor as a function of frequency.
+
+    Args:
+        freqs (float_array): Array of frequencies.
+        C (float): Capacitance value.
+
+    Returns:
+        np.ndarray: Impedance of the capacitor.
+    """
     assert C >= 0
     return -1j / (2 * np.pi * freqs * C)
 
 
 @njit
-def stub(freqs: float_array, L: float, C: float, length: float, open: bool = True):
-    """Impedance of stub as function of frequency."""
+def stub(
+    freqs: float_array, L: float, C: float, length: float, open: bool = True
+) -> complex_array:
+    """
+    Calculate the impedance of a stub as a function of frequency.
+
+    Args:
+        freqs (float_array): Array of frequencies.
+        L (float): Inductance value.
+        C (float): Capacitance value.
+        length (float): Length of the stub.
+        open (bool): If True, calculate for an open stub; otherwise, for a short stub.
+
+    Returns:
+        np.ndarray: Impedance of the stub.
+    """
     beta_l = 2 * np.pi * freqs * np.sqrt(L * C) * length
     Z = np.sqrt(L / C)
     if open:
@@ -31,8 +63,16 @@ def stub(freqs: float_array, L: float, C: float, length: float, open: bool = Tru
 
 
 @njit
-def parallel_admittance_abcd(Y: complex_array):
-    """Get abcd matrix of parallel admittance."""
+def parallel_admittance_abcd(Y: complex_array) -> complex_array:
+    """
+    Calculate the ABCD matrix of a parallel admittance.
+
+    Args:
+        Y (complex_array): Array of admittance values.
+
+    Returns:
+        np.ndarray: ABCD matrix of the parallel admittance.
+    """
     abcd = np.zeros((len(Y), 2, 2), dtype=np.complex128)
     abcd[:, 0, 0] = 1
     abcd[:, 1, 1] = 1
@@ -41,8 +81,16 @@ def parallel_admittance_abcd(Y: complex_array):
 
 
 @njit
-def series_impedance_abcd(Z: complex_array):
-    """Get abcd matrix of series impedance."""
+def series_impedance_abcd(Z: complex_array) -> complex_array:
+    """
+    Calculate the ABCD matrix of a series impedance.
+
+    Args:
+        Z (complex_array): Array of impedance values.
+
+    Returns:
+        np.ndarray: ABCD matrix of the series impedance.
+    """
     abcd = np.zeros((len(Z), 2, 2), dtype=np.complex128)
     abcd[:, 0, 0] = 1
     abcd[:, 1, 1] = 1
@@ -54,7 +102,18 @@ def series_impedance_abcd(Z: complex_array):
 def lossless_line_abcd(
     freqs: float_array, C: float, L: float, l: float
 ) -> complex_array:
-    """Get base abcd matrix of lossless line."""
+    """
+    Calculate the ABCD matrix of a lossless transmission line.
+
+    Args:
+        freqs (float_array): Array of frequencies.
+        C (float): Capacitance per unit length.
+        L (float): Inductance per unit length.
+        l (float): Length of the transmission line.
+
+    Returns:
+        np.ndarray: ABCD matrix of the lossless transmission line.
+    """
     assert C >= 0
     assert L >= 0
     Z0 = np.sqrt(L / C)
@@ -63,22 +122,25 @@ def lossless_line_abcd(
     for i in range(n_mat):
         beta = 2 * np.pi * freqs[i] * np.sqrt(L * C) * l
         abcd[i, 0, 0] = np.cos(beta)
-
         abcd[i, 0, 1] = 1j * Z0 * np.sin(beta)
         abcd[i, 1, 0] = 1j * np.sin(beta) / Z0
         abcd[i, 1, 1] = np.cos(beta)
-
     return abcd
 
 
 @njit
 def LCLf_abcd(freqs: float_array, C: float, L: float, Lf: float) -> complex_array:
     """
-    Get abcd matrix of LCLf cell model.
+    Calculate the ABCD matrix of an LCLf cell model.
 
-    'ABCD matrix computation for the single cell of a fishbone line
-    PRX Quantum 2 (2021) 010302
-    https://doi.org/10.1103/PRXQuantum.2.010302'
+    Args:
+        freqs (float_array): Array of frequencies.
+        C (float): Capacitance value.
+        L (float): Inductance value.
+        Lf (float): Additional inductance value.
+
+    Returns:
+        np.ndarray: ABCD matrix of the LCLf cell model.
     """
     assert C >= 0
     assert L >= 0
@@ -97,13 +159,21 @@ def LCLf_abcd(freqs: float_array, C: float, L: float, Lf: float) -> complex_arra
 
 @njit
 def get_stub_cell(
-    freqs: float_array,
-    C: float,
-    L: float,
-    l1: float,
-    l2: float,
+    freqs: float_array, C: float, L: float, l1: float, l2: float
 ) -> complex_array:
-    """Get abcd matrix of stub cell model."""
+    """
+    Calculate the ABCD matrix of a stub cell model.
+
+    Args:
+        freqs (float_array): Array of frequencies.
+        C (float): Capacitance value.
+        L (float): Inductance value.
+        l1 (float): Length of the first section of the stub.
+        l2 (float): Length of the second section of the stub.
+
+    Returns:
+        np.ndarray: ABCD matrix of the stub cell model.
+    """
     assert C >= 0
     assert L >= 0
     Z0 = np.sqrt(L / C)
@@ -117,10 +187,7 @@ def get_stub_cell(
         Z3_inv = 2 * 1j * np.tan(beta) / Z0
 
         abcd[i, 0, 0] = 1
-
         abcd[i, 0, 1] = Z2
-
         abcd[i, 1, 0] = Z3_inv
         abcd[i, 1, 1] = 1 + Z2 * Z3_inv
-
     return abcd
