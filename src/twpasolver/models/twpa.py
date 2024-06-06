@@ -7,7 +7,7 @@ from functools import partial
 import numpy as np
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 
-from twpasolver.abcd_matrices import ABCDArray, abcd_identity
+from twpasolver.matrices_arrays import ABCDArray, abcd_identity
 from twpasolver.models.base_components import Inductance
 from twpasolver.models.rf_functions import LCLf_abcd, get_stub_cell, lossless_line_abcd
 from twpasolver.twoport import TwoPortModel

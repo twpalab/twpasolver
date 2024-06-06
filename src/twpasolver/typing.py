@@ -11,7 +11,12 @@ from typing_extensions import Annotated
 
 
 def validate_impedance(Z: complex | float | str) -> complex | float:
-    """Validate impedance value."""
+    """
+    Validate impedance value.
+
+    Args:
+        Z (complex | float | str): Input impedance value.
+    """
     try:
         Z = complex(Z)
     except:

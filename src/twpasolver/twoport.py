@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import itertools
 from abc import ABC, abstractmethod
 
 import numpy as np
 import skrf as rf
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt
 
-from twpasolver.abcd_matrices import ABCDArray
 from twpasolver.file_utils import read_file, save_to_file
+from twpasolver.logging import log
 from twpasolver.mathutils import a2s, s2a
+from twpasolver.matrices_arrays import ABCDArray, SMatrixArray
 from twpasolver.typing import Impedance, validate_impedance
 
 
@@ -18,15 +20,18 @@ class TwoPortCell:
     """Class representing a two-port RF cell."""
 
     def __init__(
-        self, freqs: np.ndarray, abcd: np.ndarray | ABCDArray, Z0: Impedance = 50
+        self,
+        freqs: np.ndarray,
+        abcd: np.ndarray | ABCDArray,
+        Z0: Impedance = 50,
     ):
         """
         Initialize the TwoPortCell instance.
 
-        Parameters:
-        - freqs (numpy.ndarray): Frequencies of the network.
-        - mat (numpy.ndarray): Input array of 2x2 matrices.
-        - Z0 (complex | float): Line impedance.
+        Args:
+            freqs (numpy.ndarray): Frequencies of the network.
+            abcd (numpy.ndarray | ABCDArray): Input array of 2x2 matrices.
+            Z0 (Impedance): Reference line impedance.
         """
         if not isinstance(abcd, ABCDArray):
             abcd = ABCDArray(abcd)
@@ -38,13 +43,32 @@ class TwoPortCell:
 
     @classmethod
     def from_s_par(cls, freqs: np.ndarray, s_mat: np.ndarray, Z0: float | int = 50):
-        """Instantiate from array of S-parameters."""
+        """
+        Instantiate from array of S-parameters.
+
+        Args:
+            freqs (numpy.ndarray): Frequencies of the network.
+            s_mat (numpy.ndarray): S-parameter matrix.
+            Z0 (float | int): Reference line impedance.
+
+        Returns:
+            TwoPortCell: Instance of TwoPortCell.
+        """
         abcd_mat = s2a(s_mat, Z0)
         return cls(freqs, abcd_mat, Z0=Z0)
 
     @classmethod
     def from_file(cls, filename: str, writer="hdf5"):
-        """Load model from file."""
+        """
+        Load model from file.
+
+        Args:
+            filename (str): Name of the file.
+            writer (str): File format.
+
+        Returns:
+            TwoPortCell: Instance of TwoPortCell.
+        """
         model_dict = read_file(filename, writer=writer)
         return cls(model_dict["freqs"], model_dict["abcd"], model_dict["Z0"])
 
@@ -55,6 +79,12 @@ class TwoPortCell:
 
     @freqs.setter
     def freqs(self, freqs: np.ndarray):
+        """
+        Set the frequencies.
+
+        Args:
+            freqs (numpy.ndarray): Frequencies array.
+        """
         if freqs.ndim != 1:
             raise ValueError("Frequencies must be 1-D array")
         if min(freqs) < 0:
@@ -65,40 +95,109 @@ class TwoPortCell:
 
     @property
     def Z0(self) -> Impedance:
-        """Line impedance getter."""
+        """Reference line impedance getter."""
         return self._Z0
 
     @Z0.setter
     def Z0(self, value: Impedance):
+        """
+        Set the line impedance.
+
+        Args:
+            value (Impedance): Reference line impedance.
+        """
         validate_impedance(value)
         self._Z0 = value
 
     def to_network(self):
-        """Convert to scikit-rf Network."""
+        """
+        Convert to scikit-rf Network.
+
+        Returns:
+            rf.Network: scikit-rf Network.
+        """
         f = rf.Frequency.from_f(self.freqs * 1e-9, "ghz")
         return rf.Network(frequency=f, a=np.asarray(self.abcd))
 
     def get_s_par(self):
-        """Return S-parameter matrix."""
-        return a2s(np.asarray(self.abcd), self.Z0)
+        """
+        Return S-parameter matrix.
+
+        Returns:
+            SMatrixArray: S-parameter matrix.
+        """
+        return SMatrixArray(a2s(np.asarray(self.abcd), self.Z0))
 
     def __repr__(self):
-        """Return a string representation of the TwoPortCell."""
+        """
+        Return a string representation of the TwoPortCell.
+
+        Returns:
+            str: String representation of the TwoPortCell.
+        """
         return f"{self.__class__.__name__}(freqs={self.freqs},\nabcd={self.abcd},\nZ0={self.Z0})"
 
-    def __getitem__(self, idxs):
-        """Get slice of TwoPortCell."""
+    def __getitem__(self, idxs: slice):
+        """
+        Get slice of TwoPortCell.
+
+        Args:
+            idxs (slice): Slice indices.
+
+        Returns:
+            TwoPortCell: Sliced instance of TwoPortCell.
+        """
         if not isinstance(idxs, slice):
             raise ValueError("Only slicing of TwoPortCell is allowed")
         return self.__class__(self.freqs[idxs], self.abcd[idxs], self.Z0)
 
     def as_dict(self):
-        """Return cell contents as dictionary."""
+        """
+        Return cell contents as dictionary.
+
+        Returns:
+            dict: Dictionary containing cell contents.
+        """
         return {"freqs": self.freqs, "abcd": np.asarray(self.abcd), "Z0": self.Z0}
 
     def dump_to_file(self, filename: str, writer="hdf5"):
-        """Dump cell to file."""
+        """
+        Dump cell to file.
+
+        Args:
+            filename (str): Name of the file.
+            writer (str): File format.
+        """
         save_to_file(filename, self.as_dict(), writer=writer)
+
+    def interpolate(self, freqs: np.ndarray, polar: bool = True) -> TwoPortCell:
+        """
+        Return abcd matrix of internal cell interpolating the given frequencies.
+
+        Args:
+            freqs (numpy.ndarray): Frequencies array to interpolate.
+            polar (bool): Interpolate magnitude and phase instead of real and imaginary part.
+
+        Returns:
+            TwoPortCell: Interpolated instance of TwoPortCell.
+        """
+        if np.array_equal(freqs, self.freqs):
+            return self
+        if freqs[0] < self.freqs[0] or freqs[-1] > self.freqs[-1]:
+            log.warning("Interpolation out of predefined range might be imprecise.")
+
+        abcd_interp = []
+        for i, j in itertools.product(range(2), repeat=2):
+            if polar:
+                interp_mag = np.interp(freqs, self.freqs, np.abs(self.abcd[:, i, j]))
+                interp_phase = np.interp(
+                    freqs, self.freqs, np.unwrap(np.angle(self.abcd[:, i, j]))
+                )
+
+                abcd_interp.append(interp_mag * np.exp(1j * interp_phase))
+            else:
+                abcd_interp.append(np.interp(freqs, self.freqs, self.abcd[:, i, j]))
+        return self.__class__(freqs, np.array(abcd_interp), self.Z0)
 
 
 class TwoPortModel(BaseModel, ABC):
@@ -109,7 +208,7 @@ class TwoPortModel(BaseModel, ABC):
     )
     name: str | None = Field(default=None, description="Name of the model.")
     Z0: Impedance = Field(
-        default=50.0, description="Line impedance of the two-port component."
+        default=50.0, description="Reference line impedance of the two-port component."
     )
     N: NonNegativeInt = Field(
         default=1,
