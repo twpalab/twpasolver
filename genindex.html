@@ -1,0 +1,868 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="#" /><link rel="search" title="Search" href="search.html" />
+
+    <link rel="shortcut icon" href="_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 --><title>Index - twpasolver · 0.0.1</title>
+<link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?digest=369552022d0b975c8e74270ce6eabe0fb7978f24" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="_static/css/style.css" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?digest=30d1aed668e5c3a91c3e3bf6a60b675221979f0e" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  --color-brand-primary: #6400FF;
+  --color-brand-secondary: #6400FF;
+  --color-brand-content: #6400FF;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-half" viewBox="0 0 24 24">
+    <title>Auto light/dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-shadow">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M13 12h5" />
+      <path d="M13 15h4" />
+      <path d="M13 18h1" />
+      <path d="M13 9h4" />
+      <path d="M13 6h1" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="index.html"><div class="brand">twpasolver · 0.0.1</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto"><use href="#svg-sun-half"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
+  
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="_static/twpalab_logo.png" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="_static/twpalab_logo.png" alt="Dark Logo"/>
+  </div>
+  
+  <span class="sidebar-brand-text">twpasolver · 0.0.1</span>
+  
+</a><form class="sidebar-search-container" method="get" action="search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Api reference</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="api-reference/modules.html">twpasolver</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of twpasolver</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="api-reference/twpasolver.html">twpasolver package</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of twpasolver package</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.models.html">twpasolver.models package</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto"><use href="#svg-sun-half"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main">
+          
+<section class="genindex-section">
+  <h1 id="index">Index</h1>
+  <div class="genindex-jumpbox"><a href="#A"><strong>A</strong></a> | <a href="#B"><strong>B</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#D"><strong>D</strong></a> | <a href="#E"><strong>E</strong></a> | <a href="#F"><strong>F</strong></a> | <a href="#G"><strong>G</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#K"><strong>K</strong></a> | <a href="#L"><strong>L</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#N"><strong>N</strong></a> | <a href="#O"><strong>O</strong></a> | <a href="#P"><strong>P</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a> | <a href="#T"><strong>T</strong></a> | <a href="#U"><strong>U</strong></a> | <a href="#V"><strong>V</strong></a> | <a href="#X"><strong>X</strong></a> | <a href="#Z"><strong>Z</strong></a></div>
+</section>
+<section id="A" class="genindex-section">
+  <h2>A</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.ABCDArray.A">A (twpasolver.matrices_arrays.ABCDArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.mathutils.a2s">a2s() (in module twpasolver.mathutils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.abcd_identity">abcd_identity() (in module twpasolver.matrices_arrays)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.ABCDArray">ABCDArray (class in twpasolver.matrices_arrays)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.file_utils.add_extension">add_extension() (in module twpasolver.file_utils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.alpha">alpha (twpasolver.models.twpa.TWPA property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.analysis_function">analysis_function() (in module twpasolver.analysis)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.ExecutionRequest.args">args (twpasolver.analysis.ExecutionRequest attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.as_dict">as_dict() (twpasolver.twoport.TwoPortCell method)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="B" class="genindex-section">
+  <h2>B</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.ABCDArray.B">B (twpasolver.matrices_arrays.ABCDArray property)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.bandwidth">bandwidth() (twpasolver.analysis.TWPAnalysis method)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="C" class="genindex-section">
+  <h2>C</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.ABCDArray.C">C (twpasolver.matrices_arrays.ABCDArray property)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Capacitance.C">(twpasolver.models.base_components.Capacitance attribute)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Stub.C">(twpasolver.models.base_components.Stub attribute)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.LCLfBaseCell.C">(twpasolver.models.twpa.LCLfBaseCell attribute)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.StubBaseCell.C">(twpasolver.models.twpa.StubBaseCell attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.rf_functions.capacitance">capacitance() (in module twpasolver.models.rf_functions)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.cells">cells (twpasolver.models.twpa.TWPA attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.LCLfBaseCell.centered">centered (twpasolver.models.twpa.LCLfBaseCell attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.chi">chi (twpasolver.models.twpa.TWPA property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.mathutils.cme_solve">cme_solve() (in module twpasolver.mathutils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.mathutils.CMEode_complete">CMEode_complete() (in module twpasolver.mathutils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.mathutils.compute_phase_matching">compute_phase_matching() (in module twpasolver.mathutils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.logging.CustomHandler">CustomHandler (class in twpasolver.logging)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="D" class="genindex-section">
+  <h2>D</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.ABCDArray.D">D (twpasolver.matrices_arrays.ABCDArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.data">data (twpasolver.analysis.Analyzer attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.data_file">data_file (twpasolver.analysis.Analyzer attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.mathutils.dBm_to_I">dBm_to_I() (in module twpasolver.mathutils)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.file_utils.NpEncoder.default">default() (twpasolver.file_utils.NpEncoder method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.dump_to_file">dump_to_file() (twpasolver.analysis.Analyzer method)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.dump_to_file">(twpasolver.twoport.TwoPortCell method)</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.dump_to_file">(twpasolver.twoport.TwoPortModel method)</a>
+</li>
+        </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="E" class="genindex-section">
+  <h2>E</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.file_utils.ensure_directory_exists">ensure_directory_exists() (in module twpasolver.file_utils)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.epsilon">epsilon (twpasolver.models.twpa.TWPA property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.execute">execute() (twpasolver.analysis.Analyzer method)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="F" class="genindex-section">
+  <h2>F</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.logging.CustomHandler.format">format() (twpasolver.logging.CustomHandler method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.freqs">freqs (twpasolver.twoport.TwoPortCell property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.freqs_arange">freqs_arange (twpasolver.analysis.TWPAnalysis attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.freqs_unit">freqs_unit (twpasolver.analysis.TWPAnalysis attribute)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.from_file">from_file() (twpasolver.analysis.Analyzer class method)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.from_file">(twpasolver.twoport.TwoPortCell class method)</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.from_file">(twpasolver.twoport.TwoPortModel class method)</a>
+</li>
+        </ul></li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.from_s_par">from_s_par() (twpasolver.twoport.TwoPortCell class method)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="G" class="genindex-section">
+  <h2>G</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.gain">gain() (twpasolver.analysis.TWPAnalysis method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.get_abcd">get_abcd() (twpasolver.twoport.TwoPortModel method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.get_cell">get_cell() (twpasolver.twoport.TwoPortModel method)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.get_network">get_network() (twpasolver.twoport.TwoPortModel method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.get_s_par">get_s_par() (twpasolver.twoport.TwoPortCell method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.rf_functions.get_stub_cell">get_stub_cell() (in module twpasolver.models.rf_functions)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="I" class="genindex-section">
+  <h2>I</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.mathutils.I_to_dBm">I_to_dBm() (in module twpasolver.mathutils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.Idc">Idc (twpasolver.models.twpa.TWPA attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.rf_functions.inductance">inductance() (in module twpasolver.models.rf_functions)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.interpolate">interpolate() (twpasolver.twoport.TwoPortCell method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.Ip0">Ip0 (twpasolver.models.twpa.TWPA attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.Iratio">Iratio (twpasolver.models.twpa.TWPA property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.Istar">Istar (twpasolver.models.twpa.TWPA attribute)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="K" class="genindex-section">
+  <h2>K</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.ExecutionRequest.kwargs">kwargs (twpasolver.analysis.ExecutionRequest attribute)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="L" class="genindex-section">
+  <h2>L</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Inductance.L">L (twpasolver.models.base_components.Inductance attribute)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Stub.L">(twpasolver.models.base_components.Stub attribute)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.LCLfBaseCell.L">(twpasolver.models.twpa.LCLfBaseCell attribute)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.StubBaseCell.L">(twpasolver.models.twpa.StubBaseCell attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.StubBaseCell.l1">l1 (twpasolver.models.twpa.StubBaseCell attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.StubBaseCell.l2">l2 (twpasolver.models.twpa.StubBaseCell attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.rf_functions.LCLf_abcd">LCLf_abcd() (in module twpasolver.models.rf_functions)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.TwoByTwoArray.len">len (twpasolver.matrices_arrays.TwoByTwoArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Stub.length">length (twpasolver.models.base_components.Stub attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.LCLfBaseCell.Lf">Lf (twpasolver.models.twpa.LCLfBaseCell attribute)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.StubBaseCell.Lf">(twpasolver.models.twpa.StubBaseCell attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.StubBaseCell.line">line (twpasolver.models.twpa.StubBaseCell attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.load_data">load_data() (twpasolver.analysis.Analyzer method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.load_model_from_file">load_model_from_file() (twpasolver.analysis.TWPAnalysis class method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.rf_functions.lossless_line_abcd">lossless_line_abcd() (in module twpasolver.models.rf_functions)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="M" class="genindex-section">
+  <h2>M</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.mathutils.matmul_2x2">matmul_2x2() (in module twpasolver.mathutils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.mathutils.matpow_2x2">matpow_2x2() (in module twpasolver.mathutils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.model_post_init">model_post_init() (twpasolver.analysis.Analyzer method)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.model_post_init">(twpasolver.analysis.TWPAnalysis method)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Capacitance.model_post_init">(twpasolver.models.base_components.Capacitance method)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Component.model_post_init">(twpasolver.models.base_components.Component method)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Inductance.model_post_init">(twpasolver.models.base_components.Inductance method)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Stub.model_post_init">(twpasolver.models.base_components.Stub method)</a>
+</li>
+        </ul></li>
+        <li>
+    module
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver">twpasolver</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.analysis">twpasolver.analysis</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.file_utils">twpasolver.file_utils</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.logging">twpasolver.logging</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.mathutils">twpasolver.mathutils</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.matrices_arrays">twpasolver.matrices_arrays</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#module-twpasolver.models">twpasolver.models</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#module-twpasolver.models.base_components">twpasolver.models.base_components</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#module-twpasolver.models.rf_functions">twpasolver.models.rf_functions</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#module-twpasolver.models.twpa">twpasolver.models.twpa</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.plotting">twpasolver.plotting</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.twoport">twpasolver.twoport</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.typing">twpasolver.typing</a>
+</li>
+        </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="N" class="genindex-section">
+  <h2>N</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.N">N (twpasolver.twoport.TwoPortModel attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.N_tot">N_tot (twpasolver.models.twpa.TWPA property)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.ExecutionRequest.name">name (twpasolver.analysis.ExecutionRequest attribute)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.name">(twpasolver.twoport.TwoPortModel attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.file_utils.NpEncoder">NpEncoder (class in twpasolver.file_utils)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="O" class="genindex-section">
+  <h2>O</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Stub.open">open (twpasolver.models.base_components.Stub attribute)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="P" class="genindex-section">
+  <h2>P</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Component.parallel">parallel (twpasolver.models.base_components.Component attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.rf_functions.parallel_admittance_abcd">parallel_admittance_abcd() (in module twpasolver.models.rf_functions)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.parameter_sweep">parameter_sweep() (twpasolver.analysis.Analyzer method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.phase_matching">phase_matching() (twpasolver.analysis.TWPAnalysis method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.plotting.plot_gain">plot_gain() (in module twpasolver.plotting)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.plot_gain">(twpasolver.analysis.TWPAnalysis method)</a>
+</li>
+        </ul></li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.plotting.plot_phase_matching">plot_phase_matching() (in module twpasolver.plotting)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.plot_phase_matching">(twpasolver.analysis.TWPAnalysis method)</a>
+</li>
+        </ul></li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.plotting.plot_response">plot_response() (in module twpasolver.plotting)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.plot_response">(twpasolver.analysis.TWPAnalysis method)</a>
+</li>
+        </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="R" class="genindex-section">
+  <h2>R</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.file_utils.read_file">read_file() (in module twpasolver.file_utils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.file_utils.read_hdf5">read_hdf5() (in module twpasolver.file_utils)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.file_utils.read_json">read_json() (in module twpasolver.file_utils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.run">run (twpasolver.analysis.Analyzer attribute)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="S" class="genindex-section">
+  <h2>S</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.SMatrixArray.S11">S11 (twpasolver.matrices_arrays.SMatrixArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.SMatrixArray.S12">S12 (twpasolver.matrices_arrays.SMatrixArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.SMatrixArray.S21">S21 (twpasolver.matrices_arrays.SMatrixArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.SMatrixArray.S22">S22 (twpasolver.matrices_arrays.SMatrixArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.mathutils.s2a">s2a() (in module twpasolver.mathutils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.save_data">save_data() (twpasolver.analysis.Analyzer method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.file_utils.save_to_file">save_to_file() (in module twpasolver.file_utils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.file_utils.save_to_hdf5">save_to_hdf5() (in module twpasolver.file_utils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.file_utils.save_to_json">save_to_json() (in module twpasolver.file_utils)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.rf_functions.series_impedance_abcd">series_impedance_abcd() (in module twpasolver.models.rf_functions)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.TwoByTwoArray.shape">shape (twpasolver.matrices_arrays.TwoByTwoArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.base_components.Component.single_abcd">single_abcd() (twpasolver.models.base_components.Component method)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.LCLfBaseCell.single_abcd">(twpasolver.models.twpa.LCLfBaseCell method)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.StubBaseCell.single_abcd">(twpasolver.models.twpa.StubBaseCell method)</a>
+</li>
+          <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.single_abcd">(twpasolver.models.twpa.TWPA method)</a>
+</li>
+          <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.single_abcd">(twpasolver.twoport.TwoPortModel method)</a>
+</li>
+        </ul></li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.SMatrixArray">SMatrixArray (class in twpasolver.matrices_arrays)</a>
+</li>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.rf_functions.stub">stub() (in module twpasolver.models.rf_functions)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="T" class="genindex-section">
+  <h2>T</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.mathutils.to_dB">to_dB() (in module twpasolver.mathutils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.to_network">to_network() (twpasolver.twoport.TwoPortCell method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.matrices_arrays.TwoByTwoArray">TwoByTwoArray (class in twpasolver.matrices_arrays)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell">TwoPortCell (class in twpasolver.twoport)</a>
+</li>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.twpa">twpa (twpasolver.analysis.TWPAnalysis attribute)</a>
+</li>
+        <li>
+    twpasolver
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.analysis
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.analysis">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.file_utils
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.file_utils">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.logging
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.logging">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.mathutils
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.mathutils">module</a>
+</li>
+        </ul></li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li>
+    twpasolver.matrices_arrays
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.matrices_arrays">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.models
+
+        <ul>
+          <li><a href="api-reference/twpasolver.models.html#module-twpasolver.models">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.models.base_components
+
+        <ul>
+          <li><a href="api-reference/twpasolver.models.html#module-twpasolver.models.base_components">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.models.rf_functions
+
+        <ul>
+          <li><a href="api-reference/twpasolver.models.html#module-twpasolver.models.rf_functions">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.models.twpa
+
+        <ul>
+          <li><a href="api-reference/twpasolver.models.html#module-twpasolver.models.twpa">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.plotting
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.plotting">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.twoport
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.twoport">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.typing
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#module-twpasolver.typing">module</a>
+</li>
+        </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="U" class="genindex-section">
+  <h2>U</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.update">update() (twpasolver.twoport.TwoPortModel method)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.analysis.Analyzer.update_base_data">update_base_data() (twpasolver.analysis.Analyzer method)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.update_base_data">(twpasolver.analysis.TWPAnalysis method)</a>
+</li>
+        </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="V" class="genindex-section">
+  <h2>V</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.typing.validate_impedance">validate_impedance() (in module twpasolver.typing)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="X" class="genindex-section">
+  <h2>X</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.xi">xi (twpasolver.models.twpa.TWPA property)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="Z" class="genindex-section">
+  <h2>Z</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.Z0">Z0 (twpasolver.twoport.TwoPortCell property)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.Z0">(twpasolver.twoport.TwoPortModel attribute)</a>
+</li>
+        </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2024, twpalab
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            <div class="icons">
+              <a class="muted-link " href="https://github.com/twpalab/twpasolver" aria-label="GitHub">
+                    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                </a>
+              
+            </div>
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/scripts/furo.js"></script>
+    <script src="_static/clipboard.min.js"></script>
+    <script src="_static/copybutton.js"></script>
+    </body>
+</html>
