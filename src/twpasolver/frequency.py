@@ -23,8 +23,10 @@ class Frequencies(BaseModel):
         default=None,
         description="Tuple passed to numpy.arange to construct frequency span.",
     )
-    unit: Literal["Hz", "kHz", "MHz", "GHz"] = "GHz"
-    _unit_multipliers = PrivateAttr({"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9})
+    unit: Literal["Hz", "kHz", "MHz", "GHz", "THz"] = "GHz"
+    _unit_multipliers = PrivateAttr(
+        {"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9, "THz": 1e12}
+    )
 
     @property
     def f(self) -> np.ndarray:

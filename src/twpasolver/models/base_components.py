@@ -1,8 +1,8 @@
 """Simple components."""
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from functools import partial
-from typing import Callable
+from typing import Callable, Literal
 
 import numpy as np
 from pydantic import NonNegativeFloat, PrivateAttr
@@ -19,7 +19,7 @@ from twpasolver.twoport import TwoPortModel
 from twpasolver.typing import complex_array, float_array
 
 
-class Component(TwoPortModel):
+class Component(TwoPortModel, ABC):
     """Base class for single components."""
 
     parallel: bool = False
@@ -40,6 +40,7 @@ class Component(TwoPortModel):
 class Capacitance(Component):
     """Model of a capacitor."""
 
+    name: Literal["Capacitance"] = "Capacitance"
     C: NonNegativeFloat
 
     def model_post_init(self, _):
@@ -50,6 +51,7 @@ class Capacitance(Component):
 class Inductance(Component):
     """Model of an inductance."""
 
+    name: Literal["Inductance"] = "Inductance"
     L: NonNegativeFloat
 
     def model_post_init(self, _):
@@ -60,6 +62,7 @@ class Inductance(Component):
 class Stub(Component):
     """Model of a stub."""
 
+    name: Literal["Stub"] = "Stub"
     L: NonNegativeFloat
     C: NonNegativeFloat
     length: NonNegativeFloat

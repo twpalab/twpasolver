@@ -23,6 +23,8 @@ def validate_impedance(Z: complex | float | str) -> complex | float:
         raise ValueError(f"Cannot convert {type(Z)} {Z} to complex number.")
     if np.real(Z) < 0:
         raise ValueError("Real part of impedance {Z} must be non-negative.")
+    if np.imag(Z) == 0:
+        Z = Z.real
     return Z
 
 

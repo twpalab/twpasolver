@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 from twpasolver.matrices_arrays import ABCDArray, TwoByTwoArray
-from twpasolver.models.twpa import TWPA
+from twpasolver.models.base_components import Capacitance, Inductance
+from twpasolver.models.model_arrays import TWPA
 from twpasolver.twoport import TwoPortCell
 
 
@@ -38,7 +39,6 @@ def twoport_cell():
 def twpa_data():
     """Return data for a TWPA model with LCLf cells."""
     return {
-        "name": "model_cpw_dartwars_13nm_Lk8.5",
         "Lk": 8.5,
         "t": 13,
         "d": 0,
@@ -47,7 +47,7 @@ def twpa_data():
         "repetition": "60-6",
         "cells": [
             {
-                "name": "Unloaded cell",
+                "name": "LCLfBaseCell",
                 "l": 102,
                 "Z": 50,
                 "N": 30,
@@ -56,7 +56,7 @@ def twpa_data():
                 "Lf": 0.87e-9,
             },
             {
-                "name": "Loaded cell",
+                "name": "LCLfBaseCell",
                 "l": 33.5,
                 "Z": 80,
                 "N": 6,
@@ -65,7 +65,7 @@ def twpa_data():
                 "Lf": 0.28e-9,
             },
             {
-                "name": "Unloaded cell",
+                "name": "LCLfBaseCell",
                 "l": 102,
                 "Z": 50,
                 "N": 30,
@@ -89,6 +89,18 @@ def twpa_data():
 
 
 @pytest.fixture
-def twpa_model(twpa_data):
+def twpa(twpa_data):
     """Return an instance of a TWPA model."""
     return TWPA(**twpa_data)
+
+
+@pytest.fixture
+def capacitor():
+    """Return example capacitance."""
+    return Capacitance(C=1e-15)
+
+
+@pytest.fixture
+def inductor():
+    """Return example inductor."""
+    return Inductance(L=1e-12)
