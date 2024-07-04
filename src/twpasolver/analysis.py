@@ -178,7 +178,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             ]
 
             # Fit low frequency phase response to correctly unrwap at f=0 Hz
-            if self.f[0] > freqs[stopband_start_idx] / 10:
+            if self.f[0] / self.unit_multiplier > freqs[stopband_start_idx] / 10:
                 log.warning(
                     "Starting frequency is too high, unwrap of phase response might be imprecise."
                 )
