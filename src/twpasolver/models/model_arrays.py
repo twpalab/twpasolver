@@ -49,8 +49,7 @@ class ModelArray(TwoPortModel):
             return self.__class__(
                 cells=self.cells + other.cells, N=self.N, name=self.name
             )
-        else:
-            return self.__class__(cells=[self, other])
+        return self.__class__(cells=[self, other])
 
     def __getitem__(self, indices: slice | int) -> ModelArray | AnyModel:
         """
@@ -111,7 +110,7 @@ class TWPA(ModelArray):
     @property
     def N_tot(self) -> NonNegativeInt:
         """Total number of base cells in the model."""
-        return sum([cell.N for cell in self.cells]) * self.N
+        return sum(cell.N for cell in self.cells) * self.N
 
 
 def all_subclasses(cls):
