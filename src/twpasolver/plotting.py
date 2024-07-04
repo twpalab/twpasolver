@@ -1,5 +1,6 @@
 """Collection of plot functions."""
 
+# mypy: ignore-errors
 from typing import Optional
 
 import matplotlib.pyplot as plt
