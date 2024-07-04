@@ -3,7 +3,6 @@
 # mypy: ignore-errors
 from __future__ import annotations
 
-from functools import partial
 from typing import Annotated, Any, Literal, Union
 
 import numpy as np
@@ -17,13 +16,6 @@ from pydantic import (
 
 from twpasolver.matrices_arrays import ABCDArray, abcd_identity
 from twpasolver.twoport import TwoPortModel
-
-
-def all_subclasses(cls):
-    """Recursively get all subclasses of a given class."""
-    return cls.__subclasses__() + [
-        s for c in cls.__subclasses__() for s in all_subclasses(c)
-    ]
 
 
 class ModelArray(TwoPortModel):
@@ -75,9 +67,6 @@ class ModelArray(TwoPortModel):
         return self.cells[indices]
 
 
-required = partial(Field, ...)
-
-
 class TWPA(ModelArray):
     """Simple model for TWPAs."""
 
@@ -123,6 +112,13 @@ class TWPA(ModelArray):
     def N_tot(self) -> NonNegativeInt:
         """Total number of base cells in the model."""
         return sum([cell.N for cell in self.cells]) * self.N
+
+
+def all_subclasses(cls):
+    """Recursively get all subclasses of a given class."""
+    return cls.__subclasses__() + [
+        s for c in cls.__subclasses__() for s in all_subclasses(c)
+    ]
 
 
 named_models = [c for c in all_subclasses(TwoPortModel) if "name" in c.model_fields]

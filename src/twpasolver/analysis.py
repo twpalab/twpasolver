@@ -3,19 +3,20 @@
 from abc import ABC, abstractmethod
 from functools import partial, wraps
 from time import strftime
-from typing import Any, Literal, Optional
+from typing import Any, Optional
 
 import numpy as np
 from matplotlib.axes import Axes
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
-from typing_extensions import Self
+from pydantic import ConfigDict, Field, PrivateAttr, field_validator
 
+from twpasolver.basemodel import BaseModel
 from twpasolver.file_utils import read_file, save_to_file
+from twpasolver.frequency import Frequencies
 from twpasolver.logging import log
 from twpasolver.mathutils import cme_solve, compute_phase_matching
 from twpasolver.models import TWPA
 from twpasolver.plotting import plot_gain, plot_phase_matching, plot_response
-from twpasolver.typing import FrequencyArange, float_array
+from twpasolver.typing import float_array
 
 
 def analysis_function(
@@ -74,17 +75,6 @@ class Analyzer(BaseModel, ABC):
     def update_base_data(self) -> None:
         """Check and update base data of the class if necessary."""
 
-    @classmethod
-    def from_file(cls, filename: str) -> Self:
-        """Load analysis from file."""
-        analysis_dict = read_file(filename, writer="json")
-        return cls(**analysis_dict)
-
-    def dump_to_file(self, filename: str) -> None:
-        """Dump analysis to file."""
-        analysis_dict = self.model_dump()
-        save_to_file(filename, analysis_dict, writer="json")
-
     def save_data(self, writer: str = "hdf5") -> None:
         """Save data to file."""
         save_to_file(self.data_file, self.data, writer=writer)
@@ -140,15 +130,15 @@ class Analyzer(BaseModel, ABC):
         return results
 
 
-class TWPAnalysis(Analyzer):
+class TWPAnalysis(Analyzer, Frequencies):
     """Runner for standard analysis routines of 3WM twpa models."""
 
     model_config = ConfigDict(validate_assignment=True)
     twpa: TWPA
-    freqs_arange: FrequencyArange
-    freqs_unit: Literal["Hz", "kHz", "MHz", "GHz"] = "GHz"
+    # freqs_arange: FrequencyArange
+    # freqs_unit: Literal["Hz", "kHz", "MHz", "GHz"] = "GHz"
     _previous_state: dict[str, Any] = PrivateAttr()
-    _unit_multipliers = PrivateAttr({"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9})
+    # _unit_multipliers = PrivateAttr({"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9})
 
     @field_validator("twpa", mode="before", check_fields=True)
     @classmethod
@@ -173,9 +163,8 @@ class TWPAnalysis(Analyzer):
             or current_state != self._previous_state
         ):
             log.info("Computing base parameters.")
-            unit_multiplier = self._unit_multipliers[self.freqs_unit]
-            freqs = np.arange(*self.freqs_arange)
-            cell = self.twpa.get_cell(freqs * unit_multiplier)
+            cell = self.twpa.get_cell(self.f)
+            freqs = self.f / self.unit_multiplier
             self.data["freqs"] = freqs
             self.data["abcd"] = np.asarray(cell.abcd)
             self.data["S21"] = cell.get_s_par()[:, 1, 0]
@@ -189,7 +178,7 @@ class TWPAnalysis(Analyzer):
             ]
 
             # Fit low frequency phase response to correctly unrwap at f=0 Hz
-            if self.freqs_arange[0] > freqs[stopband_start_idx] / 10:
+            if self.f[0] > freqs[stopband_start_idx] / 10:
                 log.warning(
                     "Starting frequency is too high, unwrap of phase response might be imprecise."
                 )
@@ -380,7 +369,7 @@ class TWPAnalysis(Analyzer):
             self.data["freqs"],
             self.data["S21_db"],
             self.data["k_star"],
-            freqs_unit=self.freqs_unit,
+            freqs_unit=self.unit,
             **kwargs,
         )
 
@@ -392,7 +381,7 @@ class TWPAnalysis(Analyzer):
         return plot_gain(
             gain_data["signal_freqs"],
             gain_data["gain_db"],
-            freqs_unit=self.freqs_unit,
+            freqs_unit=self.unit,
             **kwargs,
         )
 
@@ -407,6 +396,6 @@ class TWPAnalysis(Analyzer):
             phase_matching_data["pump_freqs"],
             phase_matching_data["signal_freqs"],
             phase_matching_data["delta"],
-            freqs_unit=self.freqs_unit,
+            freqs_unit=self.unit,
             **kwargs,
         )

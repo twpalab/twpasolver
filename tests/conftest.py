@@ -6,7 +6,7 @@ import pytest
 from twpasolver.matrices_arrays import ABCDArray, TwoByTwoArray
 from twpasolver.models.base_components import Capacitance, Inductance
 from twpasolver.models.model_arrays import TWPA
-from twpasolver.twoport import TwoPortCell
+from twpasolver.twoport import TwoPortCell, TwoPortModel
 
 
 @pytest.fixture()
@@ -104,3 +104,34 @@ def capacitor():
 def inductor():
     """Return example inductor."""
     return Inductance(L=1e-12)
+
+
+@pytest.fixture
+def frequency_list():
+    """Return example simple list."""
+    return list(range(0, 10))
+
+
+@pytest.fixture
+def frequency_arange():
+    """Return example arange tuple."""
+    return (0, 1, 10)
+
+
+class RandomModel(TwoPortModel):
+    """Generate random normal ABCD matrices."""
+
+    mu: float = 0
+    sigma: float = 1
+
+    def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
+        """Generate random abcd."""
+        return ABCDArray(
+            np.random.normal(loc=self.mu, scale=self.sigma, size=(len(freqs), 2, 2))
+        )
+
+
+@pytest.fixture
+def random_model():
+    """Return instance of model for random ABCD matrices."""
+    return RandomModel()

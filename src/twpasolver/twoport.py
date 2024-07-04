@@ -7,23 +7,15 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import skrf as rf
-from pydantic import BaseModel as PydanticBaseModel
 from pydantic import ConfigDict, Field, NonNegativeInt
 
+# from pydantic import BaseModel as PydanticBaseModel, field_validator
+from twpasolver.basemodel import BaseModel
 from twpasolver.file_utils import read_file, save_to_file
-from twpasolver.frequency import Frequencies
 from twpasolver.logging import log
 from twpasolver.mathutils import a2s, s2a
 from twpasolver.matrices_arrays import ABCDArray, SMatrixArray
 from twpasolver.typing import Impedance, validate_impedance
-
-
-class BaseModel(PydanticBaseModel):
-    """Override BaseModel to exclude serializing optional arguments by default."""
-
-    def model_dump(self, exclude_none=True, **kwargs):
-        """Override model_dump method."""
-        return super().model_dump(exclude_none=exclude_none, **kwargs)
 
 
 class TwoPortCell:
@@ -223,15 +215,6 @@ class TwoPortModel(BaseModel, ABC):
         default=1,
         description="Number of repetitions of the model in the computed abcd matrix.",
     )
-    frequencies: Frequencies | None = Field(
-        default=None, description="Frequency span over which to compute the model."
-    )
-
-    @classmethod
-    def from_file(cls, filename: str):
-        """Load model from file."""
-        model_dict = read_file(filename, writer="json")
-        return cls(**model_dict)
 
     def update(self, **kwargs) -> None:
         """Update multiple attributes of the model."""
@@ -240,17 +223,6 @@ class TwoPortModel(BaseModel, ABC):
                 setattr(self, key, value)
             else:
                 raise RuntimeError(f"The cell model does not have the {key} attribute.")
-
-    def _validate_freqs_arg(self, freqs: np.ndarray | None = None) -> np.ndarray:
-        """Check frequency argument and return correct array."""
-        if freqs is None:
-            if self.frequencies is None:
-                raise RuntimeError(
-                    "Must provide frequency span either as numpy array in function call or Frequencies class as model attribute."
-                )
-            else:
-                return self.frequencies.f
-        return freqs
 
     def __mul__(self, factor: int) -> TwoPortModel:
         """Return model multiplied by integer factor."""
@@ -262,23 +234,16 @@ class TwoPortModel(BaseModel, ABC):
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute the abcd matrix of a single iteration of the model."""
 
-    def get_abcd(self, freqs: np.ndarray | None = None) -> ABCDArray:
+    def get_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute the abcd matrix of the model."""
-        freqs = self._validate_freqs_arg(freqs)
         if self.N == 1:
             return self.single_abcd(freqs)
         return self.single_abcd(freqs) ** self.N
 
-    def get_cell(self, freqs: np.ndarray | None = None) -> TwoPortCell:
+    def get_cell(self, freqs: np.ndarray) -> TwoPortCell:
         """Return the two-port cell of the model."""
-        freqs = self._validate_freqs_arg(freqs)
         return TwoPortCell(freqs, self.get_abcd(freqs), Z0=self.Z0)
 
-    def get_network(self, freqs: np.ndarray | None = None) -> rf.Network:
+    def get_network(self, freqs: np.ndarray) -> rf.Network:
         """Return the two-port cell of the model as a scikit-rf Network."""
         return self.get_cell(freqs).to_network()
-
-    def dump_to_file(self, filename: str):
-        """Dump model to file."""
-        model_dict = self.model_dump()
-        save_to_file(filename, model_dict, writer="json")
