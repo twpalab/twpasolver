@@ -22,7 +22,7 @@ class BaseModel(PydanticBaseModel):
         model_dict = read_file(filename, writer="json")
         return cls(**model_dict)
 
-    def dump_to_file(self, filename: str):
+    def dump_to_file(self, filename: str, **kwargs):
         """Dump model to file."""
-        model_dict = self.model_dump()
+        model_dict = self.model_dump(**kwargs)
         save_to_file(filename, model_dict, writer="json")

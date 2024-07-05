@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 
 from twpasolver.matrices_arrays import ABCDArray, TwoByTwoArray
-from twpasolver.models.base_components import Capacitance, Inductance
-from twpasolver.models.model_arrays import TWPA
+from twpasolver.models.oneport import Capacitance, Inductance
+from twpasolver.models.twoportarrays import TWPA
 from twpasolver.twoport import TwoPortCell, TwoPortModel
 
 

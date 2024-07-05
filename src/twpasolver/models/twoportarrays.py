@@ -3,38 +3,31 @@
 # mypy: ignore-errors
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Literal, Union
 
 import numpy as np
-from pydantic import (
-    Field,
-    NonNegativeFloat,
-    NonNegativeInt,
-    computed_field,
-    field_validator,
-)
+from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 
 from twpasolver.matrices_arrays import ABCDArray, abcd_identity
+from twpasolver.models.modelarray import ModelArray
 from twpasolver.twoport import TwoPortModel
 
 
-class ModelArray(TwoPortModel):
+def all_subclasses(cls):
+    """Recursively get all subclasses of a given class."""
+    return cls.__subclasses__() + [
+        s for c in cls.__subclasses__() for s in all_subclasses(c)
+    ]
+
+
+class TwoPortArray(ModelArray):
     """Generic container for arrays of TwoPortModels."""
 
-    name: Literal["ModelArray"] = Field(default="ModelArray")
+    name: Literal["TwoPortArray"] = Field(default="TwoPortArray")
     cells: list[AnyModel] = Field(
-        ...,
+        default_factory=list,
         description="List of TwoPortModels representing the basic cells. Nested lists are allowed.",
     )
-
-    @field_validator("cells", mode="before", check_fields=True)
-    @classmethod
-    def validate_nested_cells(cls, cells: list[AnyModel | dict[str, Any]]):
-        """Recursively create ModelArrays inside nested lists."""
-        for i, c in enumerate(cells):
-            if isinstance(c, list):
-                cells[i] = cls(cells=c)
-        return cells
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute abcd of combined models."""
@@ -43,30 +36,8 @@ class ModelArray(TwoPortModel):
             sc = sc @ cell.get_abcd(freqs)
         return sc
 
-    def __add__(self, other: ModelArray) -> ModelArray:
-        """Operator to concatenate two ModelArrays."""
-        if other.N == self.N:
-            return self.__class__(
-                cells=self.cells + other.cells, N=self.N, name=self.name
-            )
-        return self.__class__(cells=[self, other])
 
-    def __getitem__(self, indices: slice | int) -> ModelArray | AnyModel:
-        """
-        Get model(s) at indices or slice.
-
-        Args:
-            indices: Indices to access the internal AnyModel list.
-
-        Returns:
-            ModelArray | Anymodel: Value at the specified indices or slice.
-        """
-        if isinstance(indices, slice):
-            return self.__class__(cells=self.cells[indices])
-        return self.cells[indices]
-
-
-class TWPA(ModelArray):
+class TWPA(TwoPortArray):
     """Simple model for TWPAs."""
 
     name: Literal["TWPA"] = Field(default="TWPA")
@@ -111,13 +82,6 @@ class TWPA(ModelArray):
     def N_tot(self) -> NonNegativeInt:
         """Total number of base cells in the model."""
         return sum(cell.N for cell in self.cells) * self.N
-
-
-def all_subclasses(cls):
-    """Recursively get all subclasses of a given class."""
-    return cls.__subclasses__() + [
-        s for c in cls.__subclasses__() for s in all_subclasses(c)
-    ]
 
 
 named_models = [c for c in all_subclasses(TwoPortModel) if "name" in c.model_fields]

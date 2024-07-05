@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import Field, NonNegativeFloat
 
 from twpasolver.matrices_arrays import ABCDArray
-from twpasolver.models.base_components import Inductance
+from twpasolver.models.oneport import Inductance
 from twpasolver.models.rf_functions import LCLf_abcd, get_stub_cell, lossless_line_abcd
 from twpasolver.twoport import TwoPortModel
 
