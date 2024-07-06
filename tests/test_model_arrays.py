@@ -34,16 +34,6 @@ def test_array_creation_from_file(tmpdir, capacitor, inductor, twpa):
     assert arr.model_dump() == arr_from_file.model_dump()
 
 
-def test_array_add(capacitor, inductor, twpa):
-    """Test composition of arrays."""
-    arr1 = TwoPortArray(cells=[capacitor, inductor])
-    arr_sum = arr1 + twpa
-    assert (
-        arr_sum.model_dump()
-        == TwoPortArray(cells=[[capacitor, inductor], twpa]).model_dump()
-    )
-
-
 def test_array_append(capacitor, inductor):
     """Test append function."""
     arr = TwoPortArray(cells=[capacitor])

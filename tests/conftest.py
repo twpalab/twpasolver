@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from twpasolver.matrices_arrays import ABCDArray, TwoByTwoArray
-from twpasolver.models.oneport import Capacitance, Inductance
+from twpasolver.models.oneport import Capacitance, Inductance, OnePortArray, Resistance
 from twpasolver.models.twoportarrays import TWPA
 from twpasolver.twoport import TwoPortCell, TwoPortModel
 
@@ -104,6 +104,18 @@ def capacitor():
 def inductor():
     """Return example inductor."""
     return Inductance(L=1e-12)
+
+
+@pytest.fixture
+def resistance():
+    """Fixture for Resistance instance."""
+    return Resistance(R=50.0)
+
+
+@pytest.fixture
+def one_port_array(resistance, inductor):
+    """Fixture for OnePortArray instance."""
+    return OnePortArray(cells=[resistance, inductor])
 
 
 @pytest.fixture

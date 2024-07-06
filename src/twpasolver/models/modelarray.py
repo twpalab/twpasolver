@@ -1,6 +1,10 @@
-"""Generic models for user-defined abcd matrices and TwoPortModel lists."""
+"""
+Generic models for user-defined ABCD matrices and TwoPortModel lists.
 
-# mypy: ignore-errors
+This module provides a generic container class for arrays of TwoPortModels, allowing for the
+organization and manipulation of multiple two-port network models, including nested lists.
+"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -20,31 +24,40 @@ class ModelArray(TwoPortModel):
 
     @field_validator("cells", mode="before", check_fields=True)
     @classmethod
-    def validate_nested_cells(cls, cells: list[TwoPortModel]):
-        """Recursively create ModelArrays inside nested lists."""
+    def validate_nested_cells(cls, cells: list[TwoPortModel]) -> list[TwoPortModel]:
+        """
+        Recursively create ModelArrays inside nested lists.
+
+        Args:
+            cells (list[TwoPortModel]): List of TwoPortModels or nested lists of TwoPortModels.
+
+        Returns:
+            list[TwoPortModel]: Validated and potentially nested ModelArrays.
+        """
         for i, c in enumerate(cells):
             if isinstance(c, list):
                 cells[i] = cls(cells=c)
         return cells
-
-    def __add__(self, other: ModelArray) -> ModelArray:
-        """Operator to concatenate two ModelArrays."""
-        return self.__class__(cells=[self, other])
 
     def __getitem__(self, indices: slice | int) -> ModelArray | TwoPortModel:
         """
         Get model(s) at indices or slice.
 
         Args:
-            indices: Indices to access the internal AnyModel list.
+            indices (slice | int): Indices to access the internal cells list.
 
         Returns:
-            ModelArray | Anymodel: Value at the specified indices or slice.
+            ModelArray | TwoPortModel: Value at the specified indices or slice.
         """
         if isinstance(indices, slice):
             return self.__class__(cells=self.cells[indices])
         return self.cells[indices]
 
     def append(self, other: TwoPortModel) -> None:
-        """Append new model to internal cell array."""
+        """
+        Append new model to internal cell array.
+
+        Args:
+            other (TwoPortModel): The model to append to the cells list.
+        """
         self.cells.append(other)

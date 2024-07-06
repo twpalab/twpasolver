@@ -27,7 +27,7 @@ def test_init_with_s_parameters():
     freqs = np.array([1e9, 2e9, 3e9])
     s_mat = np.array([[[0.5, 0.5j], [0.5, 0.5]]] * 3)
     Z0 = 50
-    cell = TwoPortCell.from_s_par(freqs, s_mat, Z0=Z0)
+    cell = TwoPortCell.from_s(freqs, s_mat, Z0=Z0)
 
     assert np.array_equal(cell.freqs, freqs)
     assert np.allclose(cell.abcd, s2a(s_mat, Z0))
@@ -67,7 +67,7 @@ def test_getitem():
 
 
 def test_interpolate():
-    """Test interpolate function of TwoPortCell"""
+    """Test interpolate function of TwoPortCell."""
     freqs_base = np.linspace(1, 10, 10)
     freqs_interp = np.linspace(1, 10, 100)
     L_abcd = series_impedance_abcd(inductance(freqs_base, 0.1))

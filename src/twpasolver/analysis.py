@@ -167,7 +167,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             freqs = self.f / self.unit_multiplier
             self.data["freqs"] = freqs
             self.data["abcd"] = np.asarray(cell.abcd)
-            self.data["S21"] = cell.get_s_par()[:, 1, 0]
+            self.data["S21"] = cell.s.S21
             s21_db = 20 * np.log(np.abs(self.data["S21"]))
             self.data["S21_db"] = s21_db
             s21_db_diff = s21_db[1:] - s21_db[:-1]
