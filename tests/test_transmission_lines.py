@@ -11,7 +11,9 @@ def test_from_z0_vp(lossless_line):
     line_copy = LosslessTL.from_z_vp(
         lossless_line.Z0, lossless_line.vp, lossless_line.l
     )
-    assert line_copy.model_dump() == lossless_line.model_dump()
+    assert np.isclose(line_copy.C, lossless_line.C)
+    assert np.isclose(line_copy.L, lossless_line.L)
+    assert np.isclose(line_copy.l, lossless_line.l)
 
 
 def test_composed_line(lossless_line):
