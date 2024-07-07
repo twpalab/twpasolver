@@ -59,6 +59,7 @@ from twpasolver.models.oneport import (
     Stub,
     OnePortArray,
 )
+from twpasolver.models.transmission_lines import LosslessTL
 from twpasolver.models.twpa_cells import LCLfBaseCell, StubBaseCell
 from twpasolver.models.twoportarrays import TWPA, AnyModel, TwoPortArray
 from twpasolver.models.compose import compose

@@ -173,7 +173,7 @@ class TwoPortCell:
             rf.Network: scikit-rf Network.
         """
         f = rf.Frequency.from_f(self.freqs * 1e-9, "ghz")
-        return rf.Network(frequency=f, a=np.asarray(self.abcd))
+        return rf.Network(frequency=f, a=np.asarray(self.abcd), z0=self.Z0)
 
     @property
     def s(self) -> SMatrixArray:
@@ -262,7 +262,7 @@ class TwoPortModel(BaseModel, ABC):
     model_config = ConfigDict(
         validate_assignment=True, revalidate_instances="always", protected_namespaces=()
     )
-    Z0: Impedance = Field(
+    Z0_ref: Impedance = Field(
         default=50.0, description="Reference line impedance of the two-port component."
     )
     N: NonNegativeInt = Field(
@@ -333,7 +333,7 @@ class TwoPortModel(BaseModel, ABC):
         Returns:
             TwoPortCell: Two-port cell of the model.
         """
-        return TwoPortCell(freqs, self.get_abcd(freqs), Z0=self.Z0)
+        return TwoPortCell(freqs, self.get_abcd(freqs), Z0=self.Z0_ref)
 
     def get_network(self, freqs: np.ndarray) -> rf.Network:
         """

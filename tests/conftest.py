@@ -5,6 +5,7 @@ import pytest
 
 from twpasolver.matrices_arrays import ABCDArray, TwoByTwoArray
 from twpasolver.models.oneport import Capacitance, Inductance, OnePortArray, Resistance
+from twpasolver.models.transmission_lines import LosslessTL
 from twpasolver.models.twoportarrays import TWPA
 from twpasolver.twoport import TwoPortCell, TwoPortModel
 
@@ -116,6 +117,12 @@ def resistance():
 def one_port_array(resistance, inductor):
     """Fixture for OnePortArray instance."""
     return OnePortArray(cells=[resistance, inductor])
+
+
+@pytest.fixture
+def lossless_line():
+    """Return example lossless transmission line."""
+    return LosslessTL(L=6.2e-7, C=4.2e-10, l=10e-6)
 
 
 @pytest.fixture
