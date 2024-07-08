@@ -19,6 +19,7 @@ release = twpasolver.__version__
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    "nbsphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.doctest",
     "sphinx.ext.coverage",
@@ -34,7 +35,8 @@ extensions = [
 templates_path = ["_templates"]
 exclude_patterns = []
 autodoc_pydantic_model_show_json = True
-autodoc_pydantic_model_show_fields_summary = True
+autodoc_pydantic_model_show_fields_summary = False
+autodoc_pydantic_settings_show_field_summary = False
 autodoc_pydantic_model_show_config_summary = False
 autodoc_pydantic_model_show_undoc_members = False
 autodoc_pydantic_model_members = False
@@ -55,7 +57,7 @@ html_theme_options = {
     "source_branch": "main",
     "source_directory": "docs/source/",
     "light_logo": "twpalab_logo.png",
-    "dark_logo": "twpalab_logo.png",
+    "dark_logo": "twpalab_logo_dark.png",
     "light_css_variables": {
         "color-brand-primary": "#6400FF",
         "color-brand-secondary": "#6400FF",
@@ -88,7 +90,7 @@ def run_apidoc(_):
     if docs_dest.is_dir():
         shutil.rmtree(docs_dest, ignore_errors=False, onerror=None)
     package = source.parents[1] / "src" / "twpasolver"
-    apidoc.main(["--module-first", "-o", str(docs_dest), str(package)])
+    apidoc.main(["--module-first", "-o", str(docs_dest), str(package), "--separate"])
 
 
 def setup(app):

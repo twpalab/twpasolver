@@ -6,6 +6,7 @@ Welcome to twpasolver's documentation!
    :caption: Contents:
 
    installation
+   tutorials
 
 .. toctree::
     :maxdepth: 2
