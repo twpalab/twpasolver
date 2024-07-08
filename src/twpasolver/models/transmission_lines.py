@@ -43,7 +43,7 @@ class LosslessTL(TwoPortModel):
         """
         return cls(l=l, L=Z0 / vp, C=1 / (vp * Z0))
 
-    @computed_field
+    @computed_field  # type: ignore
     @property
     def Z0(self) -> NonNegativeFloat:
         """
@@ -54,7 +54,7 @@ class LosslessTL(TwoPortModel):
         """
         return np.sqrt(self.L / self.C)
 
-    @computed_field
+    @computed_field  # type: ignore
     @property
     def vp(self) -> NonNegativeFloat:
         """
