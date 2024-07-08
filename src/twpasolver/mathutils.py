@@ -146,7 +146,7 @@ def to_dB(values: float_array | complex_array) -> float_array:
     Returns:
         float_array: Array of values in dB.
     """
-    return np.log10(np.abs(values))
+    return 20.0 * np.log10(np.abs(values))
 
 
 @nb.njit(cache=True)

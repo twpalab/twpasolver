@@ -1,4 +1,47 @@
-"""Twoport network module."""
+"""
+Two-port network module.
+
+This module provides classes and methods for representing and manipulating two-port RF (radio frequency)
+networks. It includes functionality for handling frequency-dependent network parameters, converting
+between different representations (such as ABCD matrices and S-parameters), and performing common
+operations on two-port networks.
+This module can be used to define and work with two-port network models in RF electronics. It is
+designed to support tasks such as network analysis, simulation, and design.
+
+Examples
+--------
+Create a TwoPortCell from ABCD parameters:
+
+.. code-block:: python
+
+    freqs = np.array([1e9, 2e9, 3e9])
+    abcd = np.array([
+        [[1, 2], [3, 4]],
+        [[5, 6], [7, 8]],
+        [[9, 10], [11, 12]]
+    ])
+    cell = TwoPortCell(freqs, abcd)
+
+Convert to S-parameters:
+
+.. code-block:: python
+
+    s_params = cell.s
+
+Interpolate to new frequencies:
+
+.. code-block:: python
+
+    new_freqs = np.array([1.5e9, 2.5e9])
+    interpolated_cell = cell.interpolate(new_freqs)
+
+Save and load from file:
+
+.. code-block:: python
+
+    cell.dump_to_file('cell_data.hdf5')
+    loaded_cell = TwoPortCell.from_file('cell_data.hdf5')
+"""
 
 from __future__ import annotations
 
@@ -7,8 +50,9 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import skrf as rf
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt
+from pydantic import ConfigDict, Field, NonNegativeInt
 
+from twpasolver.basemodel import BaseModel
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.logging import log
 from twpasolver.mathutils import a2s, s2a
@@ -42,7 +86,9 @@ class TwoPortCell:
         self.Z0 = Z0
 
     @classmethod
-    def from_s_par(cls, freqs: np.ndarray, s_mat: np.ndarray, Z0: float | int = 50):
+    def from_s(
+        cls, freqs: np.ndarray, s_mat: np.ndarray, Z0: float | int = 50
+    ) -> TwoPortCell:
         """
         Instantiate from array of S-parameters.
 
@@ -58,7 +104,7 @@ class TwoPortCell:
         return cls(freqs, abcd_mat, Z0=Z0)
 
     @classmethod
-    def from_file(cls, filename: str, writer="hdf5"):
+    def from_file(cls, filename: str, writer="hdf5") -> TwoPortCell:
         """
         Load model from file.
 
@@ -74,11 +120,16 @@ class TwoPortCell:
 
     @property
     def freqs(self) -> np.ndarray:
-        """Frequencies array getter."""
+        """
+        Get the frequencies array.
+
+        Returns:
+            numpy.ndarray: Frequencies array.
+        """
         return self._freqs
 
     @freqs.setter
-    def freqs(self, freqs: np.ndarray):
+    def freqs(self, freqs: np.ndarray) -> None:
         """
         Set the frequencies.
 
@@ -95,13 +146,18 @@ class TwoPortCell:
 
     @property
     def Z0(self) -> Impedance:
-        """Reference line impedance getter."""
+        """
+        Get the reference line impedance.
+
+        Returns:
+            Impedance: Reference line impedance.
+        """
         return self._Z0
 
     @Z0.setter
-    def Z0(self, value: Impedance):
+    def Z0(self, value: Impedance) -> None:
         """
-        Set the line impedance.
+        Set the reference line impedance.
 
         Args:
             value (Impedance): Reference line impedance.
@@ -109,7 +165,7 @@ class TwoPortCell:
         validate_impedance(value)
         self._Z0 = value
 
-    def to_network(self):
+    def to_network(self) -> rf.Network:
         """
         Convert to scikit-rf Network.
 
@@ -117,18 +173,19 @@ class TwoPortCell:
             rf.Network: scikit-rf Network.
         """
         f = rf.Frequency.from_f(self.freqs * 1e-9, "ghz")
-        return rf.Network(frequency=f, a=np.asarray(self.abcd))
+        return rf.Network(frequency=f, a=np.asarray(self.abcd), z0=self.Z0)
 
-    def get_s_par(self):
+    @property
+    def s(self) -> SMatrixArray:
         """
-        Return S-parameter matrix.
+        Get the S-parameter matrix.
 
         Returns:
             SMatrixArray: S-parameter matrix.
         """
         return SMatrixArray(a2s(np.asarray(self.abcd), self.Z0))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Return a string representation of the TwoPortCell.
 
@@ -137,7 +194,7 @@ class TwoPortCell:
         """
         return f"{self.__class__.__name__}(freqs={self.freqs},\nabcd={self.abcd},\nZ0={self.Z0})"
 
-    def __getitem__(self, idxs: slice):
+    def __getitem__(self, idxs: slice) -> TwoPortCell:
         """
         Get slice of TwoPortCell.
 
@@ -151,7 +208,7 @@ class TwoPortCell:
             raise ValueError("Only slicing of TwoPortCell is allowed")
         return self.__class__(self.freqs[idxs], self.abcd[idxs], self.Z0)
 
-    def as_dict(self):
+    def as_dict(self) -> dict:
         """
         Return cell contents as dictionary.
 
@@ -160,7 +217,7 @@ class TwoPortCell:
         """
         return {"freqs": self.freqs, "abcd": np.asarray(self.abcd), "Z0": self.Z0}
 
-    def dump_to_file(self, filename: str, writer="hdf5"):
+    def dump_to_file(self, filename: str, writer="hdf5") -> None:
         """
         Dump cell to file.
 
@@ -193,7 +250,6 @@ class TwoPortCell:
                 interp_phase = np.interp(
                     freqs, self.freqs, np.unwrap(np.angle(self.abcd[:, i, j]))
                 )
-
                 abcd_interp.append(interp_mag * np.exp(1j * interp_phase))
             else:
                 abcd_interp.append(np.interp(freqs, self.freqs, self.abcd[:, i, j]))
@@ -206,8 +262,7 @@ class TwoPortModel(BaseModel, ABC):
     model_config = ConfigDict(
         validate_assignment=True, revalidate_instances="always", protected_namespaces=()
     )
-    name: str | None = Field(default=None, description="Name of the model.")
-    Z0: Impedance = Field(
+    Z0_ref: Impedance = Field(
         default=50.0, description="Reference line impedance of the two-port component."
     )
     N: NonNegativeInt = Field(
@@ -215,39 +270,79 @@ class TwoPortModel(BaseModel, ABC):
         description="Number of repetitions of the model in the computed abcd matrix.",
     )
 
-    @classmethod
-    def from_file(cls, filename: str):
-        """Load model from file."""
-        model_dict = read_file(filename, writer="json")
-        return cls(**model_dict)
-
     def update(self, **kwargs) -> None:
-        """Update multiple attributes of the model."""
+        """
+        Update multiple attributes of the model.
+
+        Args:
+            **kwargs: Attributes to update.
+        """
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
             else:
                 raise RuntimeError(f"The cell model does not have the {key} attribute.")
 
+    def __mul__(self, factor: int) -> TwoPortModel:
+        """
+        Return model multiplied by integer factor.
+
+        Args:
+            factor (int): Multiplication factor.
+
+        Returns:
+            TwoPortModel: New instance of the model multiplied by the factor.
+        """
+        new_instance = self.__class__(**self.model_dump())
+        new_instance.N = factor * self.N
+        return new_instance
+
     @abstractmethod
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
-        """Compute the abcd matrix of a single iteration of the model."""
+        """
+        Compute the abcd matrix of a single iteration of the model.
+
+        Args:
+            freqs (numpy.ndarray): Frequencies array.
+
+        Returns:
+            ABCDArray: ABCD matrix for a single iteration.
+        """
 
     def get_abcd(self, freqs: np.ndarray) -> ABCDArray:
-        """Compute the abcd matrix of the model."""
+        """
+        Compute the abcd matrix of the model.
+
+        Args:
+            freqs (numpy.ndarray): Frequencies array.
+
+        Returns:
+            ABCDArray: Computed ABCD matrix of the model.
+        """
         if self.N == 1:
             return self.single_abcd(freqs)
         return self.single_abcd(freqs) ** self.N
 
     def get_cell(self, freqs: np.ndarray) -> TwoPortCell:
-        """Return the two-port cell of the model."""
-        return TwoPortCell(freqs, self.get_abcd(freqs), Z0=self.Z0)
+        """
+        Return the two-port cell of the model.
+
+        Args:
+            freqs (numpy.ndarray): Frequencies array.
+
+        Returns:
+            TwoPortCell: Two-port cell of the model.
+        """
+        return TwoPortCell(freqs, self.get_abcd(freqs), Z0=self.Z0_ref)
 
     def get_network(self, freqs: np.ndarray) -> rf.Network:
-        """Return the two-port cell of the model as a scikit-rf Network."""
-        return self.get_cell(freqs).to_network()
+        """
+        Return the two-port cell of the model as a scikit-rf Network.
 
-    def dump_to_file(self, filename: str):
-        """Dump model to file."""
-        model_dict = self.model_dump()
-        save_to_file(filename, model_dict, writer="json")
+        Args:
+            freqs (numpy.ndarray): Frequencies array.
+
+        Returns:
+            rf.Network: scikit-rf Network representation of the model.
+        """
+        return self.get_cell(freqs).to_network()

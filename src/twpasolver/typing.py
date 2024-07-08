@@ -1,13 +1,28 @@
 """Type annotations module."""
 
-from typing import Any, Callable, Tuple, TypeAlias
+from typing import Any, Callable, TypeAlias
 
 import numpy as np
-from pydantic import GetJsonSchemaHandler, NonNegativeFloat
+from pydantic import GetJsonSchemaHandler, NonNegativeFloat, NonNegativeInt
 from pydantic.functional_validators import BeforeValidator
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 from typing_extensions import Annotated
+
+
+def all_subclasses(cls) -> list:
+    """
+    Recursively get all subclasses of a given class.
+
+    Args:
+        cls: The class for which to find all subclasses.
+
+    Returns:
+        list: A list of all subclasses of the given class.
+    """
+    return cls.__subclasses__() + [
+        s for c in cls.__subclasses__() for s in all_subclasses(c)
+    ]
 
 
 def validate_impedance(Z: complex | float | str) -> complex | float:
@@ -23,6 +38,8 @@ def validate_impedance(Z: complex | float | str) -> complex | float:
         raise ValueError(f"Cannot convert {type(Z)} {Z} to complex number.")
     if np.real(Z) < 0:
         raise ValueError("Real part of impedance {Z} must be non-negative.")
+    if np.imag(Z) == 0:
+        Z = Z.real
     return Z
 
 
@@ -61,7 +78,9 @@ class _Impedance2PydanticAnnotation:
 Impedance = Annotated[
     complex | float, _Impedance2PydanticAnnotation, BeforeValidator(validate_impedance)
 ]
-FrequencyArange = Tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat]
+FrequencyList = list[NonNegativeFloat]
+FrequencyArange = tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat]
+FrequencyLinspace = tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeInt]
 
 complex_array: TypeAlias = np.ndarray[Any, np.dtype[np.complex128]]
 float_array: TypeAlias = np.ndarray[Any, np.dtype[np.float64]]

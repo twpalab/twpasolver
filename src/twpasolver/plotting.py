@@ -1,5 +1,6 @@
 """Collection of plot functions."""
 
+# mypy: ignore-errors
 from typing import Optional
 
 import matplotlib.pyplot as plt
@@ -31,7 +32,7 @@ def plot_response(
     ax[0].plot(freqs, s21_db, **plot_kwargs)
     ax[0].set_ylabel("$|S_{21}|$ [dB]")
     ax[1].plot(freqs, k_star, **plot_kwargs)
-    ax[1].set_xlabel("Frequency " + freqs_unit)
+    ax[1].set_xlabel(f"Frequency [{freqs_unit}]")
     ax[1].set_ylabel("$k^*$ [rad]")
     if pump_freq:
         ax[0].axvline(pump_freq, c="black", ls="--", zorder=0, lw=2)
@@ -56,7 +57,7 @@ def plot_gain(
     plt.figure()
     ax = plt.axes()
     ax.plot(freqs, gain_db, **plot_kwargs)
-    ax.set_xlabel("Frequency " + freqs_unit)
+    ax.set_xlabel(f"Frequency [{freqs_unit}]")
     ax.set_ylabel("Gain [dB]")
     return ax
 
@@ -95,7 +96,7 @@ def plot_phase_matching(
         **plot_kwargs,
     )
     c = plt.colorbar(m, ax=ax)
-    ax.set_xlabel("Pump frequency " + freqs_unit)
-    ax.set_ylabel("Signal frequency " + freqs_unit)
+    ax.set_xlabel(f"Pump frequency [{freqs_unit}]")
+    ax.set_ylabel(f"Signal frequency [{freqs_unit}]")
     c.set_label(z_label)
     return ax

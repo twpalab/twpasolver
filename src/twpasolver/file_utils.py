@@ -1,4 +1,11 @@
-"""Functions for saving to json and hdf5 files."""
+"""
+Functions for saving to json and hdf5 files.
+
+This module provides functions to read from and write to JSON and HDF5 files. It includes utility
+functions to ensure file extensions and directories are correctly handled, as well as recursive
+functions to handle nested dictionaries when working with HDF5 files.
+
+"""
 
 import json
 import os
@@ -7,7 +14,6 @@ from typing import Any, Dict, List
 import h5py
 import numpy as np
 from h5py import Group
-from h5py._hl.group import Group
 
 
 def read_file(savename: str, writer: str = "json") -> Dict[str, Any]:
@@ -126,7 +132,13 @@ def save_to_json(savename: str, d: Dict[str, Any]) -> None:
 
 
 def _recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> None:
-    """Recursively save dictionary contents to an HDF5 group."""
+    """
+    Recursively save dictionary contents to an HDF5 group.
+
+    Args:
+        f (Group): The HDF5 group.
+        d (Dict[str, Any]): The dictionary to save.
+    """
     for key, item in d.items():
         key = str(key)
 
@@ -134,7 +146,7 @@ def _recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> Non
             subgroup = f.create_group(key)
             _recursively_save_dict_contents_to_group(subgroup, item)
         else:
-            if isinstance(item, list | tuple):
+            if isinstance(item, (list, tuple)):
                 item = np.array(item)
             if isinstance(item, str):
                 dtype = h5py.special_dtype(vlen=str)
@@ -146,8 +158,16 @@ def _recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> Non
 
 
 def _recursively_load_dict_contents_from_group(f: Group) -> Dict[str, Any]:
-    """Recursively load dictionary contents from an HDF5 group."""
-    ans = dict()
+    """
+    Recursively load dictionary contents from an HDF5 group.
+
+    Args:
+        f (Group): The HDF5 group.
+
+    Returns:
+        Dict[str, Any]: The loaded dictionary.
+    """
+    ans = {}
     for key, item in f.items():
         if isinstance(item, h5py.Dataset):
             ans[key] = (
@@ -162,7 +182,15 @@ class NpEncoder(json.JSONEncoder):
     """JSON encoder for handling NumPy types."""
 
     def default(self, o: Any) -> int | float | List[Any] | str:
-        """Return default encoding."""
+        """
+        Return default encoding for NumPy types.
+
+        Args:
+            o (Any): The object to encode.
+
+        Returns:
+            int | float | List[Any] | str: The encoded object.
+        """
         if isinstance(o, np.integer):
             return int(o)
         elif isinstance(o, np.floating):
