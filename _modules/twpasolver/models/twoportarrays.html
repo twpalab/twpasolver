@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" />
 
     <link rel="shortcut icon" href="../../../_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
-        <title>twpasolver.models.twpa - twpasolver · 0.0.1</title>
+        <title>twpasolver.models.twoportarrays - twpasolver · 0.0.1</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?digest=369552022d0b975c8e74270ce6eabe0fb7978f24" />
     <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css" />
@@ -209,122 +209,133 @@
           </label>
         </div>
         <article role="main">
-          <h1>Source code for twpasolver.models.twpa</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Models for TWPAS.&quot;&quot;&quot;</span>
+          <h1>Source code for twpasolver.models.twoportarrays</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Generic models for user-defined abcd matrices and TwoPortModel lists.</span>
 
+<span class="sd">This module provides a generic container class for arrays of TwoPortModels, allowing for the</span>
+<span class="sd">organization and manipulation of multiple two-port network models, including nested lists.</span>
+<span class="sd">It also includes specific models like TWPA for specialized applications.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># mypy: ignore-errors</span>
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">NonNegativeInt</span><span class="p">,</span> <span class="n">computed_field</span>
 
 <span class="kn">from</span> <span class="nn">twpasolver.matrices_arrays</span> <span class="kn">import</span> <span class="n">ABCDArray</span><span class="p">,</span> <span class="n">abcd_identity</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models.base_components</span> <span class="kn">import</span> <span class="n">Inductance</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models.rf_functions</span> <span class="kn">import</span> <span class="n">LCLf_abcd</span><span class="p">,</span> <span class="n">get_stub_cell</span><span class="p">,</span> <span class="n">lossless_line_abcd</span>
+<span class="kn">from</span> <span class="nn">twpasolver.models.modelarray</span> <span class="kn">import</span> <span class="n">ModelArray</span>
 <span class="kn">from</span> <span class="nn">twpasolver.twoport</span> <span class="kn">import</span> <span class="n">TwoPortModel</span>
+<span class="kn">from</span> <span class="nn">twpasolver.typing</span> <span class="kn">import</span> <span class="n">all_subclasses</span>
 
-<span class="n">required</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
 
+<div class="viewcode-block" id="TwoPortArray"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.twoportarrays.TwoPortArray">[docs]</a><span class="k">class</span> <span class="nc">TwoPortArray</span><span class="p">(</span><span class="n">ModelArray</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generic container for arrays of TwoPortModels.&quot;&quot;&quot;</span>
 
-<div class="viewcode-block" id="StubBaseCell"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.twpa.StubBaseCell">[docs]</a><span class="k">class</span> <span class="nc">StubBaseCell</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base cell of twpa stub filter model.&quot;&quot;&quot;</span>
-
-    <span class="n">L</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Inductance of the straight line.&quot;</span><span class="p">)</span>
-    <span class="n">C</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Capacitance of the line.&quot;</span><span class="p">)</span>
-    <span class="n">Lf</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Inductance of the stub finger.&quot;</span><span class="p">)</span>
-    <span class="n">l1</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Length of the stub finger.&quot;</span><span class="p">)</span>
-    <span class="n">l2</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Length of the straight line.&quot;</span><span class="p">)</span>
-    <span class="n">line</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
-        <span class="kc">False</span><span class="p">,</span>
-        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Model line as distributed element instead of lumped inductance.&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;TwoPortArray&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;TwoPortArray&quot;</span><span class="p">)</span>
+    <span class="n">cells</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">AnyModel</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;List of TwoPortModels representing the basic cells. Nested lists are allowed.&quot;</span><span class="p">,</span>
     <span class="p">)</span>
 
-<div class="viewcode-block" id="StubBaseCell.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.twpa.StubBaseCell.single_abcd">[docs]</a>    <span class="k">def</span> <span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute abcd matrix.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">line</span><span class="p">:</span>
-            <span class="n">parallel_stubs</span> <span class="o">=</span> <span class="n">ABCDArray</span><span class="p">(</span>
-                <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">get_stub_cell</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Lf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-            <span class="p">)</span>
-            <span class="n">half_line</span> <span class="o">=</span> <span class="n">ABCDArray</span><span class="p">(</span>
-                <span class="n">lossless_line_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l2</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
-            <span class="p">)</span>
-            <span class="k">return</span> <span class="n">half_line</span> <span class="o">@</span> <span class="n">parallel_stubs</span> <span class="o">@</span> <span class="n">half_line</span>
+<div class="viewcode-block" id="TwoPortArray.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.twoportarrays.TwoPortArray.single_abcd">[docs]</a>    <span class="k">def</span> <span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute abcd of combined models.</span>
 
-        <span class="k">return</span> <span class="n">ABCDArray</span><span class="p">(</span><span class="n">get_stub_cell</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l2</span><span class="p">))</span></div></div>
+<span class="sd">        Args:</span>
+<span class="sd">            freqs (np.ndarray): Array of frequencies.</span>
 
-
-<div class="viewcode-block" id="LCLfBaseCell"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.twpa.LCLfBaseCell">[docs]</a><span class="k">class</span> <span class="nc">LCLfBaseCell</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base cell of twpa LC model.&quot;&quot;&quot;</span>
-
-    <span class="n">L</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Inductance of the straight line.&quot;</span><span class="p">)</span>
-    <span class="n">C</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Capacitance of the stub finger.&quot;</span><span class="p">)</span>
-    <span class="n">Lf</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Inductance of the stub finger.&quot;</span><span class="p">)</span>
-    <span class="n">centered</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
-
-<div class="viewcode-block" id="LCLfBaseCell.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.twpa.LCLfBaseCell.single_abcd">[docs]</a>    <span class="k">def</span> <span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute abcd matrix.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">centered</span><span class="p">:</span>
-            <span class="n">fingers</span> <span class="o">=</span> <span class="n">ABCDArray</span><span class="p">(</span><span class="n">LCLf_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Lf</span><span class="p">))</span>
-            <span class="n">half_inductance</span> <span class="o">=</span> <span class="n">Inductance</span><span class="p">(</span><span class="n">L</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">get_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">half_inductance</span> <span class="o">@</span> <span class="n">fingers</span> <span class="o">@</span> <span class="n">half_inductance</span>
-        <span class="k">return</span> <span class="n">ABCDArray</span><span class="p">(</span><span class="n">LCLf_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Lf</span><span class="p">))</span></div></div>
+<span class="sd">        Returns:</span>
+<span class="sd">            ABCDArray: The combined ABCD matrix of the models.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sc</span> <span class="o">=</span> <span class="n">abcd_identity</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">freqs</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">:</span>
+            <span class="n">sc</span> <span class="o">=</span> <span class="n">sc</span> <span class="o">@</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">sc</span></div></div>
 
 
-<div class="viewcode-block" id="TWPA"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA">[docs]</a><span class="k">class</span> <span class="nc">TWPA</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
+<div class="viewcode-block" id="TWPA"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.twoportarrays.TWPA">[docs]</a><span class="k">class</span> <span class="nc">TWPA</span><span class="p">(</span><span class="n">TwoPortArray</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Simple model for TWPAs.&quot;&quot;&quot;</span>
 
-    <span class="n">cells</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">LCLfBaseCell</span> <span class="o">|</span> <span class="n">StubBaseCell</span><span class="p">]</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span>
-        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;List of TwoPortModels representing the basic cells.&quot;</span>
-    <span class="p">)</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;TWPA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;TWPA&quot;</span><span class="p">)</span>
     <span class="n">Istar</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
         <span class="n">default</span><span class="o">=</span><span class="mf">6.5e-3</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Nonlinearity scale current parameter.&quot;</span>
     <span class="p">)</span>
     <span class="n">Idc</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Bias dc current.&quot;</span><span class="p">)</span>
     <span class="n">Ip0</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mf">2e-4</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Rf pump amplitude.&quot;</span><span class="p">)</span>
 
-<div class="viewcode-block" id="TWPA.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.twpa.TWPA.single_abcd">[docs]</a>    <span class="k">def</span> <span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute abcd of supercell.&quot;&quot;&quot;</span>
-        <span class="n">sc</span> <span class="o">=</span> <span class="n">abcd_identity</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">freqs</span><span class="p">))</span>
-        <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">:</span>
-            <span class="n">sc</span> <span class="o">=</span> <span class="n">sc</span> <span class="o">@</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">sc</span></div>
-
-    <span class="nd">@computed_field</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">epsilon</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Coefficient of first-order term in inductance.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Coefficient of first-order term in inductance.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NonNegativeFloat: The epsilon value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">Idc</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Idc</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">Istar</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
 
-    <span class="nd">@computed_field</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">xi</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Coefficient of second-order term in inductance.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Coefficient of second-order term in inductance.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NonNegativeFloat: The xi value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Idc</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">Istar</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
 
-    <span class="nd">@computed_field</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">chi</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Coefficient for second term of phase matching relation.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Coefficient for second term of phase matching relation.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NonNegativeFloat: The chi value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">Ip0</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">xi</span> <span class="o">/</span> <span class="mi">8</span>
 
-    <span class="nd">@computed_field</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">alpha</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Second-order correction term for inductance as function of dc current.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Second-order correction term for inductance as function of dc current.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NonNegativeFloat: The alpha value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="mi">1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">Idc</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">Istar</span><span class="o">**</span><span class="mi">2</span>
 
-    <span class="nd">@computed_field</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">Iratio</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Ratio between bias and nonlinearity current parameter.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Ratio between bias and nonlinearity current parameter.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NonNegativeFloat: The Iratio value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">Idc</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">Istar</span>
 
-    <span class="nd">@computed_field</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">N_tot</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeInt</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Total number of base cells in the model.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="nb">sum</span><span class="p">([</span><span class="n">cell</span><span class="o">.</span><span class="n">N</span> <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">])</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">N</span></div>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Total number of base cells in the model.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NonNegativeInt: The total number of base cells.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">N</span> <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">N</span></div>
+
+
+<span class="n">named_models</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">all_subclasses</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">in</span> <span class="n">c</span><span class="o">.</span><span class="n">model_fields</span><span class="p">]</span>
+<span class="n">AnyModel</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">named_models</span><span class="p">)],</span> <span class="n">Field</span><span class="p">(</span><span class="n">discriminator</span><span class="o">=</span><span class="s2">&quot;name&quot;</span><span class="p">)]</span>
 </pre></div>
         </article>
       </div>

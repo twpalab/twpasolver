@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" />
 
     <link rel="shortcut icon" href="../../../_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
-        <title>twpasolver.models.base_components - twpasolver · 0.0.1</title>
+        <title>twpasolver.models.modelarray - twpasolver · 0.0.1</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?digest=369552022d0b975c8e74270ce6eabe0fb7978f24" />
     <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css" />
@@ -209,79 +209,70 @@
           </label>
         </div>
         <article role="main">
-          <h1>Source code for twpasolver.models.base_components</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Simple components.&quot;&quot;&quot;</span>
+          <h1>Source code for twpasolver.models.modelarray</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Generic models for user-defined ABCD matrices and TwoPortModel lists.</span>
 
-<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">abstractmethod</span>
-<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+<span class="sd">This module provides a generic container class for arrays of TwoPortModels, allowing for the</span>
+<span class="sd">organization and manipulation of multiple two-port network models, including nested lists.</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">PrivateAttr</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.matrices_arrays</span> <span class="kn">import</span> <span class="n">ABCDArray</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models.rf_functions</span> <span class="kn">import</span> <span class="p">(</span>
-    <span class="n">capacitance</span><span class="p">,</span>
-    <span class="n">inductance</span><span class="p">,</span>
-    <span class="n">parallel_admittance_abcd</span><span class="p">,</span>
-    <span class="n">series_impedance_abcd</span><span class="p">,</span>
-    <span class="n">stub</span><span class="p">,</span>
-<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">field_validator</span>
+
 <span class="kn">from</span> <span class="nn">twpasolver.twoport</span> <span class="kn">import</span> <span class="n">TwoPortModel</span>
-<span class="kn">from</span> <span class="nn">twpasolver.typing</span> <span class="kn">import</span> <span class="n">complex_array</span><span class="p">,</span> <span class="n">float_array</span>
 
 
-<div class="viewcode-block" id="Component"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.base_components.Component">[docs]</a><span class="k">class</span> <span class="nc">Component</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for single components.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="ModelArray"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.modelarray.ModelArray">[docs]</a><span class="k">class</span> <span class="nc">ModelArray</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generic container for arrays of TwoPortModels.&quot;&quot;&quot;</span>
 
-    <span class="n">parallel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="n">_get_impedance</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">float_array</span><span class="p">],</span> <span class="n">complex_array</span><span class="p">]</span> <span class="o">=</span> <span class="n">PrivateAttr</span><span class="p">()</span>
+    <span class="n">cells</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;List of TwoPortModels representing the basic cells. Nested lists are allowed.&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
 
-    <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">model_post_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set _get_impedance function here.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="ModelArray.validate_nested_cells"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.modelarray.ModelArray.validate_nested_cells">[docs]</a>    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;cells&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">,</span> <span class="n">check_fields</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">validate_nested_cells</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">cells</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TwoPortModel</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">TwoPortModel</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Recursively create ModelArrays inside nested lists.</span>
 
-<div class="viewcode-block" id="Component.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.base_components.Component.single_abcd">[docs]</a>    <span class="k">def</span> <span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get abcd of series impedance or parallel admittance.&quot;&quot;&quot;</span>
-        <span class="n">impedance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_impedance</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parallel</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">ABCDArray</span><span class="p">(</span><span class="n">parallel_admittance_abcd</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">impedance</span><span class="p">))</span>
-        <span class="k">return</span> <span class="n">ABCDArray</span><span class="p">(</span><span class="n">series_impedance_abcd</span><span class="p">(</span><span class="n">impedance</span><span class="p">))</span></div></div>
+<span class="sd">        Args:</span>
+<span class="sd">            cells (list[TwoPortModel]): List of TwoPortModels or nested lists of TwoPortModels.</span>
 
+<span class="sd">        Returns:</span>
+<span class="sd">            list[TwoPortModel]: Validated and potentially nested ModelArrays.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cells</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="n">cells</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">cells</span><span class="o">=</span><span class="n">c</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cells</span></div>
 
-<div class="viewcode-block" id="Capacitance"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.base_components.Capacitance">[docs]</a><span class="k">class</span> <span class="nc">Capacitance</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Model of a capacitor.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">:</span> <span class="nb">slice</span> <span class="o">|</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ModelArray</span> <span class="o">|</span> <span class="n">TwoPortModel</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get model(s) at indices or slice.</span>
 
-    <span class="n">C</span><span class="p">:</span> <span class="n">NonNegativeFloat</span>
+<span class="sd">        Args:</span>
+<span class="sd">            indices (slice | int): Indices to access the internal cells list.</span>
 
-    <span class="k">def</span> <span class="nf">model_post_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set _get_impedance function here.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_get_impedance</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">capacitance</span><span class="p">,</span> <span class="n">C</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">)</span></div>
+<span class="sd">        Returns:</span>
+<span class="sd">            ModelArray | TwoPortModel: Value at the specified indices or slice.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="nb">slice</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">(</span><span class="n">cells</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">[</span><span class="n">indices</span><span class="p">])</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
 
+<div class="viewcode-block" id="ModelArray.append"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.modelarray.ModelArray.append">[docs]</a>    <span class="k">def</span> <span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">TwoPortModel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Append new model to internal cell array.</span>
 
-<div class="viewcode-block" id="Inductance"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.base_components.Inductance">[docs]</a><span class="k">class</span> <span class="nc">Inductance</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Model of an inductance.&quot;&quot;&quot;</span>
-
-    <span class="n">L</span><span class="p">:</span> <span class="n">NonNegativeFloat</span>
-
-    <span class="k">def</span> <span class="nf">model_post_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set _get_impedance function here.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_get_impedance</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">inductance</span><span class="p">,</span> <span class="n">L</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="Stub"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.html#twpasolver.models.base_components.Stub">[docs]</a><span class="k">class</span> <span class="nc">Stub</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Model of a stub.&quot;&quot;&quot;</span>
-
-    <span class="n">L</span><span class="p">:</span> <span class="n">NonNegativeFloat</span>
-    <span class="n">C</span><span class="p">:</span> <span class="n">NonNegativeFloat</span>
-    <span class="n">length</span><span class="p">:</span> <span class="n">NonNegativeFloat</span>
-    <span class="nb">open</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
-
-    <span class="k">def</span> <span class="nf">model_post_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set _get_impedance function here.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_get_impedance</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
-            <span class="n">stub</span><span class="p">,</span> <span class="n">L</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="n">C</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">length</span><span class="p">,</span> <span class="nb">open</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">open</span>
-        <span class="p">)</span></div>
+<span class="sd">        Args:</span>
+<span class="sd">            other (TwoPortModel): The model to append to the cells list.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">other</span><span class="p">)</span></div></div>
 </pre></div>
         </article>
       </div>

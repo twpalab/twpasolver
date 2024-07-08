@@ -215,19 +215,20 @@
 <span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
 <span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span><span class="p">,</span> <span class="n">wraps</span>
 <span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">strftime</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">from</span> <span class="nn">matplotlib.axes</span> <span class="kn">import</span> <span class="n">Axes</span>
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">PrivateAttr</span><span class="p">,</span> <span class="n">field_validator</span>
-<span class="kn">from</span> <span class="nn">typing_extensions</span> <span class="kn">import</span> <span class="n">Self</span>
+<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">PrivateAttr</span><span class="p">,</span> <span class="n">field_validator</span>
 
+<span class="kn">from</span> <span class="nn">twpasolver.basemodel</span> <span class="kn">import</span> <span class="n">BaseModel</span>
 <span class="kn">from</span> <span class="nn">twpasolver.file_utils</span> <span class="kn">import</span> <span class="n">read_file</span><span class="p">,</span> <span class="n">save_to_file</span>
+<span class="kn">from</span> <span class="nn">twpasolver.frequency</span> <span class="kn">import</span> <span class="n">Frequencies</span>
 <span class="kn">from</span> <span class="nn">twpasolver.logging</span> <span class="kn">import</span> <span class="n">log</span>
 <span class="kn">from</span> <span class="nn">twpasolver.mathutils</span> <span class="kn">import</span> <span class="n">cme_solve</span><span class="p">,</span> <span class="n">compute_phase_matching</span>
 <span class="kn">from</span> <span class="nn">twpasolver.models</span> <span class="kn">import</span> <span class="n">TWPA</span>
 <span class="kn">from</span> <span class="nn">twpasolver.plotting</span> <span class="kn">import</span> <span class="n">plot_gain</span><span class="p">,</span> <span class="n">plot_phase_matching</span><span class="p">,</span> <span class="n">plot_response</span>
-<span class="kn">from</span> <span class="nn">twpasolver.typing</span> <span class="kn">import</span> <span class="n">FrequencyArange</span><span class="p">,</span> <span class="n">float_array</span>
+<span class="kn">from</span> <span class="nn">twpasolver.typing</span> <span class="kn">import</span> <span class="n">float_array</span>
 
 
 <div class="viewcode-block" id="analysis_function"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.analysis.analysis_function">[docs]</a><span class="k">def</span> <span class="nf">analysis_function</span><span class="p">(</span>
@@ -286,17 +287,6 @@
     <span class="k">def</span> <span class="nf">update_base_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Check and update base data of the class if necessary.&quot;&quot;&quot;</span></div>
 
-<div class="viewcode-block" id="Analyzer.from_file"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.analysis.Analyzer.from_file">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load analysis from file.&quot;&quot;&quot;</span>
-        <span class="n">analysis_dict</span> <span class="o">=</span> <span class="n">read_file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;json&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">analysis_dict</span><span class="p">)</span></div>
-
-<div class="viewcode-block" id="Analyzer.dump_to_file"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.analysis.Analyzer.dump_to_file">[docs]</a>    <span class="k">def</span> <span class="nf">dump_to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump analysis to file.&quot;&quot;&quot;</span>
-        <span class="n">analysis_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()</span>
-        <span class="n">save_to_file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">analysis_dict</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;json&quot;</span><span class="p">)</span></div>
-
 <div class="viewcode-block" id="Analyzer.save_data"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.analysis.Analyzer.save_data">[docs]</a>    <span class="k">def</span> <span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">writer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Save data to file.&quot;&quot;&quot;</span>
         <span class="n">save_to_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_file</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="n">writer</span><span class="p">)</span></div>
@@ -352,15 +342,15 @@
         <span class="k">return</span> <span class="n">results</span></div></div>
 
 
-<div class="viewcode-block" id="TWPAnalysis"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis">[docs]</a><span class="k">class</span> <span class="nc">TWPAnalysis</span><span class="p">(</span><span class="n">Analyzer</span><span class="p">):</span>
+<div class="viewcode-block" id="TWPAnalysis"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis">[docs]</a><span class="k">class</span> <span class="nc">TWPAnalysis</span><span class="p">(</span><span class="n">Analyzer</span><span class="p">,</span> <span class="n">Frequencies</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Runner for standard analysis routines of 3WM twpa models.&quot;&quot;&quot;</span>
 
     <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">validate_assignment</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">twpa</span><span class="p">:</span> <span class="n">TWPA</span>
-    <span class="n">freqs_arange</span><span class="p">:</span> <span class="n">FrequencyArange</span>
-    <span class="n">freqs_unit</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;Hz&quot;</span><span class="p">,</span> <span class="s2">&quot;kHz&quot;</span><span class="p">,</span> <span class="s2">&quot;MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;GHz&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;GHz&quot;</span>
+    <span class="c1"># freqs_arange: FrequencyArange</span>
+    <span class="c1"># freqs_unit: Literal[&quot;Hz&quot;, &quot;kHz&quot;, &quot;MHz&quot;, &quot;GHz&quot;] = &quot;GHz&quot;</span>
     <span class="n">_previous_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">PrivateAttr</span><span class="p">()</span>
-    <span class="n">_unit_multipliers</span> <span class="o">=</span> <span class="n">PrivateAttr</span><span class="p">({</span><span class="s2">&quot;Hz&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;kHz&quot;</span><span class="p">:</span> <span class="mf">1e3</span><span class="p">,</span> <span class="s2">&quot;MHz&quot;</span><span class="p">:</span> <span class="mf">1e6</span><span class="p">,</span> <span class="s2">&quot;GHz&quot;</span><span class="p">:</span> <span class="mf">1e9</span><span class="p">})</span>
+    <span class="c1"># _unit_multipliers = PrivateAttr({&quot;Hz&quot;: 1, &quot;kHz&quot;: 1e3, &quot;MHz&quot;: 1e6, &quot;GHz&quot;: 1e9})</span>
 
 <div class="viewcode-block" id="TWPAnalysis.load_model_from_file"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.analysis.TWPAnalysis.load_model_from_file">[docs]</a>    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;twpa&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">,</span> <span class="n">check_fields</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="nd">@classmethod</span>
@@ -385,12 +375,11 @@
             <span class="ow">or</span> <span class="n">current_state</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_previous_state</span>
         <span class="p">):</span>
             <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Computing base parameters.&quot;</span><span class="p">)</span>
-            <span class="n">unit_multiplier</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unit_multipliers</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">freqs_unit</span><span class="p">]</span>
-            <span class="n">freqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">freqs_arange</span><span class="p">)</span>
-            <span class="n">cell</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">get_cell</span><span class="p">(</span><span class="n">freqs</span> <span class="o">*</span> <span class="n">unit_multiplier</span><span class="p">)</span>
+            <span class="n">cell</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">get_cell</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">)</span>
+            <span class="n">freqs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">f</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_multiplier</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;freqs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">freqs</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;abcd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">abcd</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S21&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_s_par</span><span class="p">()[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S21&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">s</span><span class="o">.</span><span class="n">S21</span>
             <span class="n">s21_db</span> <span class="o">=</span> <span class="mi">20</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S21&quot;</span><span class="p">]))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S21_db&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">s21_db</span>
             <span class="n">s21_db_diff</span> <span class="o">=</span> <span class="n">s21_db</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">s21_db</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -401,7 +390,7 @@
             <span class="p">]</span>
 
             <span class="c1"># Fit low frequency phase response to correctly unrwap at f=0 Hz</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">freqs_arange</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">freqs</span><span class="p">[</span><span class="n">stopband_start_idx</span><span class="p">]</span> <span class="o">/</span> <span class="mi">10</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_multiplier</span> <span class="o">&gt;</span> <span class="n">freqs</span><span class="p">[</span><span class="n">stopband_start_idx</span><span class="p">]</span> <span class="o">/</span> <span class="mi">10</span><span class="p">:</span>
                 <span class="n">log</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                     <span class="s2">&quot;Starting frequency is too high, unwrap of phase response might be imprecise.&quot;</span>
                 <span class="p">)</span>
@@ -592,7 +581,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;freqs&quot;</span><span class="p">],</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S21_db&quot;</span><span class="p">],</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;k_star&quot;</span><span class="p">],</span>
-            <span class="n">freqs_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">freqs_unit</span><span class="p">,</span>
+            <span class="n">freqs_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span></div>
 
@@ -604,7 +593,7 @@
         <span class="k">return</span> <span class="n">plot_gain</span><span class="p">(</span>
             <span class="n">gain_data</span><span class="p">[</span><span class="s2">&quot;signal_freqs&quot;</span><span class="p">],</span>
             <span class="n">gain_data</span><span class="p">[</span><span class="s2">&quot;gain_db&quot;</span><span class="p">],</span>
-            <span class="n">freqs_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">freqs_unit</span><span class="p">,</span>
+            <span class="n">freqs_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span></div>
 
@@ -619,7 +608,7 @@
             <span class="n">phase_matching_data</span><span class="p">[</span><span class="s2">&quot;pump_freqs&quot;</span><span class="p">],</span>
             <span class="n">phase_matching_data</span><span class="p">[</span><span class="s2">&quot;signal_freqs&quot;</span><span class="p">],</span>
             <span class="n">phase_matching_data</span><span class="p">[</span><span class="s2">&quot;delta&quot;</span><span class="p">],</span>
-            <span class="n">freqs_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">freqs_unit</span><span class="p">,</span>
+            <span class="n">freqs_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span></div></div>
 </pre></div>

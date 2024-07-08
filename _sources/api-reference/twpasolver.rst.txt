@@ -25,10 +25,26 @@ twpasolver.analysis module
    :undoc-members:
    :show-inheritance:
 
+twpasolver.basemodel module
+---------------------------
+
+.. automodule:: twpasolver.basemodel
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 twpasolver.file\_utils module
 -----------------------------
 
 .. automodule:: twpasolver.file_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+twpasolver.frequency module
+---------------------------
+
+.. automodule:: twpasolver.frequency
    :members:
    :undoc-members:
    :show-inheritance:

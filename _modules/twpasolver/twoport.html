@@ -210,7 +210,50 @@
         </div>
         <article role="main">
           <h1>Source code for twpasolver.twoport</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Twoport network module.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Two-port network module.</span>
+
+<span class="sd">This module provides classes and methods for representing and manipulating two-port RF (radio frequency)</span>
+<span class="sd">networks. It includes functionality for handling frequency-dependent network parameters, converting</span>
+<span class="sd">between different representations (such as ABCD matrices and S-parameters), and performing common</span>
+<span class="sd">operations on two-port networks.</span>
+<span class="sd">This module can be used to define and work with two-port network models in RF electronics. It is</span>
+<span class="sd">designed to support tasks such as network analysis, simulation, and design.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">Create a TwoPortCell from ABCD parameters:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    freqs = np.array([1e9, 2e9, 3e9])</span>
+<span class="sd">    abcd = np.array([</span>
+<span class="sd">        [[1, 2], [3, 4]],</span>
+<span class="sd">        [[5, 6], [7, 8]],</span>
+<span class="sd">        [[9, 10], [11, 12]]</span>
+<span class="sd">    ])</span>
+<span class="sd">    cell = TwoPortCell(freqs, abcd)</span>
+
+<span class="sd">Convert to S-parameters:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    s_params = cell.s</span>
+
+<span class="sd">Interpolate to new frequencies:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    new_freqs = np.array([1.5e9, 2.5e9])</span>
+<span class="sd">    interpolated_cell = cell.interpolate(new_freqs)</span>
+
+<span class="sd">Save and load from file:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    cell.dump_to_file(&#39;cell_data.hdf5&#39;)</span>
+<span class="sd">    loaded_cell = TwoPortCell.from_file(&#39;cell_data.hdf5&#39;)</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
 
@@ -219,8 +262,9 @@
 
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">skrf</span> <span class="k">as</span> <span class="nn">rf</span>
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">NonNegativeInt</span>
+<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">NonNegativeInt</span>
 
+<span class="kn">from</span> <span class="nn">twpasolver.basemodel</span> <span class="kn">import</span> <span class="n">BaseModel</span>
 <span class="kn">from</span> <span class="nn">twpasolver.file_utils</span> <span class="kn">import</span> <span class="n">read_file</span><span class="p">,</span> <span class="n">save_to_file</span>
 <span class="kn">from</span> <span class="nn">twpasolver.logging</span> <span class="kn">import</span> <span class="n">log</span>
 <span class="kn">from</span> <span class="nn">twpasolver.mathutils</span> <span class="kn">import</span> <span class="n">a2s</span><span class="p">,</span> <span class="n">s2a</span>
@@ -253,8 +297,10 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">freqs</span> <span class="o">=</span> <span class="n">freqs</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">Z0</span> <span class="o">=</span> <span class="n">Z0</span>
 
-<div class="viewcode-block" id="TwoPortCell.from_s_par"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.from_s_par">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_s_par</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">s_mat</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Z0</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">):</span>
+<div class="viewcode-block" id="TwoPortCell.from_s"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.from_s">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_s</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">s_mat</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Z0</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TwoPortCell</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Instantiate from array of S-parameters.</span>
 
@@ -270,7 +316,7 @@
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="n">abcd_mat</span><span class="p">,</span> <span class="n">Z0</span><span class="o">=</span><span class="n">Z0</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="TwoPortCell.from_file"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.from_file">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;hdf5&quot;</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;hdf5&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TwoPortCell</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Load model from file.</span>
 
@@ -286,11 +332,16 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">freqs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Frequencies array getter.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the frequencies array.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            numpy.ndarray: Frequencies array.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_freqs</span>
 
     <span class="nd">@freqs</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">freqs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">freqs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Set the frequencies.</span>
 
@@ -307,13 +358,18 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">Z0</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Impedance</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reference line impedance getter.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the reference line impedance.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Impedance: Reference line impedance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_Z0</span>
 
     <span class="nd">@Z0</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">Z0</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Impedance</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">Z0</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Impedance</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Set the line impedance.</span>
+<span class="sd">        Set the reference line impedance.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            value (Impedance): Reference line impedance.</span>
@@ -321,7 +377,7 @@
         <span class="n">validate_impedance</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_Z0</span> <span class="o">=</span> <span class="n">value</span>
 
-<div class="viewcode-block" id="TwoPortCell.to_network"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.to_network">[docs]</a>    <span class="k">def</span> <span class="nf">to_network</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="TwoPortCell.to_network"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.to_network">[docs]</a>    <span class="k">def</span> <span class="nf">to_network</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">rf</span><span class="o">.</span><span class="n">Network</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Convert to scikit-rf Network.</span>
 
@@ -329,18 +385,19 @@
 <span class="sd">            rf.Network: scikit-rf Network.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">f</span> <span class="o">=</span> <span class="n">rf</span><span class="o">.</span><span class="n">Frequency</span><span class="o">.</span><span class="n">from_f</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">freqs</span> <span class="o">*</span> <span class="mf">1e-9</span><span class="p">,</span> <span class="s2">&quot;ghz&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">rf</span><span class="o">.</span><span class="n">Network</span><span class="p">(</span><span class="n">frequency</span><span class="o">=</span><span class="n">f</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">abcd</span><span class="p">))</span></div>
+        <span class="k">return</span> <span class="n">rf</span><span class="o">.</span><span class="n">Network</span><span class="p">(</span><span class="n">frequency</span><span class="o">=</span><span class="n">f</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">abcd</span><span class="p">),</span> <span class="n">z0</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Z0</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="TwoPortCell.get_s_par"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.get_s_par">[docs]</a>    <span class="k">def</span> <span class="nf">get_s_par</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">s</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SMatrixArray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Return S-parameter matrix.</span>
+<span class="sd">        Get the S-parameter matrix.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            SMatrixArray: S-parameter matrix.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">SMatrixArray</span><span class="p">(</span><span class="n">a2s</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">abcd</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">Z0</span><span class="p">))</span></div>
+        <span class="k">return</span> <span class="n">SMatrixArray</span><span class="p">(</span><span class="n">a2s</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">abcd</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">Z0</span><span class="p">))</span>
 
-    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return a string representation of the TwoPortCell.</span>
 
@@ -349,7 +406,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(freqs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">freqs</span><span class="si">}</span><span class="s2">,</span><span class="se">\n</span><span class="s2">abcd=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">abcd</span><span class="si">}</span><span class="s2">,</span><span class="se">\n</span><span class="s2">Z0=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">Z0</span><span class="si">}</span><span class="s2">)&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">slice</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">slice</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TwoPortCell</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get slice of TwoPortCell.</span>
 
@@ -363,7 +420,7 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Only slicing of TwoPortCell is allowed&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">freqs</span><span class="p">[</span><span class="n">idxs</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">abcd</span><span class="p">[</span><span class="n">idxs</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">Z0</span><span class="p">)</span>
 
-<div class="viewcode-block" id="TwoPortCell.as_dict"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.as_dict">[docs]</a>    <span class="k">def</span> <span class="nf">as_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="TwoPortCell.as_dict"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.as_dict">[docs]</a>    <span class="k">def</span> <span class="nf">as_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return cell contents as dictionary.</span>
 
@@ -372,7 +429,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;freqs&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">freqs</span><span class="p">,</span> <span class="s2">&quot;abcd&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">abcd</span><span class="p">),</span> <span class="s2">&quot;Z0&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">Z0</span><span class="p">}</span></div>
 
-<div class="viewcode-block" id="TwoPortCell.dump_to_file"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.dump_to_file">[docs]</a>    <span class="k">def</span> <span class="nf">dump_to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;hdf5&quot;</span><span class="p">):</span>
+<div class="viewcode-block" id="TwoPortCell.dump_to_file"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortCell.dump_to_file">[docs]</a>    <span class="k">def</span> <span class="nf">dump_to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;hdf5&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Dump cell to file.</span>
 
@@ -405,7 +462,6 @@
                 <span class="n">interp_phase</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span>
                     <span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">freqs</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">unwrap</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">angle</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">abcd</span><span class="p">[:,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]))</span>
                 <span class="p">)</span>
-
                 <span class="n">abcd_interp</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">interp_mag</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">interp_phase</span><span class="p">))</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">abcd_interp</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">abcd</span><span class="p">[:,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]))</span>
@@ -418,8 +474,7 @@
     <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span>
         <span class="n">validate_assignment</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">revalidate_instances</span><span class="o">=</span><span class="s2">&quot;always&quot;</span><span class="p">,</span> <span class="n">protected_namespaces</span><span class="o">=</span><span class="p">()</span>
     <span class="p">)</span>
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Name of the model.&quot;</span><span class="p">)</span>
-    <span class="n">Z0</span><span class="p">:</span> <span class="n">Impedance</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+    <span class="n">Z0_ref</span><span class="p">:</span> <span class="n">Impedance</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
         <span class="n">default</span><span class="o">=</span><span class="mf">50.0</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Reference line impedance of the two-port component.&quot;</span>
     <span class="p">)</span>
     <span class="n">N</span><span class="p">:</span> <span class="n">NonNegativeInt</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
@@ -427,42 +482,82 @@
         <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Number of repetitions of the model in the computed abcd matrix.&quot;</span><span class="p">,</span>
     <span class="p">)</span>
 
-<div class="viewcode-block" id="TwoPortModel.from_file"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.from_file">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load model from file.&quot;&quot;&quot;</span>
-        <span class="n">model_dict</span> <span class="o">=</span> <span class="n">read_file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;json&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">model_dict</span><span class="p">)</span></div>
-
 <div class="viewcode-block" id="TwoPortModel.update"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.update">[docs]</a>    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update multiple attributes of the model.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Update multiple attributes of the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            **kwargs: Attributes to update.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
                 <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The cell model does not have the </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> attribute.&quot;</span><span class="p">)</span></div>
 
+    <span class="k">def</span> <span class="fm">__mul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factor</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TwoPortModel</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return model multiplied by integer factor.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            factor (int): Multiplication factor.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            TwoPortModel: New instance of the model multiplied by the factor.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">new_instance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">model_dump</span><span class="p">())</span>
+        <span class="n">new_instance</span><span class="o">.</span><span class="n">N</span> <span class="o">=</span> <span class="n">factor</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">N</span>
+        <span class="k">return</span> <span class="n">new_instance</span>
+
 <div class="viewcode-block" id="TwoPortModel.single_abcd"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.single_abcd">[docs]</a>    <span class="nd">@abstractmethod</span>
     <span class="k">def</span> <span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the abcd matrix of a single iteration of the model.&quot;&quot;&quot;</span></div>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute the abcd matrix of a single iteration of the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            freqs (numpy.ndarray): Frequencies array.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ABCDArray: ABCD matrix for a single iteration.</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
 
 <div class="viewcode-block" id="TwoPortModel.get_abcd"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.get_abcd">[docs]</a>    <span class="k">def</span> <span class="nf">get_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the abcd matrix of the model.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute the abcd matrix of the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            freqs (numpy.ndarray): Frequencies array.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ABCDArray: Computed ABCD matrix of the model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">N</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">single_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">single_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span> <span class="o">**</span> <span class="bp">self</span><span class="o">.</span><span class="n">N</span></div>
 
 <div class="viewcode-block" id="TwoPortModel.get_cell"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.get_cell">[docs]</a>    <span class="k">def</span> <span class="nf">get_cell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TwoPortCell</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the two-port cell of the model.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">TwoPortCell</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">),</span> <span class="n">Z0</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Z0</span><span class="p">)</span></div>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the two-port cell of the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            freqs (numpy.ndarray): Frequencies array.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            TwoPortCell: Two-port cell of the model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">TwoPortCell</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">),</span> <span class="n">Z0</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Z0_ref</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="TwoPortModel.get_network"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.get_network">[docs]</a>    <span class="k">def</span> <span class="nf">get_network</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">rf</span><span class="o">.</span><span class="n">Network</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the two-port cell of the model as a scikit-rf Network.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_cell</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span><span class="o">.</span><span class="n">to_network</span><span class="p">()</span></div>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the two-port cell of the model as a scikit-rf Network.</span>
 
-<div class="viewcode-block" id="TwoPortModel.dump_to_file"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.twoport.TwoPortModel.dump_to_file">[docs]</a>    <span class="k">def</span> <span class="nf">dump_to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump model to file.&quot;&quot;&quot;</span>
-        <span class="n">model_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()</span>
-        <span class="n">save_to_file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">model_dict</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;json&quot;</span><span class="p">)</span></div></div>
+<span class="sd">        Args:</span>
+<span class="sd">            freqs (numpy.ndarray): Frequencies array.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            rf.Network: scikit-rf Network representation of the model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_cell</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span><span class="o">.</span><span class="n">to_network</span><span class="p">()</span></div></div>
 </pre></div>
         </article>
       </div>

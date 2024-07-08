@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
 
     <link rel="shortcut icon" href="../../_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
-        <title>twpasolver.typing - twpasolver · 0.0.1</title>
+        <title>twpasolver.frequency - twpasolver · 0.0.1</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?digest=369552022d0b975c8e74270ce6eabe0fb7978f24" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css" />
@@ -209,93 +209,73 @@
           </label>
         </div>
         <article role="main">
-          <h1>Source code for twpasolver.typing</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Type annotations module.&quot;&quot;&quot;</span>
+          <h1>Source code for twpasolver.frequency</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Definition of class for frequency span.</span>
 
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">TypeAlias</span>
+<span class="sd">This module defines the `Frequencies` class for representing a span of frequencies with a variable unit of measure. The span can be provided either as a list or as a tuple that will be passed to `numpy.arange`.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span>
 
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">GetJsonSchemaHandler</span><span class="p">,</span> <span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">NonNegativeInt</span>
-<span class="kn">from</span> <span class="nn">pydantic.functional_validators</span> <span class="kn">import</span> <span class="n">BeforeValidator</span>
-<span class="kn">from</span> <span class="nn">pydantic.json_schema</span> <span class="kn">import</span> <span class="n">JsonSchemaValue</span>
-<span class="kn">from</span> <span class="nn">pydantic_core</span> <span class="kn">import</span> <span class="n">core_schema</span>
-<span class="kn">from</span> <span class="nn">typing_extensions</span> <span class="kn">import</span> <span class="n">Annotated</span>
+<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">PrivateAttr</span>
+
+<span class="kn">from</span> <span class="nn">twpasolver.basemodel</span> <span class="kn">import</span> <span class="n">BaseModel</span>
+<span class="kn">from</span> <span class="nn">twpasolver.typing</span> <span class="kn">import</span> <span class="n">FrequencyArange</span><span class="p">,</span> <span class="n">FrequencyList</span>
 
 
-<div class="viewcode-block" id="all_subclasses"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.typing.all_subclasses">[docs]</a><span class="k">def</span> <span class="nf">all_subclasses</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Recursively get all subclasses of a given class.</span>
+<div class="viewcode-block" id="Frequencies"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.frequency.Frequencies">[docs]</a><span class="k">class</span> <span class="nc">Frequencies</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Frequency span with variable unit.&quot;&quot;&quot;</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        cls: The class for which to find all subclasses.</span>
+    <span class="n">f_list</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">FrequencyList</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;List of frequencies&quot;</span>
+    <span class="p">)</span>
+    <span class="n">f_arange</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">FrequencyArange</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Tuple passed to numpy.arange to construct frequency span.&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">unit</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;Hz&quot;</span><span class="p">,</span> <span class="s2">&quot;kHz&quot;</span><span class="p">,</span> <span class="s2">&quot;MHz&quot;</span><span class="p">,</span> <span class="s2">&quot;GHz&quot;</span><span class="p">,</span> <span class="s2">&quot;THz&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;GHz&quot;</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">_unit_multipliers</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">PrivateAttr</span><span class="p">(</span>
+        <span class="p">{</span><span class="s2">&quot;Hz&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;kHz&quot;</span><span class="p">:</span> <span class="mf">1e3</span><span class="p">,</span> <span class="s2">&quot;MHz&quot;</span><span class="p">:</span> <span class="mf">1e6</span><span class="p">,</span> <span class="s2">&quot;GHz&quot;</span><span class="p">:</span> <span class="mf">1e9</span><span class="p">,</span> <span class="s2">&quot;THz&quot;</span><span class="p">:</span> <span class="mf">1e12</span><span class="p">}</span>
+    <span class="p">)</span>
 
-<span class="sd">    Returns:</span>
-<span class="sd">        list: A list of all subclasses of the given class.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__subclasses__</span><span class="p">()</span> <span class="o">+</span> <span class="p">[</span>
-        <span class="n">s</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__subclasses__</span><span class="p">()</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">all_subclasses</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
-    <span class="p">]</span></div>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computed frequencies array.</span>
 
+<span class="sd">        Returns:</span>
+<span class="sd">            numpy.ndarray: Array of computed frequencies.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">f_arange</span><span class="p">:</span>
+            <span class="n">freqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">f_arange</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">f_list</span><span class="p">:</span>
+            <span class="n">freqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">f_list</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unit_multipliers</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">]</span> <span class="o">*</span> <span class="n">freqs</span>
 
-<div class="viewcode-block" id="validate_impedance"><a class="viewcode-back" href="../../api-reference/twpasolver.html#twpasolver.typing.validate_impedance">[docs]</a><span class="k">def</span> <span class="nf">validate_impedance</span><span class="p">(</span><span class="n">Z</span><span class="p">:</span> <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Validate impedance value.</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">omega</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computed angular frequencies array.</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        Z (complex | float | str): Input impedance value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">try</span><span class="p">:</span>
-        <span class="n">Z</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span>
-    <span class="k">except</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot convert </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">Z</span><span class="si">}</span><span class="s2"> to complex number.&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Real part of impedance </span><span class="si">{Z}</span><span class="s2"> must be non-negative.&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">imag</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="n">Z</span> <span class="o">=</span> <span class="n">Z</span><span class="o">.</span><span class="n">real</span>
-    <span class="k">return</span> <span class="n">Z</span></div>
+<span class="sd">        Returns:</span>
+<span class="sd">            numpy.ndarray: Array of computed angular frequencies.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">f</span>
 
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">unit_multiplier</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get multiplier of chosen unit of measure.</span>
 
-<span class="k">class</span> <span class="nc">_Impedance2PydanticAnnotation</span><span class="p">:</span>
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">__get_pydantic_core_schema__</span><span class="p">(</span>
-        <span class="bp">cls</span><span class="p">,</span>
-        <span class="n">_source_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-        <span class="n">_handler</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="n">core_schema</span><span class="o">.</span><span class="n">CoreSchema</span><span class="p">],</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">core_schema</span><span class="o">.</span><span class="n">CoreSchema</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Pydantic annotation for impedance type.&quot;&quot;&quot;</span>
-        <span class="n">from_float_schema</span> <span class="o">=</span> <span class="n">core_schema</span><span class="o">.</span><span class="n">chain_schema</span><span class="p">(</span>
-            <span class="p">[</span>
-                <span class="n">core_schema</span><span class="o">.</span><span class="n">float_schema</span><span class="p">(),</span>
-            <span class="p">]</span>
-        <span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">core_schema</span><span class="o">.</span><span class="n">json_or_python_schema</span><span class="p">(</span>
-            <span class="n">json_schema</span><span class="o">=</span><span class="n">from_float_schema</span><span class="p">,</span>
-            <span class="n">python_schema</span><span class="o">=</span><span class="n">core_schema</span><span class="o">.</span><span class="n">union_schema</span><span class="p">(</span>
-                <span class="p">[</span>
-                    <span class="n">core_schema</span><span class="o">.</span><span class="n">is_instance_schema</span><span class="p">(</span><span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span><span class="p">),</span>
-                    <span class="n">from_float_schema</span><span class="p">,</span>
-                <span class="p">]</span>
-            <span class="p">),</span>
-            <span class="n">serialization</span><span class="o">=</span><span class="n">core_schema</span><span class="o">.</span><span class="n">plain_serializer_function_ser_schema</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">),</span>
-        <span class="p">)</span>
-
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">__get_pydantic_json_schema__</span><span class="p">(</span>
-        <span class="bp">cls</span><span class="p">,</span> <span class="n">_core_schema</span><span class="p">:</span> <span class="n">core_schema</span><span class="o">.</span><span class="n">CoreSchema</span><span class="p">,</span> <span class="n">handler</span><span class="p">:</span> <span class="n">GetJsonSchemaHandler</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonSchemaValue</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">core_schema</span><span class="o">.</span><span class="n">float_schema</span><span class="p">())</span>
-
-
-<span class="n">Impedance</span> <span class="o">=</span> <span class="n">Annotated</span><span class="p">[</span>
-    <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span><span class="p">,</span> <span class="n">_Impedance2PydanticAnnotation</span><span class="p">,</span> <span class="n">BeforeValidator</span><span class="p">(</span><span class="n">validate_impedance</span><span class="p">)</span>
-<span class="p">]</span>
-<span class="n">FrequencyList</span> <span class="o">=</span> <span class="nb">list</span><span class="p">[</span><span class="n">NonNegativeFloat</span><span class="p">]</span>
-<span class="n">FrequencyArange</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">NonNegativeFloat</span><span class="p">]</span>
-<span class="n">FrequencyLinspace</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">NonNegativeInt</span><span class="p">]</span>
-
-<span class="n">complex_array</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">]]</span>
-<span class="n">float_array</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]]</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            float: Multiplier corresponding to the unit of measure.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unit_multipliers</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">unit</span><span class="p">]</span></div>
 </pre></div>
         </article>
       </div>
