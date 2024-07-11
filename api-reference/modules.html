@@ -3,7 +3,7 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="twpasolver package" href="twpasolver.html" /><link rel="prev" title="Installation" href="../installation.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="twpasolver package" href="twpasolver.html" /><link rel="prev" title="Implementing New Models" href="../implementing_models.html" />
 
     <link rel="shortcut icon" href="../_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
         <title>twpasolver - twpasolver · 0.0.1</title>
@@ -153,7 +153,7 @@
   
   <div class="sidebar-logo-container">
     <img class="sidebar-logo only-light" src="../_static/twpalab_logo.png" alt="Light Logo"/>
-    <img class="sidebar-logo only-dark" src="../_static/twpalab_logo.png" alt="Dark Logo"/>
+    <img class="sidebar-logo only-dark" src="../_static/twpalab_logo_dark.png" alt="Dark Logo"/>
   </div>
   
   <span class="sidebar-brand-text">twpasolver · 0.0.1</span>
@@ -167,12 +167,38 @@
   <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials.html">Tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Tutorials</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/01_models.html">Network models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/02_twpas.html">Constructing twpas</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Api reference</span></p>
 <ul class="current">
-<li class="toctree-l1 current has-children current-page"><a class="current reference internal" href="#">twpasolver</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of twpasolver</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
-<li class="toctree-l2 has-children"><a class="reference internal" href="twpasolver.html">twpasolver package</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of twpasolver package</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.models.html">twpasolver.models package</a></li>
+<li class="toctree-l1 current has-children current-page"><a class="current reference internal" href="#">twpasolver</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of twpasolver</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="twpasolver.html">twpasolver package</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of twpasolver package</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="twpasolver.models.html">twpasolver.models package</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of twpasolver.models package</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.compose.html">twpasolver.models.compose module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.modelarray.html">twpasolver.models.modelarray module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.oneport.html">twpasolver.models.oneport module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.rf_functions.html">twpasolver.models.rf_functions module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.transmission_lines.html">twpasolver.models.transmission_lines module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.twoportarrays.html">twpasolver.models.twoportarrays module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.twpa_cells.html">twpasolver.models.twpa_cells module</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.frequency.html">twpasolver.frequency module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html">twpasolver.twoport module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -196,16 +222,7 @@
           <span>Back to top</span>
         </a>
         <div class="content-icon-container">
-          <div class="edit-this-page">
-  <a class="muted-link" href="https://github.com/twpalab/twpasolver/edit/main/docs/source/api-reference/modules.rst" title="Edit this page">
-    <svg aria-hidden="true" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-      <path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" />
-      <line x1="13.5" y1="6.5" x2="17.5" y2="10.5" />
-    </svg>
-    <span class="visually-hidden">Edit this page</span>
-  </a>
-</div><div class="theme-toggle-container theme-toggle-content">
+          <div class="theme-toggle-container theme-toggle-content">
             <button class="theme-toggle">
               <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
               <svg class="theme-icon-when-auto"><use href="#svg-sun-half"></use></svg>
@@ -229,167 +246,78 @@
 <li class="toctree-l4"><a class="reference internal" href="twpasolver.models.html#imports">Imports</a></li>
 <li class="toctree-l4"><a class="reference internal" href="twpasolver.models.html#usage">Usage</a></li>
 <li class="toctree-l4"><a class="reference internal" href="twpasolver.models.html#submodules">Submodules</a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.html#module-twpasolver.models.compose">twpasolver.models.compose module</a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.html#module-twpasolver.models.modelarray">twpasolver.models.modelarray module</a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.html#module-twpasolver.models.oneport">twpasolver.models.oneport module</a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.html#module-twpasolver.models.rf_functions">twpasolver.models.rf_functions module</a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.html#module-twpasolver.models.transmission_lines">twpasolver.models.transmission_lines module</a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.html#module-twpasolver.models.twoportarrays">twpasolver.models.twoportarrays module</a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.models.html#module-twpasolver.models.twpa_cells">twpasolver.models.twpa_cells module</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#module-twpasolver.analysis">twpasolver.analysis module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.Analyzer"><code class="docutils literal notranslate"><span class="pre">Analyzer</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.Analyzer.data_file"><code class="docutils literal notranslate"><span class="pre">Analyzer.data_file</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.Analyzer.run"><code class="docutils literal notranslate"><span class="pre">Analyzer.run</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.Analyzer.data"><code class="docutils literal notranslate"><span class="pre">Analyzer.data</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.Analyzer.model_post_init"><code class="docutils literal notranslate"><span class="pre">Analyzer.model_post_init()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.Analyzer.update_base_data"><code class="docutils literal notranslate"><span class="pre">Analyzer.update_base_data()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.Analyzer.save_data"><code class="docutils literal notranslate"><span class="pre">Analyzer.save_data()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.Analyzer.load_data"><code class="docutils literal notranslate"><span class="pre">Analyzer.load_data()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.Analyzer.execute"><code class="docutils literal notranslate"><span class="pre">Analyzer.execute()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.Analyzer.parameter_sweep"><code class="docutils literal notranslate"><span class="pre">Analyzer.parameter_sweep()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#submodules">Submodules</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.analysis_function"><code class="docutils literal notranslate"><span class="pre">analysis_function()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.ExecutionRequest"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer"><code class="docutils literal notranslate"><span class="pre">Analyzer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.ExecutionRequest"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.ExecutionRequest.name"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest.name</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.ExecutionRequest.args"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest.args</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.ExecutionRequest.kwargs"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest.kwargs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html">twpasolver.basemodel module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.basemodel.html#twpasolver.basemodel.BaseModel"><code class="docutils literal notranslate"><span class="pre">BaseModel</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis.twpa"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.twpa</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis.load_model_from_file"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.load_model_from_file</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis.update_base_data"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.update_base_data()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis.phase_matching"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.phase_matching()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis.gain"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.gain()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis.bandwidth"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.bandwidth()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis.plot_response"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_response()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis.plot_gain"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_gain()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis.plot_phase_matching"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_phase_matching()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.TWPAnalysis.model_post_init"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.model_post_init()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.file_utils.html#twpasolver.file_utils.read_file"><code class="docutils literal notranslate"><span class="pre">read_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.file_utils.html#twpasolver.file_utils.save_to_file"><code class="docutils literal notranslate"><span class="pre">save_to_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.file_utils.html#twpasolver.file_utils.add_extension"><code class="docutils literal notranslate"><span class="pre">add_extension()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.file_utils.html#twpasolver.file_utils.ensure_directory_exists"><code class="docutils literal notranslate"><span class="pre">ensure_directory_exists()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.file_utils.html#twpasolver.file_utils.read_hdf5"><code class="docutils literal notranslate"><span class="pre">read_hdf5()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.file_utils.html#twpasolver.file_utils.read_json"><code class="docutils literal notranslate"><span class="pre">read_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.file_utils.html#twpasolver.file_utils.save_to_hdf5"><code class="docutils literal notranslate"><span class="pre">save_to_hdf5()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.file_utils.html#twpasolver.file_utils.save_to_json"><code class="docutils literal notranslate"><span class="pre">save_to_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.file_utils.html#twpasolver.file_utils.NpEncoder"><code class="docutils literal notranslate"><span class="pre">NpEncoder</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.analysis.analysis_function"><code class="docutils literal notranslate"><span class="pre">analysis_function()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.frequency.html">twpasolver.frequency module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.frequency.html#twpasolver.frequency.Frequencies"><code class="docutils literal notranslate"><span class="pre">Frequencies</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#module-twpasolver.basemodel">twpasolver.basemodel module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.basemodel.BaseModel"><code class="docutils literal notranslate"><span class="pre">BaseModel</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.basemodel.BaseModel.model_dump"><code class="docutils literal notranslate"><span class="pre">BaseModel.model_dump()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.basemodel.BaseModel.from_file"><code class="docutils literal notranslate"><span class="pre">BaseModel.from_file()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.basemodel.BaseModel.dump_to_file"><code class="docutils literal notranslate"><span class="pre">BaseModel.dump_to_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.logging.html#twpasolver.logging.CustomHandler"><code class="docutils literal notranslate"><span class="pre">CustomHandler</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.mathutils.html">twpasolver.mathutils module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.matmul_2x2"><code class="docutils literal notranslate"><span class="pre">matmul_2x2()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.matpow_2x2"><code class="docutils literal notranslate"><span class="pre">matpow_2x2()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.a2s"><code class="docutils literal notranslate"><span class="pre">a2s()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.s2a"><code class="docutils literal notranslate"><span class="pre">s2a()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.to_dB"><code class="docutils literal notranslate"><span class="pre">to_dB()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.dBm_to_I"><code class="docutils literal notranslate"><span class="pre">dBm_to_I()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.I_to_dBm"><code class="docutils literal notranslate"><span class="pre">I_to_dBm()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.compute_phase_matching"><code class="docutils literal notranslate"><span class="pre">compute_phase_matching()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.CMEode_complete"><code class="docutils literal notranslate"><span class="pre">CMEode_complete()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.cme_solve"><code class="docutils literal notranslate"><span class="pre">cme_solve()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#module-twpasolver.file_utils">twpasolver.file_utils module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.file_utils.NpEncoder"><code class="docutils literal notranslate"><span class="pre">NpEncoder</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.file_utils.NpEncoder.default"><code class="docutils literal notranslate"><span class="pre">NpEncoder.default()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.TwoByTwoArray"><code class="docutils literal notranslate"><span class="pre">TwoByTwoArray</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ABCDArray"><code class="docutils literal notranslate"><span class="pre">ABCDArray</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.SMatrixArray"><code class="docutils literal notranslate"><span class="pre">SMatrixArray</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.abcd_identity"><code class="docutils literal notranslate"><span class="pre">abcd_identity()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.file_utils.add_extension"><code class="docutils literal notranslate"><span class="pre">add_extension()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.file_utils.ensure_directory_exists"><code class="docutils literal notranslate"><span class="pre">ensure_directory_exists()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.file_utils.read_file"><code class="docutils literal notranslate"><span class="pre">read_file()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.file_utils.read_hdf5"><code class="docutils literal notranslate"><span class="pre">read_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.file_utils.read_json"><code class="docutils literal notranslate"><span class="pre">read_json()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.file_utils.save_to_file"><code class="docutils literal notranslate"><span class="pre">save_to_file()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.file_utils.save_to_hdf5"><code class="docutils literal notranslate"><span class="pre">save_to_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.file_utils.save_to_json"><code class="docutils literal notranslate"><span class="pre">save_to_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.plotting.html#twpasolver.plotting.plot_response"><code class="docutils literal notranslate"><span class="pre">plot_response()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.plotting.html#twpasolver.plotting.plot_gain"><code class="docutils literal notranslate"><span class="pre">plot_gain()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.plotting.html#twpasolver.plotting.plot_phase_matching"><code class="docutils literal notranslate"><span class="pre">plot_phase_matching()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#module-twpasolver.frequency">twpasolver.frequency module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.frequency.Frequencies"><code class="docutils literal notranslate"><span class="pre">Frequencies</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.frequency.Frequencies.f_list"><code class="docutils literal notranslate"><span class="pre">Frequencies.f_list</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.frequency.Frequencies.f_arange"><code class="docutils literal notranslate"><span class="pre">Frequencies.f_arange</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.frequency.Frequencies.unit"><code class="docutils literal notranslate"><span class="pre">Frequencies.unit</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.frequency.Frequencies.f"><code class="docutils literal notranslate"><span class="pre">Frequencies.f</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.frequency.Frequencies.omega"><code class="docutils literal notranslate"><span class="pre">Frequencies.omega</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.frequency.Frequencies.unit_multiplier"><code class="docutils literal notranslate"><span class="pre">Frequencies.unit_multiplier</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.frequency.Frequencies.model_post_init"><code class="docutils literal notranslate"><span class="pre">Frequencies.model_post_init()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html">twpasolver.twoport module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell"><code class="docutils literal notranslate"><span class="pre">TwoPortCell</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortModel"><code class="docutils literal notranslate"><span class="pre">TwoPortModel</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.typing.html">twpasolver.typing module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.typing.html#twpasolver.typing.all_subclasses"><code class="docutils literal notranslate"><span class="pre">all_subclasses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="twpasolver.typing.html#twpasolver.typing.validate_impedance"><code class="docutils literal notranslate"><span class="pre">validate_impedance()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#module-twpasolver.logging">twpasolver.logging module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.logging.CustomHandler"><code class="docutils literal notranslate"><span class="pre">CustomHandler</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.logging.CustomHandler.format"><code class="docutils literal notranslate"><span class="pre">CustomHandler.format()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#module-twpasolver.mathutils">twpasolver.mathutils module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.mathutils.CMEode_complete"><code class="docutils literal notranslate"><span class="pre">CMEode_complete()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.mathutils.I_to_dBm"><code class="docutils literal notranslate"><span class="pre">I_to_dBm()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.mathutils.a2s"><code class="docutils literal notranslate"><span class="pre">a2s()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.mathutils.cme_solve"><code class="docutils literal notranslate"><span class="pre">cme_solve()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.mathutils.compute_phase_matching"><code class="docutils literal notranslate"><span class="pre">compute_phase_matching()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.mathutils.dBm_to_I"><code class="docutils literal notranslate"><span class="pre">dBm_to_I()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.mathutils.matmul_2x2"><code class="docutils literal notranslate"><span class="pre">matmul_2x2()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.mathutils.matpow_2x2"><code class="docutils literal notranslate"><span class="pre">matpow_2x2()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.mathutils.s2a"><code class="docutils literal notranslate"><span class="pre">s2a()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.mathutils.to_dB"><code class="docutils literal notranslate"><span class="pre">to_dB()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#module-twpasolver.matrices_arrays">twpasolver.matrices_arrays module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.ABCDArray"><code class="docutils literal notranslate"><span class="pre">ABCDArray</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.ABCDArray.A"><code class="docutils literal notranslate"><span class="pre">ABCDArray.A</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.ABCDArray.B"><code class="docutils literal notranslate"><span class="pre">ABCDArray.B</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.ABCDArray.C"><code class="docutils literal notranslate"><span class="pre">ABCDArray.C</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.ABCDArray.D"><code class="docutils literal notranslate"><span class="pre">ABCDArray.D</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.SMatrixArray"><code class="docutils literal notranslate"><span class="pre">SMatrixArray</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.SMatrixArray.S11"><code class="docutils literal notranslate"><span class="pre">SMatrixArray.S11</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.SMatrixArray.S12"><code class="docutils literal notranslate"><span class="pre">SMatrixArray.S12</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.SMatrixArray.S21"><code class="docutils literal notranslate"><span class="pre">SMatrixArray.S21</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.SMatrixArray.S22"><code class="docutils literal notranslate"><span class="pre">SMatrixArray.S22</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.TwoByTwoArray"><code class="docutils literal notranslate"><span class="pre">TwoByTwoArray</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.TwoByTwoArray.len"><code class="docutils literal notranslate"><span class="pre">TwoByTwoArray.len</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.TwoByTwoArray.shape"><code class="docutils literal notranslate"><span class="pre">TwoByTwoArray.shape</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.matrices_arrays.abcd_identity"><code class="docutils literal notranslate"><span class="pre">abcd_identity()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#module-twpasolver.plotting">twpasolver.plotting module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.plotting.plot_gain"><code class="docutils literal notranslate"><span class="pre">plot_gain()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.plotting.plot_phase_matching"><code class="docutils literal notranslate"><span class="pre">plot_phase_matching()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.plotting.plot_response"><code class="docutils literal notranslate"><span class="pre">plot_response()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#module-twpasolver.twoport">twpasolver.twoport module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortCell"><code class="docutils literal notranslate"><span class="pre">TwoPortCell</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortCell.Z0"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.Z0</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortCell.as_dict"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.as_dict()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortCell.dump_to_file"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.dump_to_file()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortCell.freqs"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.freqs</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortCell.from_file"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.from_file()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortCell.from_s"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.from_s()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortCell.interpolate"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.interpolate()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortCell.s"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.s</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortCell.to_network"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.to_network()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortModel"><code class="docutils literal notranslate"><span class="pre">TwoPortModel</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortModel.Z0_ref"><code class="docutils literal notranslate"><span class="pre">TwoPortModel.Z0_ref</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortModel.N"><code class="docutils literal notranslate"><span class="pre">TwoPortModel.N</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortModel.update"><code class="docutils literal notranslate"><span class="pre">TwoPortModel.update()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortModel.single_abcd"><code class="docutils literal notranslate"><span class="pre">TwoPortModel.single_abcd()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortModel.get_abcd"><code class="docutils literal notranslate"><span class="pre">TwoPortModel.get_abcd()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortModel.get_cell"><code class="docutils literal notranslate"><span class="pre">TwoPortModel.get_cell()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="twpasolver.html#twpasolver.twoport.TwoPortModel.get_network"><code class="docutils literal notranslate"><span class="pre">TwoPortModel.get_network()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.html#module-twpasolver.typing">twpasolver.typing module</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.typing.all_subclasses"><code class="docutils literal notranslate"><span class="pre">all_subclasses()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.html#twpasolver.typing.validate_impedance"><code class="docutils literal notranslate"><span class="pre">validate_impedance()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -412,14 +340,14 @@
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="../installation.html">
+          <a class="prev-page" href="../implementing_models.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Installation</div>
+                <div class="title">Implementing New Models</div>
                 
               </div>
             </a>
@@ -460,5 +388,6 @@
     <script src="../_static/scripts/furo.js"></script>
     <script src="../_static/clipboard.min.js"></script>
     <script src="../_static/copybutton.js"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     </body>
 </html>

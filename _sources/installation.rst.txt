@@ -9,7 +9,7 @@ Clone the repository with:
 
   git clone https://github.com/twpalab/twpasolver
 
-then to install it in normal mode:
+then to install the package in normal mode:
 
 .. code-block:: bash
 
@@ -21,4 +21,5 @@ install the pre-commits!
 .. code-block:: bash
 
   poetry install --with docs,analysis
+  pip install pre-commit
   pre-commit install

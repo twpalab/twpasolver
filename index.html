@@ -153,7 +153,7 @@
   
   <div class="sidebar-logo-container">
     <img class="sidebar-logo only-light" src="_static/twpalab_logo.png" alt="Light Logo"/>
-    <img class="sidebar-logo only-dark" src="_static/twpalab_logo.png" alt="Dark Logo"/>
+    <img class="sidebar-logo only-dark" src="_static/twpalab_logo_dark.png" alt="Dark Logo"/>
   </div>
   
   <span class="sidebar-brand-text">twpasolver · 0.0.1</span>
@@ -167,12 +167,38 @@
   <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="tutorials.html">Tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Tutorials</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/01_models.html">Network models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/02_twpas.html">Constructing twpas</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="implementing_models.html">Implementing New Models</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Api reference</span></p>
 <ul>
-<li class="toctree-l1 has-children"><a class="reference internal" href="api-reference/modules.html">twpasolver</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of twpasolver</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
-<li class="toctree-l2 has-children"><a class="reference internal" href="api-reference/twpasolver.html">twpasolver package</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of twpasolver package</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
-<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.models.html">twpasolver.models package</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="api-reference/modules.html">twpasolver</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of twpasolver</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="api-reference/twpasolver.html">twpasolver package</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of twpasolver package</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="api-reference/twpasolver.models.html">twpasolver.models package</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of twpasolver.models package</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="api-reference/twpasolver.models.compose.html">twpasolver.models.compose module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api-reference/twpasolver.models.modelarray.html">twpasolver.models.modelarray module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api-reference/twpasolver.models.oneport.html">twpasolver.models.oneport module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api-reference/twpasolver.models.rf_functions.html">twpasolver.models.rf_functions module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api-reference/twpasolver.models.transmission_lines.html">twpasolver.models.transmission_lines module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api-reference/twpasolver.models.twoportarrays.html">twpasolver.models.twoportarrays module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="api-reference/twpasolver.models.twpa_cells.html">twpasolver.models.twpa_cells module</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -221,10 +247,26 @@
         <article role="main">
           <section id="welcome-to-twpasolver-s-documentation">
 <h1>Welcome to twpasolver’s documentation!<a class="headerlink" href="#welcome-to-twpasolver-s-documentation" title="Permalink to this heading">#</a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> is an open-source library designed for analyzing and simulating the behavior of Traveling Wave Parametric Amplifiers (TWPAs) by solving systems of differential equations known as Coupled Mode Equations (CMEs).</p>
+<div class="admonition caution">
+<p class="admonition-title">Caution</p>
+<p>Please note that <code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> is currently in a very early development stage. This means that the API is subject to significant changes.</p>
+</div>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/01_models.html">Network models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/02_twpas.html">Constructing twpas</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="implementing_models.html">Implementing New Models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="implementing_models.html#adding-a-new-twoportmodel">Adding a New TwoPortModel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="implementing_models.html#adding-a-new-oneportmodel">Adding a New OnePortModel</a></li>
+</ul>
+</li>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
@@ -317,5 +359,6 @@
     <script src="_static/scripts/furo.js"></script>
     <script src="_static/clipboard.min.js"></script>
     <script src="_static/copybutton.js"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     </body>
 </html>

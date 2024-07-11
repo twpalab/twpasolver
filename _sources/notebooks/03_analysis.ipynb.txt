@@ -1,0 +1,220 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# 3WM gain and TWPAnalysis\n",
+    "\n",
+    "This tutorial demonstrates how to utilize the `twpasolver.TWPAnalysis` class to simulate the gain response of a TWPA by solving the Coupled Mode Equations (CMEs).\n",
+    "\n",
+    "### Overivew\n",
+    "`twpasolver.TWPAnalysis` automates the procedures required to compute the gain characteristics of a TWPA model.\n",
+    "\n",
+    "Implemented features:\n",
+    "\n",
+    "* Calculation of phase-matching profile, gain and bandwidth.\n",
+    "* Automatic caching of data from the respectve `phase_matching()`, `gain()` and `bandwidth()` methods.\n",
+    "* Sweeps over lists of input parameters for the analysis functions.\n",
+    "* Simple plots.\n",
+    "\n",
+    "Current limitations:\n",
+    "\n",
+    "* Specialized for solving 3-wave mixing systems only.\n",
+    "* Simple sytems of CMEs, reflections and additional harmonics not considered.\n",
+    "* Analysis routines are not isolated from the class.\n",
+    "* 1-D sweeps only.\n",
+    "\n",
+    "### Example - Setup\n",
+    "\n",
+    "Let's start by importing the required libraries and initializing the `TWPAnalysis` instance. This object requires:\n",
+    "* A `TWPA` instance or the name of a json file containing the definition of the model\n",
+    "* A frequency span which determines the full region that will be considered in the analysis, which can be provided either as a list of values or a tuple that will be passed to `numpy.arange`. Some precautions in choosing the frequency span must be taken to correctly unwrap the phase response of the device. Namely, the frequency array should be dense enough and should start from frequencies much lower than the position of the stopband.\n",
+    "\n",
+    "The computed response and results of the following analysis functions are stored in the internal `data` dictionary, which can be accessed and saved to an hdf5 file through the `save_data()` method."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import logging\n",
+    "\n",
+    "import matplotlib.pyplot as plt\n",
+    "import numpy as np\n",
+    "\n",
+    "from twpasolver import TWPAnalysis\n",
+    "from twpasolver.logging import log\n",
+    "from twpasolver.mathutils import dBm_to_I\n",
+    "\n",
+    "log.setLevel(logging.WARNING)\n",
+    "\n",
+    "plt.rcParams[\"font.size\"] = 13.5\n",
+    "plt.rcParams[\"axes.axisbelow\"] = True\n",
+    "\n",
+    "twpa_file = \"model_cpw_dartwars_13nm_Lk8_5.json\"\n",
+    "a = TWPAnalysis(twpa=twpa_file, f_arange=(0.5, 10, 0.5e-3))\n",
+    "a.update_base_data()  # compute response, estimate stopband position and optimal pump frequency\n",
+    "ax = a.plot_response(pump_freq=a.data[\"optimal_pump_freq\"])\n",
+    "a.twpa.model_dump()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Phase matching\n",
+    "\n",
+    "This is the first analysis function implemented by the class. It computes the phase matching condition as a function of pump and signal frequency. By default, the signal range is chosen from the start of the total frequency span to the beginning of the stopband, while the pump range is chosen from the end of the stopband to the maximum of the full span."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "_ = a.phase_matching()\n",
+    "ax = a.plot_phase_matching(thin=3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Gain and bandwidth\n",
+    "Since `twpasolver` uses a numba-based implementation of the Runge-Kutta algorithm to solve the CMEs, it may take some seconds to compile all the functions when the `gain` method is called for the first time, becoming much faster afterwards."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "s_arange = np.arange(1, 7, 0.05)\n",
+    "_ = a.gain(signal_freqs=s_arange, Is0=1e-6)\n",
+    "a.plot_gain()\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "The `bandwidth` analysis function computes the bandwidth by finding all the regions between the maximum gain value and a certain threshold, by default defined as 3 dB lower than the maximum gain. It is designed to keep track of the asymmetry and formation of lobes in the gain profile due to depleted pump effects and high pump frequency choice, potentially computing the bandwidth over discontinuous regions."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "_ = a.gain(signal_freqs=s_arange, Is0=3e-5, pump=a.data[\"optimal_pump_freq\"] + 0.15)\n",
+    "a.plot_gain()\n",
+    "_ = a.bandwidth()\n",
+    "for edg in a.data[\"bandwidth\"][\"bandwidth_edges\"]:\n",
+    "    plt.axvline(edg, color=\"black\", ls=\"--\")\n",
+    "plt.axhline(a.data[\"bandwidth\"][\"reduced_gain\"], c=\"black\", ls=\"--\")\n",
+    "plt.axhline(a.data[\"bandwidth\"][\"mean_gain\"], c=\"black\", ls=\"--\")\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Parameter sweeps\n",
+    "\n",
+    "The `parameter_sweep` analysis method allows performing sweeps over an input variable for one of the other analysis functions. Basic usage involves passing as the first three positional arguments of a sweep the name of the target function, the name of the target variable and its list of values.\n",
+    "\n",
+    "#### Gain as a function of pump frequency"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "optimal = a.data[\"optimal_pump_freq\"]\n",
+    "pumps = np.arange(optimal - 0.2, optimal + 0.5, 0.02)\n",
+    "pumpsweep_res = a.parameter_sweep(\n",
+    "    \"gain\", \"pump\", pumps, signal_freqs=s_arange, save_name=\"pump_profile\"\n",
+    ")\n",
+    "\n",
+    "plt.pcolor(pumpsweep_res[\"signal_freqs\"][0], pumps, pumpsweep_res[\"gain_db\"])\n",
+    "plt.xlabel(\"Signal frequency [GHz]\")\n",
+    "plt.ylabel(\"Pump frequency [GHz]\")\n",
+    "c = plt.colorbar()\n",
+    "c.set_label(\"Gain [dB]\")\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Compression point\n",
+    "\n",
+    "Since the default CMEs system considers pump depletion effects, it is possible to simulate power-dependent measurements such as the compression point."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "signals_db = np.arange(-80, -40, 1)\n",
+    "signals = dBm_to_I(signals_db)\n",
+    "edges = a.data[\"bandwidth\"][\"bandwidth_edges\"]\n",
+    "s_arange = a.data[\"bandwidth\"][\"bw_freqs\"]  # (edges[0], edges[-1], 0.1)\n",
+    "compression_res = a.parameter_sweep(\n",
+    "    \"gain\", \"Is0\", signals, signal_freqs=s_arange, thin=1000, save_name=\"compression\"\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "mean_gains = np.mean(compression_res[\"gain_db\"], axis=1)\n",
+    "reduced_1db = mean_gains[0] - 1\n",
+    "cp_1db = np.interp(reduced_1db, mean_gains[::-1], signals_db[::-1])\n",
+    "plt.scatter(signals_db, mean_gains)\n",
+    "plt.xlabel(\"Signal power [dBm]\")\n",
+    "plt.ylabel(\"Gain [dB]\")\n",
+    "plt.axhline(reduced_1db, c=\"black\", ls=\"--\")\n",
+    "plt.axvline(cp_1db, c=\"black\", ls=\"--\")\n",
+    "plt.show()"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "twpaenv",
+   "language": "python",
+   "name": "twpaenv"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.14"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}

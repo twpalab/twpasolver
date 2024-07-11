@@ -1,0 +1,517 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Constructing twpas" href="02_twpas.html" /><link rel="prev" title="Tutorials" href="../tutorials.html" />
+
+    <link rel="shortcut icon" href="../_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
+        <title>Network models - twpasolver · 0.0.1</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?digest=369552022d0b975c8e74270ce6eabe0fb7978f24" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/style.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?digest=30d1aed668e5c3a91c3e3bf6a60b675221979f0e" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  --color-brand-primary: #6400FF;
+  --color-brand-secondary: #6400FF;
+  --color-brand-content: #6400FF;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-half" viewBox="0 0 24 24">
+    <title>Auto light/dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-shadow">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M13 12h5" />
+      <path d="M13 15h4" />
+      <path d="M13 18h1" />
+      <path d="M13 9h4" />
+      <path d="M13 6h1" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">twpasolver · 0.0.1</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto"><use href="#svg-sun-half"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="../_static/twpalab_logo.png" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="../_static/twpalab_logo_dark.png" alt="Dark Logo"/>
+  </div>
+  
+  <span class="sidebar-brand-text">twpasolver · 0.0.1</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../tutorials.html">Tutorials</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Tutorials</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Network models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02_twpas.html">Constructing twpas</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_analysis.html">3WM gain and TWPAnalysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Api reference</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api-reference/modules.html">twpasolver</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of twpasolver</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api-reference/twpasolver.html">twpasolver package</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of twpasolver package</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../api-reference/twpasolver.models.html">twpasolver.models package</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of twpasolver.models package</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api-reference/twpasolver.models.compose.html">twpasolver.models.compose module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api-reference/twpasolver.models.modelarray.html">twpasolver.models.modelarray module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api-reference/twpasolver.models.oneport.html">twpasolver.models.oneport module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api-reference/twpasolver.models.rf_functions.html">twpasolver.models.rf_functions module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api-reference/twpasolver.models.transmission_lines.html">twpasolver.models.transmission_lines module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api-reference/twpasolver.models.twoportarrays.html">twpasolver.models.twoportarrays module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api-reference/twpasolver.models.twpa_cells.html">twpasolver.models.twpa_cells module</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="edit-this-page">
+  <a class="muted-link" href="https://github.com/twpalab/twpasolver/edit/main/docs/source/notebooks/01_models.ipynb" title="Edit this page">
+    <svg aria-hidden="true" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+      <path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" />
+      <line x1="13.5" y1="6.5" x2="17.5" y2="10.5" />
+    </svg>
+    <span class="visually-hidden">Edit this page</span>
+  </a>
+</div><div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto"><use href="#svg-sun-half"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main">
+          <section id="Network-models">
+<h1>Network models<a class="headerlink" href="#Network-models" title="Permalink to this heading">#</a></h1>
+<p>These examples provides an overview of the <code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> library’s basic capabilities, focusing on the implementation of various circuit components and their compositions. The classes involved include <code class="docutils literal notranslate"><span class="pre">Models</span></code>, <code class="docutils literal notranslate"><span class="pre">TwoPortCell</span></code>, and <code class="docutils literal notranslate"><span class="pre">ABCDArrays</span></code>, which offer functionalities to handle one-port and two-port circuit components. The core functionalities are housed within <code class="docutils literal notranslate"><span class="pre">twpasolver.twoport</span></code> and <code class="docutils literal notranslate"><span class="pre">twpasolver.models</span></code>.</p>
+<section id="Overview">
+<h2>Overview<a class="headerlink" href="#Overview" title="Permalink to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> provides simple functionalities to handle one-port and two-port circuit components. Each component is implemented as a class that defines how its ABCD matrix is computed as a function of an input frequency array. These models, which are derived from <code class="docutils literal notranslate"><span class="pre">twpasolver.twoport.TwoPortModel</span></code>, can be found in the <code class="docutils literal notranslate"><span class="pre">twpasolver.models</span></code> subpackage. The response of the circuit element is accessed by calling one of the <code class="docutils literal notranslate"><span class="pre">get</span></code> methods of the model class.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">get_abcd(freq_array)</span></code> returns an instance of <code class="docutils literal notranslate"><span class="pre">twpasolver.ABCDArray</span></code>. It is a specialized subclass of <code class="docutils literal notranslate"><span class="pre">numpy.array</span></code> which is used to represent arrays of 2x2 matrices and includes efficient matrix multiplication operations. This class is the fundamental building block for constructing the response of concatenated circuit elements.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_cell(freq_array)</span></code> returns a <code class="docutils literal notranslate"><span class="pre">TwoPortCell</span></code> class, which contains an <code class="docutils literal notranslate"><span class="pre">ABCDArray</span></code>, a frequencies array, and additional functions to convert responses to S-parameters and <code class="docutils literal notranslate"><span class="pre">scikit-rf.Network</span></code> objects.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_network(freq_array)</span></code> directly returns a <code class="docutils literal notranslate"><span class="pre">scikit-rf.Network</span></code> with the computed response.</p></li>
+</ul>
+<p>Some other features common to all models implemented in <code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> are:</p>
+<ul class="simple">
+<li><p>Repetition of <span class="math notranslate nohighlight">\(N\)</span> consecutive instances of the circuit through the <code class="docutils literal notranslate"><span class="pre">N</span></code> attribute.</p></li>
+<li><p>Dumping and loading to/from json files and attribute validation, implemented through <code class="docutils literal notranslate"><span class="pre">pydantic</span></code>.</p></li>
+</ul>
+</section>
+<section id="Example:-Capacitor">
+<h2>Example: Capacitor<a class="headerlink" href="#Example:-Capacitor" title="Permalink to this heading">#</a></h2>
+<p>Let’s start with a simple example of analyzing a capacitor. We will create a capacitor model, compute its response over a frequency range, and plot the S-parameters.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">twpasolver.mathutils</span> <span class="kn">import</span> <span class="n">to_dB</span>
+<span class="kn">from</span> <span class="nn">twpasolver.models</span> <span class="kn">import</span> <span class="n">Capacitance</span>
+
+<span class="c1"># Define frequency range</span>
+<span class="n">freqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">1e9</span><span class="p">,</span> <span class="mf">10e9</span><span class="p">,</span> <span class="mf">1e6</span><span class="p">)</span>
+
+<span class="c1"># Create capacitor</span>
+<span class="n">C_val</span> <span class="o">=</span> <span class="mf">1e-12</span>  <span class="c1"># 1 pF</span>
+<span class="n">C</span> <span class="o">=</span> <span class="n">Capacitance</span><span class="p">(</span><span class="n">C</span><span class="o">=</span><span class="n">C_val</span><span class="p">)</span>
+
+<span class="c1"># Get network response and plot S11</span>
+<span class="n">net</span> <span class="o">=</span> <span class="n">C</span><span class="o">.</span><span class="n">get_network</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
+<span class="n">net</span><span class="o">.</span><span class="n">s11</span><span class="o">.</span><span class="n">plot_s_db</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="s2">&quot;S11, from skrf.Network&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+<span class="c1"># Get cell response and plot S11</span>
+<span class="n">cell</span> <span class="o">=</span> <span class="n">C</span><span class="o">.</span><span class="n">get_cell</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">freqs</span><span class="p">,</span> <span class="n">to_dB</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">s</span><span class="o">.</span><span class="n">S11</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;S11, from TwoPortCell&quot;</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;S11 (dB)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_01_models_2_0.png" src="../_images/notebooks_01_models_2_0.png" />
+</div>
+</div>
+<p>Dump the model to a json file and recover it.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">C</span><span class="o">.</span><span class="n">dump_to_file</span><span class="p">(</span><span class="s2">&quot;Capacitor.json&quot;</span><span class="p">)</span>
+<span class="n">C_recovered</span> <span class="o">=</span> <span class="n">Capacitance</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;Capacitor.json&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">C</span> <span class="o">==</span> <span class="n">C_recovered</span><span class="p">)</span>
+<span class="n">C</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+True
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+{&#39;Z0_ref&#39;: 50.0,
+ &#39;N&#39;: 1,
+ &#39;twoport_parallel&#39;: False,
+ &#39;name&#39;: &#39;Capacitance&#39;,
+ &#39;C&#39;: 1e-12}
+</pre></div></div>
+</div>
+</section>
+<section id="ModelArrays">
+<h2>ModelArrays<a class="headerlink" href="#ModelArrays" title="Permalink to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">OnePortModel</span></code> and <code class="docutils literal notranslate"><span class="pre">TwoPortModel</span></code> instances can be assembled into arrays, and the overall response be retrieved automatically. This can be done wither by instancing the arrays directly or by using the <code class="docutils literal notranslate"><span class="pre">twpasolver.models.compose</span></code> function. In this way it is possible to connect multiple components in series or parallel to form more complex networks. The <code class="docutils literal notranslate"><span class="pre">compose</span></code> function returns either:</p>
+<ul class="simple">
+<li><p>A <code class="docutils literal notranslate"><span class="pre">OnePortArray</span></code> if all the elements are <code class="docutils literal notranslate"><span class="pre">OnePortModel</span></code>s and have the same series/parallel configuration when inserted in a two-port network, which is specified by the <code class="docutils literal notranslate"><span class="pre">twoport_parallel</span></code> attribute present in all <code class="docutils literal notranslate"><span class="pre">OnePortModel</span></code> derived classes. Since one-port elements are specified entirely by their impedance response, they are specialized to allow connecting them in parallel or in series into another one port network, which simplifies calculations and makes it possible to create
+more complex elements to insert into a two-port circuit.</p></li>
+<li><p>A <code class="docutils literal notranslate"><span class="pre">TwoPortArray</span></code> otherwise. The composition of two-port circuits is based entirely on multiplying their abcd matrices.</p></li>
+</ul>
+<p>Some functionalities common to both kinds of model arrays are:</p>
+<ul class="simple">
+<li><p>Basic list operations, such as appending and indexing/slicing.</p></li>
+<li><p>Compatibility with nested arrays.</p></li>
+<li><p>Correct serialization of nested structures to json.</p></li>
+</ul>
+</section>
+<section id="Example:-LC-Resonator-and-resonators-array">
+<h2>Example: LC Resonator and resonators array<a class="headerlink" href="#Example:-LC-Resonator-and-resonators-array" title="Permalink to this heading">#</a></h2>
+<p>Now let’s create an LC resonator by combining an inductor and a capacitor, which returns a <code class="docutils literal notranslate"><span class="pre">OnePortArray</span></code>, and plotting its frequency response.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">twpasolver.mathutils</span> <span class="kn">import</span> <span class="n">to_dB</span>
+<span class="kn">from</span> <span class="nn">twpasolver.models</span> <span class="kn">import</span> <span class="n">Capacitance</span><span class="p">,</span> <span class="n">Inductance</span><span class="p">,</span> <span class="n">Resistance</span><span class="p">,</span> <span class="n">compose</span>
+
+<span class="c1"># Define frequency range</span>
+<span class="n">freqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">1e9</span><span class="p">,</span> <span class="mf">10e9</span><span class="p">,</span> <span class="mf">2e6</span><span class="p">)</span>
+
+<span class="c1"># Resonance frequency and inductance value</span>
+<span class="n">f_res</span> <span class="o">=</span> <span class="mf">5e9</span>
+<span class="n">L_val</span> <span class="o">=</span> <span class="mf">1e-9</span>
+<span class="n">R_val</span> <span class="o">=</span> <span class="mf">1e-3</span>
+
+<span class="c1"># Create series LC resonator</span>
+<span class="n">L</span> <span class="o">=</span> <span class="n">Inductance</span><span class="p">(</span><span class="n">L</span><span class="o">=</span><span class="n">L_val</span><span class="p">)</span>
+<span class="n">C</span> <span class="o">=</span> <span class="n">Capacitance</span><span class="p">(</span><span class="n">C</span><span class="o">=</span><span class="mi">1</span> <span class="o">/</span> <span class="p">((</span><span class="n">f_res</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">L_val</span><span class="p">))</span>
+<span class="n">R</span> <span class="o">=</span> <span class="n">Resistance</span><span class="p">(</span><span class="n">R</span><span class="o">=</span><span class="n">R_val</span><span class="p">)</span>
+<span class="n">LCres</span> <span class="o">=</span> <span class="n">compose</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">R</span><span class="p">)</span>
+
+<span class="n">net</span> <span class="o">=</span> <span class="n">LCres</span><span class="o">.</span><span class="n">get_network</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
+<span class="n">net</span><span class="o">.</span><span class="n">s11</span><span class="o">.</span><span class="n">plot_s_db</span><span class="p">(</span><span class="n">lw</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;S11 (dB)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_01_models_6_0.png" src="../_images/notebooks_01_models_6_0.png" />
+</div>
+</div>
+<p>Finally, we create an array of LC resonators with different resonance frequencies inserted in parallel in a two-port network and observe their combined response.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">twpasolver.models</span> <span class="kn">import</span> <span class="n">TwoPortArray</span>
+
+<span class="c1"># Create array of LC resonators with different resonance frequencies</span>
+<span class="n">LCarray</span> <span class="o">=</span> <span class="n">TwoPortArray</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">f_res</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">2e9</span><span class="p">,</span> <span class="mf">8e9</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
+    <span class="n">C</span> <span class="o">=</span> <span class="n">Capacitance</span><span class="p">(</span><span class="n">C</span><span class="o">=</span><span class="mi">1</span> <span class="o">/</span> <span class="p">((</span><span class="n">f_res</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">L_val</span><span class="p">))</span>
+    <span class="n">LC</span> <span class="o">=</span> <span class="n">compose</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="n">C</span><span class="p">,</span> <span class="n">R</span><span class="p">)</span>
+    <span class="n">LC</span><span class="o">.</span><span class="n">twoport_parallel</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">LCarray</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">LC</span><span class="p">)</span>
+
+<span class="c1"># Get network response and plot S21</span>
+<span class="n">net</span> <span class="o">=</span> <span class="n">LCarray</span><span class="o">.</span><span class="n">get_network</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
+<span class="n">net</span><span class="o">.</span><span class="n">s21</span><span class="o">.</span><span class="n">plot_s_db</span><span class="p">(</span><span class="n">lw</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;S21&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;S21 (dB)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_01_models_8_0.png" src="../_images/notebooks_01_models_8_0.png" />
+</div>
+</div>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="02_twpas.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Constructing twpas</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="../tutorials.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Tutorials</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2024, twpalab
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            <div class="icons">
+              <a class="muted-link " href="https://github.com/twpalab/twpasolver" aria-label="GitHub">
+                    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                </a>
+              
+            </div>
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Network models</a><ul>
+<li><a class="reference internal" href="#Overview">Overview</a></li>
+<li><a class="reference internal" href="#Example:-Capacitor">Example: Capacitor</a></li>
+<li><a class="reference internal" href="#ModelArrays">ModelArrays</a></li>
+<li><a class="reference internal" href="#Example:-LC-Resonator-and-resonators-array">Example: LC Resonator and resonators array</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/sphinx_highlight.js"></script>
+    <script src="../_static/scripts/furo.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
