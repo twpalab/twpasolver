@@ -50,6 +50,8 @@ sphinx-markdown-tables = "^0.0.17"
 sphinx-copybutton = "^0.5.1"
 sphinx-last-updated-by-git = "^0.3.5"
 autodoc_pydantic = ">=2.1.0"
+ipykernel = ">=6.15.2"
+ipython = ">=8.4.0"
 
 [[tool.mypy.overrides]]
 module=["numba.*", "h5py.*", "skrf", "scipy.*", "matplotlib.*", "CyRK.*"]

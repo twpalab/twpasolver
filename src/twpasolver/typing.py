@@ -34,8 +34,8 @@ def validate_impedance(Z: complex | float | str) -> complex | float:
     """
     try:
         Z = complex(Z)
-    except:
-        raise ValueError(f"Cannot convert {type(Z)} {Z} to complex number.")
+    except Exception as exc:
+        raise ValueError(f"Cannot convert {type(Z)} {Z} to complex number.") from exc
     if np.real(Z) < 0:
         raise ValueError("Real part of impedance {Z} must be non-negative.")
     if np.imag(Z) == 0:
@@ -82,5 +82,5 @@ FrequencyList = list[NonNegativeFloat]
 FrequencyArange = tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat]
 FrequencyLinspace = tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeInt]
 
-complex_array: TypeAlias = np.ndarray[Any, np.dtype[np.complex128]]
-float_array: TypeAlias = np.ndarray[Any, np.dtype[np.float64]]
+ComplexArray: TypeAlias = np.ndarray[Any, np.dtype[np.complex128]]
+FloatArray: TypeAlias = np.ndarray[Any, np.dtype[np.float64]]

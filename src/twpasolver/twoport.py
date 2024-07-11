@@ -1,12 +1,10 @@
 """
 Two-port network module.
 
-This module provides classes and methods for representing and manipulating two-port RF (radio frequency)
+This module provides classes and methods for representing and manipulating two-port RF
 networks. It includes functionality for handling frequency-dependent network parameters, converting
 between different representations (such as ABCD matrices and S-parameters), and performing common
 operations on two-port networks.
-This module can be used to define and work with two-port network models in RF electronics. It is
-designed to support tasks such as network analysis, simulation, and design.
 
 Examples
 --------
@@ -285,13 +283,13 @@ class TwoPortModel(BaseModel, ABC):
 
     def __mul__(self, factor: int) -> TwoPortModel:
         """
-        Return model multiplied by integer factor.
+        Return model multiplied by integer factor, updating the ``N`` attribute.
 
         Args:
             factor (int): Multiplication factor.
 
         Returns:
-            TwoPortModel: New instance of the model multiplied by the factor.
+            TwoPortModel: New instance of the model additionally repeated by the factor.
         """
         new_instance = self.__class__(**self.model_dump())
         new_instance.N = factor * self.N

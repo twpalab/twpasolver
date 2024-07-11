@@ -1,37 +1,37 @@
 """
 Models module.
 
-This module provides a collection of models for simulating and analyzing various RF (radio frequency)
-components and networks. It includes models for one-port components such as resistors, capacitors,
-inductors, and stubs, as well as more complex two-port models and TWPAs (Traveling Wave Parametric Amplifiers).
+This module provides a collection of models for simulating and analyzing various RF components and networks. It includes models for one-port components such as resistors, capacitors,
+inductors, and stubs, as well as more complex two-port models and TWPAs.
 
 Imports
 -------
 
-- One-port models:
-  - Resistance
-  - Capacitance
-  - Inductance
-  - Stub
-  - OnePortArray
+One-port models:
+  * Resistance
+  * Capacitance
+  * Inductance
+  * Stub
+  * OnePortArray
 
-- TWPA cells:
-  - LCLfBaseCell
-  - StubBaseCell
+TWPA cells:
+  * LCLfBaseCell
+  * StubBaseCell
 
-- Two-port arrays and models:
-  - TWPA
-  - AnyModel
-  - TwoPortArray
+Two-port arrays and models:
+  * TWPA
+  * AnyModel
+  * TwoPortArray
 
-- Utility functions:
-  - compose
+Utility functions:
+  * compose
 
 Usage
 -----
 These models can be used to construct and analyze RF networks, allowing for the study of their behavior
 under different conditions. The models support various operations such as impedance calculations,
 frequency response analysis, and composition of complex networks from simpler components.
+See the :ref:`tutorials` page for more examples.
 
 Example
 -------

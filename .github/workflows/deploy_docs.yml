@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10"]
+        python-version: ["3.10.4"]
     permissions:
       contents: write
     concurrency:
@@ -41,8 +41,9 @@ jobs:
 
     - name: Compile documentation
       run: |
-        sudo apt-get install python3-sphinx
+        sudo apt-get install python3-sphinx pandoc
         source $VENV
+        python -m ipykernel install --user --name twpaenv
         make -C docs html
 
 
