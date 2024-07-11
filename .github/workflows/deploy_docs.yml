@@ -43,6 +43,7 @@ jobs:
       run: |
         sudo apt-get install python3-sphinx
         source $VENV
+        pip install ipykernel
         python -m ipykernel install --user --name twpaenv
         make -C docs html
 
