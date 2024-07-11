@@ -41,9 +41,8 @@ jobs:
 
     - name: Compile documentation
       run: |
-        sudo apt-get install python3-sphinx
+        sudo apt-get install python3-sphinx pandoc
         source $VENV
-        pip install ipykernel
         python -m ipykernel install --user --name twpaenv
         make -C docs html
 
