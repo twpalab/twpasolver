@@ -1,6 +1,6 @@
 name: Lint-Test-Mypy
 
-on: [push]
+on: [merge]
 
 jobs:
   build:
