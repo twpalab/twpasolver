@@ -38,7 +38,7 @@ class Frequencies(BaseModel):
             numpy.ndarray: Array of computed frequencies.
         """
         if self.f_arange:
-            freqs = np.arange(*self.f_arange)
+            freqs = np.arange(*list(self.f_arange))
         elif self.f_list:
             freqs = np.array(self.f_list)
         else:

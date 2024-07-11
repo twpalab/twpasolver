@@ -3,16 +3,16 @@
 import numpy as np
 from numba import njit
 
-from twpasolver.typing import complex_array, float_array
+from twpasolver.typing import ComplexArray, FloatArray
 
 
 @njit
-def inductance(freqs: float_array, L: float) -> complex_array:
+def inductance(freqs: FloatArray, L: float) -> ComplexArray:
     """
     Calculate the impedance of an inductance as a function of frequency.
 
     Args:
-        freqs (float_array): Array of frequencies.
+        freqs (FloatArray): Array of frequencies.
         L (float): Inductance value.
 
     Returns:
@@ -23,12 +23,12 @@ def inductance(freqs: float_array, L: float) -> complex_array:
 
 
 @njit
-def capacitance(freqs: float_array, C: float) -> complex_array:
+def capacitance(freqs: FloatArray, C: float) -> ComplexArray:
     """
     Calculate the impedance of a capacitor as a function of frequency.
 
     Args:
-        freqs (float_array): Array of frequencies.
+        freqs (FloatArray): Array of frequencies.
         C (float): Capacitance value.
 
     Returns:
@@ -40,13 +40,13 @@ def capacitance(freqs: float_array, C: float) -> complex_array:
 
 @njit
 def stub(
-    freqs: float_array, L: float, C: float, length: float, open: bool = True
-) -> complex_array:
+    freqs: FloatArray, L: float, C: float, length: float, open: bool = True
+) -> ComplexArray:
     """
     Calculate the impedance of a stub as a function of frequency.
 
     Args:
-        freqs (float_array): Array of frequencies.
+        freqs (FloatArray): Array of frequencies.
         L (float): Inductance value.
         C (float): Capacitance value.
         length (float): Length of the stub.
@@ -63,12 +63,12 @@ def stub(
 
 
 @njit
-def parallel_admittance_abcd(Y: complex_array) -> complex_array:
+def parallel_admittance_abcd(Y: ComplexArray) -> ComplexArray:
     """
     Calculate the ABCD matrix of a parallel admittance.
 
     Args:
-        Y (complex_array): Array of admittance values.
+        Y (ComplexArray): Array of admittance values.
 
     Returns:
         np.ndarray: ABCD matrix of the parallel admittance.
@@ -81,12 +81,12 @@ def parallel_admittance_abcd(Y: complex_array) -> complex_array:
 
 
 @njit
-def series_impedance_abcd(Z: complex_array) -> complex_array:
+def series_impedance_abcd(Z: ComplexArray) -> ComplexArray:
     """
     Calculate the ABCD matrix of a series impedance.
 
     Args:
-        Z (complex_array): Array of impedance values.
+        Z (ComplexArray): Array of impedance values.
 
     Returns:
         np.ndarray: ABCD matrix of the series impedance.
@@ -99,14 +99,12 @@ def series_impedance_abcd(Z: complex_array) -> complex_array:
 
 
 @njit
-def lossless_line_abcd(
-    freqs: float_array, C: float, L: float, l: float
-) -> complex_array:
+def lossless_line_abcd(freqs: FloatArray, C: float, L: float, l: float) -> ComplexArray:
     """
     Calculate the ABCD matrix of a lossless transmission line.
 
     Args:
-        freqs (float_array): Array of frequencies.
+        freqs (FloatArray): Array of frequencies.
         C (float): Capacitance per unit length.
         L (float): Inductance per unit length.
         l (float): Length of the transmission line.
@@ -129,12 +127,12 @@ def lossless_line_abcd(
 
 
 @njit
-def LCLf_abcd(freqs: float_array, C: float, L: float, Lf: float) -> complex_array:
+def LCLf_abcd(freqs: FloatArray, C: float, L: float, Lf: float) -> ComplexArray:
     """
     Calculate the ABCD matrix of an LCLf cell model.
 
     Args:
-        freqs (float_array): Array of frequencies.
+        freqs (FloatArray): Array of frequencies.
         C (float): Capacitance value.
         L (float): Inductance value.
         Lf (float): Additional inductance value.
@@ -159,13 +157,13 @@ def LCLf_abcd(freqs: float_array, C: float, L: float, Lf: float) -> complex_arra
 
 @njit
 def get_stub_cell(
-    freqs: float_array, C: float, L: float, l1: float, l2: float
-) -> complex_array:
+    freqs: FloatArray, C: float, L: float, l1: float, l2: float
+) -> ComplexArray:
     """
     Calculate the ABCD matrix of a stub cell model.
 
     Args:
-        freqs (float_array): Array of frequencies.
+        freqs (FloatArray): Array of frequencies.
         C (float): Capacitance value.
         L (float): Inductance value.
         l1 (float): Length of the first section of the stub.

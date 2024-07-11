@@ -81,6 +81,7 @@ html_static_path = ["_static"]
 # -- Intersphinx  -------------------------------------------------------------
 
 intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
+autodoc_member_order = "bysource"
 
 
 def run_apidoc(_):

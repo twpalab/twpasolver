@@ -1,9 +1,8 @@
 """
 One-port network components.
 
-This module provides classes for modeling one-port RF (radio frequency) network components.
-These components are described by their impedance as a function of frequency and can be
-used to build and analyze more complex RF networks.
+This module provides classes for modeling one-port RF network components.
+These components are described by their impedance as a function of frequency and can be used to build and analyze more complex RF networks.
 
 """
 

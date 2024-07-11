@@ -16,7 +16,7 @@ from twpasolver.logging import log
 from twpasolver.mathutils import cme_solve, compute_phase_matching
 from twpasolver.models import TWPA
 from twpasolver.plotting import plot_gain, plot_phase_matching, plot_response
-from twpasolver.typing import float_array
+from twpasolver.typing import FloatArray
 
 
 def analysis_function(
@@ -147,8 +147,10 @@ class TWPAnalysis(Analyzer, Frequencies):
         if isinstance(twpa, str):
             try:
                 twpa = TWPA.from_file(twpa)
-            except:
-                raise ValueError("Input string mut be valid path to model file.")
+            except Exception as exc:
+                raise ValueError(
+                    "Input string mut be valid path to model file."
+                ) from exc
         return twpa  # type: ignore[return-value]
 
     def update_base_data(self) -> None:
@@ -247,7 +249,7 @@ class TWPAnalysis(Analyzer, Frequencies):
     @analysis_function
     def gain(
         self,
-        signal_freqs: float_array,
+        signal_freqs: FloatArray,
         pump: Optional[float] = None,
         Is0: float = 1e-6,
         Ip0: Optional[float] = None,
@@ -257,7 +259,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         Compute expected gain with 3WM as a function of frequency and cell number in the TWPA.
 
         Args:
-            signal_freqs (float_array): Array of signal frequencies to consider.
+            signal_freqs (FloatArray): Array of signal frequencies to consider.
             pump (Optional[float]): The pump frequency. If None, uses the optimal pump frequency from data.
             Is0 (float): Initial signal current (in A).
             Ip0 (Optional[float]): Initial pump current (in A). If None, uses the current TWPA's Ip0.
@@ -276,8 +278,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         if isinstance(signal_freqs, list):
             signal_freqs = np.asarray(signal_freqs)
         N_tot = self.twpa.N_tot
-        if thin > N_tot:
-            thin = N_tot
+        thin = min(thin, N_tot)
         if Ip0 is not None:
             self.twpa.Ip0 = Ip0
         if pump is None:

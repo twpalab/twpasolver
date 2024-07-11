@@ -28,7 +28,6 @@ jobs:
 
     - name: install_dependencies_only
       run: poetry install --no-interaction --no-root --with analysis
-      # if: steps.cache-deps.outputs.cache-hit != 'true'
 
     - name: install_project
       run: poetry install --no-interaction

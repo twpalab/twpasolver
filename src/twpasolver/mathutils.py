@@ -1,4 +1,10 @@
-"""Utility functions for mathematic expressions and rf equations."""
+"""
+Utility functions for mathematical expressions and RF equations.
+
+This module provides a set of utility functions optimized with Numba for high performance.
+These functions include matrix multiplications, conversions between different parameter
+representations, and solutions for coupled mode equations used in RF engineering.
+"""
 
 from typing import Tuple
 
@@ -6,7 +12,7 @@ import numba as nb
 import numpy as np
 from CyRK import nbrk_ode
 
-from twpasolver.typing import complex_array, float_array
+from twpasolver.typing import ComplexArray, FloatArray
 
 nb_complex3d = nb.complex128[:, :, :]
 nb_complex1d = nb.complex128[:]
@@ -15,18 +21,18 @@ nb_float1d = nb.float64[:]
 
 @nb.njit(cache=True)
 def matmul_2x2(
-    matrices_a: complex_array,
-    matrices_b: complex_array,
-) -> complex_array:
+    matrices_a: ComplexArray,
+    matrices_b: ComplexArray,
+) -> ComplexArray:
     """
-    Fast multiplication between array of 2x2 matrices.
+    Fast multiplication between arrays of 2x2 matrices.
 
     Args:
-        matrices_a (complex_array): array of 2x2 complex matrices.
-        matrices_b (complex_array): array of 2x2 complex matrices.
+        matrices_a (ComplexArray): Array of 2x2 complex matrices.
+        matrices_b (ComplexArray): Array of 2x2 complex matrices.
 
     Returns:
-        complex_array: Resultant array of 2x2 complex matrices after multiplication.
+        ComplexArray: Resultant array of 2x2 complex matrices after multiplication.
     """
     assert matrices_a.shape == matrices_b.shape
     assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
@@ -45,16 +51,16 @@ def matmul_2x2(
 
 
 @nb.njit(cache=True)
-def matpow_2x2(matrices_a: complex_array, exponent: int) -> complex_array:
+def matpow_2x2(matrices_a: ComplexArray, exponent: int) -> ComplexArray:
     """
-    Fast exponentiation of array of 2x2 matrices with recursion.
+    Fast exponentiation of arrays of 2x2 matrices using recursion.
 
     Args:
-        matrices_a (complex_array): array of 2x2 complex matrices.
+        matrices_a (ComplexArray): Array of 2x2 complex matrices.
         exponent (int): Exponent to which matrices are to be raised.
 
     Returns:
-        complex_array: Resultant array of 2x2 complex matrices after exponentiation.
+        ComplexArray: Resultant array of 2x2 complex matrices after exponentiation.
     """
     assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
     assert exponent > 0
@@ -79,16 +85,16 @@ def matpow_2x2(matrices_a: complex_array, exponent: int) -> complex_array:
 
 
 @nb.njit(cache=True)
-def a2s(abcd: complex_array, Z0: complex | float) -> complex_array:
+def a2s(abcd: ComplexArray, Z0: complex | float) -> ComplexArray:
     """
-    Convert array of ABCD matrices to array of S parameters.
+    Convert arrays of ABCD matrices to arrays of S-parameters.
 
     Args:
-        abcd (complex_array): array of 2x2 ABCD matrices.
+        abcd (ComplexArray): Array of 2x2 ABCD matrices.
         Z0 (complex | float): Reference impedance.
 
     Returns:
-        complex_array: array of 2x2 S-parameter matrices.
+        ComplexArray: Array of 2x2 S-parameter matrices.
     """
     assert abcd.shape[1] == 2 and abcd.shape[2] == 2
     assert np.real(Z0) > 0
@@ -108,16 +114,16 @@ def a2s(abcd: complex_array, Z0: complex | float) -> complex_array:
 
 
 @nb.njit(cache=True)
-def s2a(spar: complex_array, Z0: complex | float) -> complex_array:
+def s2a(spar: ComplexArray, Z0: complex | float) -> ComplexArray:
     """
-    Convert array of S parameters to array of ABCD matrices.
+    Convert arrays of S-parameters to arrays of ABCD matrices.
 
     Args:
-        spar (complex_array): array of 2x2 S-parameter matrices.
+        spar (ComplexArray): Array of 2x2 S-parameter matrices.
         Z0 (complex | float): Reference impedance.
 
     Returns:
-        complex_array: array of 2x2 ABCD matrices.
+        ComplexArray: Array of 2x2 ABCD matrices.
     """
     assert spar.shape[1] == 2 and spar.shape[2] == 2
     assert np.real(Z0) > 0
@@ -136,15 +142,15 @@ def s2a(spar: complex_array, Z0: complex | float) -> complex_array:
 
 
 @nb.njit(cache=True)
-def to_dB(values: float_array | complex_array) -> float_array:
+def to_dB(values: FloatArray | ComplexArray) -> FloatArray:
     """
-    Convert array of values to dB.
+    Convert arrays of values to dB.
 
     Args:
-        values (float_array | complex_array): Array of values to be converted to dB.
+        values (FloatArray | ComplexArray): Array of values to be converted to dB.
 
     Returns:
-        float_array: Array of values in dB.
+        FloatArray: Array of values in dB.
     """
     return 20.0 * np.log10(np.abs(values))
 
@@ -152,14 +158,14 @@ def to_dB(values: float_array | complex_array) -> float_array:
 @nb.njit(cache=True)
 def dBm_to_I(power: float, Z0: float = 50) -> float:
     """
-    Convert from dBm to A.
+    Convert power from dBm to current in amperes.
 
     Args:
         power (float): Power in dBm.
         Z0 (float, optional): Reference impedance, default is 50 ohms.
 
     Returns:
-        float: Current amplitude in A.
+        float: Current amplitude in amperes.
     """
     pw = 10 ** (power / 10) / 1000  # power in W
     return np.sqrt(pw / Z0 * 2)  # current amplitude, in A
@@ -168,10 +174,10 @@ def dBm_to_I(power: float, Z0: float = 50) -> float:
 @nb.njit(cache=True)
 def I_to_dBm(curr: float, Z0: float = 50) -> float:
     """
-    Convert from A to dBm.
+    Convert current in amperes to power in dBm.
 
     Args:
-        curr (float): Current amplitude in A.
+        curr (float): Current amplitude in amperes.
         Z0 (float, optional): Reference impedance, default is 50 ohms.
 
     Returns:
@@ -183,13 +189,25 @@ def I_to_dBm(curr: float, Z0: float = 50) -> float:
 
 @nb.njit(cache=True)
 def compute_phase_matching(
-    freqs: float_array,
-    pump_freqs: float_array,
-    k_signal_array: float_array,
-    k_pump_array: float_array,
+    freqs: FloatArray,
+    pump_freqs: FloatArray,
+    k_signal_array: FloatArray,
+    k_pump_array: FloatArray,
     chi: float,
-) -> Tuple[float_array, float_array, float_array]:
-    """Compute phase matching profile and triplets."""
+) -> Tuple[FloatArray, FloatArray, FloatArray]:
+    """
+    Compute phase matching profiles and triplets for given frequencies.
+
+    Args:
+        freqs (FloatArray): Array of signal frequencies.
+        pump_freqs (FloatArray): Array of pump frequencies.
+        k_signal_array (FloatArray): Array of signal wave numbers.
+        k_pump_array (FloatArray): Array of pump wave numbers.
+        chi (float): Nonlinear coefficient.
+
+    Returns:
+        Tuple[FloatArray, FloatArray, FloatArray]: Phase matching profile, frequency triplets, and wave number triplets.
+    """
     num_freqs = len(freqs)
     num_pumps = len(pump_freqs)
 
@@ -239,15 +257,15 @@ def compute_phase_matching(
 )
 def CMEode_complete(
     t: float,
-    y: complex_array,
+    y: ComplexArray,
     kp: float,
     ks: float,
     ki: float,
     xi: float,
     epsi: float,
-) -> complex_array:
+) -> ComplexArray:
     """
-    Complete coupled mode equation model.
+    Complete coupled mode equation model for current amplitudes.
 
     y[0] = Ip # pump current
     y[1] = Is # signal current
@@ -255,9 +273,19 @@ def CMEode_complete(
     t    = x  #
 
     Equations A5a, A5b and A5c from
-    PRX Quantum 2, 010302 (2021)
-    https://doi.org/10.1103/PRXQuantum.2.010302
+    `PRX Quantum 2, 010302 (2021) <https://doi.org/10.1103/PRXQuantum.2.010302>`_
 
+    Args:
+        t (float): Time variable.
+        y (ComplexArray): Array of current amplitudes [Ip, Is, Ii].
+        kp (float): Pump wave number.
+        ks (float): Signal wave number.
+        ki (float): Idler wave number.
+        xi (float): Nonlinear coefficient.
+        epsi (float): Small perturbation parameter.
+
+    Returns:
+        ComplexArray: Derivatives of current amplitudes [dIp/dt, dIs/dt, dIi/dt].
     """
     dk = kp - ks - ki
 
@@ -284,15 +312,29 @@ def CMEode_complete(
 
 
 def cme_solve(
-    k_signal: float_array,
-    k_idler: float_array,
-    x_array: float_array,
-    y0: complex_array,
+    k_signal: FloatArray,
+    k_idler: FloatArray,
+    x_array: FloatArray,
+    y0: ComplexArray,
     k_pump: float,
     xi: float,
     epsi: float,
-) -> complex_array:
-    """Cme solver for multiple frequencies."""
+) -> ComplexArray:
+    """
+    Solve coupled mode equations for multiple frequencies.
+
+    Args:
+        k_signal (FloatArray): Array of signal wave numbers.
+        k_idler (FloatArray): Array of idler wave numbers.
+        x_array (FloatArray): Array of position values for evaluation.
+        y0 (ComplexArray): Initial conditions for the coupled mode equations.
+        k_pump (float): Pump wave number.
+        xi (float): Nonlinear coefficient.
+        epsi (float): Small perturbation parameter.
+
+    Returns:
+        ComplexArray: Solution of the coupled mode equations for the given frequencies.
+    """
     len_k = len(k_signal)
 
     x_span = (x_array[0], x_array[-1])

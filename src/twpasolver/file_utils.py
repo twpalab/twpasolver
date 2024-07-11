@@ -193,12 +193,12 @@ class NpEncoder(json.JSONEncoder):
         """
         if isinstance(o, np.integer):
             return int(o)
-        elif isinstance(o, np.floating):
+        if isinstance(o, np.floating):
             return float(o)
-        elif isinstance(o, np.ndarray):
+        if isinstance(o, np.ndarray):
             return o.tolist()
-        elif isinstance(o, np.complexfloating):
+        if isinstance(o, np.complexfloating):
             return str(o)
-        elif isinstance(o, complex):
+        if isinstance(o, complex):
             return str(o)
         return json.JSONEncoder.default(self, o)
