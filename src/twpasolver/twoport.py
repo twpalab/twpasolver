@@ -51,11 +51,11 @@ import skrf as rf
 from pydantic import ConfigDict, Field, NonNegativeInt
 
 from twpasolver.basemodel import BaseModel
+from twpasolver.bonus_types import Impedance, validate_impedance
 from twpasolver.file_utils import read_file, save_to_file
-from twpasolver.logging import log
+from twpasolver.logger import log
 from twpasolver.mathutils import a2s, s2a
 from twpasolver.matrices_arrays import ABCDArray, SMatrixArray
-from twpasolver.typing import Impedance, validate_impedance
 
 
 class TwoPortCell:

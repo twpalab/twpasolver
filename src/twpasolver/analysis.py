@@ -10,13 +10,90 @@ from matplotlib.axes import Axes
 from pydantic import ConfigDict, Field, PrivateAttr, field_validator
 
 from twpasolver.basemodel import BaseModel
+from twpasolver.bonus_types import FloatArray
+from twpasolver.cmes import cme_general_solve, cme_solve
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.frequency import Frequencies
-from twpasolver.logging import log
-from twpasolver.mathutils import cme_solve, compute_phase_matching
+from twpasolver.logger import log
+from twpasolver.mathutils import compute_phase_matching
 from twpasolver.models import TWPA
+from twpasolver.modes_rwa import ModeArray
 from twpasolver.plotting import plot_gain, plot_phase_matching, plot_response
-from twpasolver.typing import FloatArray
+
+
+def get_cme_data(mode_array: ModeArray, num_cells: int):
+    """
+    Get data arrays for coupled mode equations from a mode array.
+
+    Parameters
+    ----------
+    mode_array : ModeArray
+        Array containing mode information
+    num_cells : int
+        Number of cells in the system
+
+    Returns
+    -------
+    list[np.ndarray]
+        List containing arrays of:
+        - frequencies
+        - wave numbers (kappas)
+        - reflection coefficients (gammas)
+        - modified coupling coefficients (gammas_tilde)
+        - transmission/reflection coefficients
+    """
+    freqs, kappas, gammas, gammas_tilde, ts_reflection = [], [], [], [], []
+    for mode in mode_array.modes.values():
+        freqs.append(mode.frequency)
+        kappa = mode.k
+        gamma = mode.gamma
+        kappas.append(kappa)
+        gammas.append(gamma)
+        gammas_tilde.append(gamma * np.exp(1j * kappa * num_cells))
+        ts_reflection.append(1 / (1 - gamma * np.exp(2j * kappa * num_cells)))
+    return [
+        np.array(dat) for dat in [freqs, kappas, gammas, gammas_tilde, ts_reflection]
+    ]
+
+
+def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
+    """
+    Prepare relation terms and coefficients for 3-wave and 4-wave mixing.
+
+    Parameters
+    ----------
+    terms_3wm : list
+        List of 3-wave mixing terms, each containing mode indices and coefficient
+    terms_4wm : list
+        List of 4-wave mixing terms, each containing mode indices and coefficient
+    epsilon : float
+        Scaling factor for 3-wave mixing coefficients
+    xi : float
+        Scaling factor for 4-wave mixing coefficients
+
+    Returns
+    -------
+    tuple
+        Contains:
+        - relations_3wm : List of mode indices for 3-wave mixing
+        - relations_4wm : List of mode indices for 4-wave mixing
+        - coeffs_3wm : numpy array of scaled coefficients for 3-wave mixing
+        - coeffs_4wm : numpy array of scaled coefficients for 4-wave mixing
+    """
+
+    def extract_indices(terms):
+        return [[term[0], *term[1]] for term in terms]
+
+    def calculate_coefficients(terms, scaling_factor):
+        return np.array([term[-1] * 1j * scaling_factor / 4 for term in terms])
+
+    relations_3wm = extract_indices(terms_3wm)
+    relations_4wm = extract_indices(terms_4wm)
+
+    coeffs_3wm = calculate_coefficients(terms_3wm, epsilon)
+    coeffs_4wm = calculate_coefficients(terms_4wm, xi)
+
+    return relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm
 
 
 def analysis_function(
@@ -178,7 +255,17 @@ class TWPAnalysis(Analyzer, Frequencies):
                 freqs[stopband_start_idx],
                 freqs[np.argmax(s21_db_diff)],
             ]
-
+            Z0 = self.twpa.Z0_ref
+            ac, b, c, d = (
+                self.data["abcd"][:, 0, 0],
+                self.data["abcd"][:, 0, 1],
+                self.data["abcd"][:, 1, 0],
+                self.data["abcd"][:, 1, 1],
+            )
+            Zbp = np.abs(2 * b / (ac - d - np.sqrt((ac + d) ** 2 - 4)))
+            gammas = np.abs(Z0 - Zbp) / (Z0 + Zbp)
+            self.data["Zb"] = Zbp
+            self.data["gammas"] = gammas
             # Fit low frequency phase response to correctly unrwap at f=0 Hz
             if self.f[0] / self.unit_multiplier > freqs[stopband_start_idx] / 10:
                 log.warning(
@@ -204,7 +291,13 @@ class TWPAnalysis(Analyzer, Frequencies):
         pump_k = ks[min_p_idx:-1]
         signal_f = pump_f / 2
         signal_k = np.interp(signal_f, freqs, ks)
-        deltas = np.abs(pump_k - 2 * signal_k + self.twpa.chi * (pump_k - 4 * signal_k))
+        deltas = np.abs(
+            pump_k
+            - 2 * signal_k
+            + (1 + np.abs(self.data["gammas"][min_p_idx:-1]) ** 2)
+            * self.twpa.chi
+            * (pump_k - 4 * signal_k)
+        )
         return pump_f[np.argmin(deltas)]
 
     @analysis_function
@@ -229,6 +322,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         """
         freqs = self.data["freqs"]
         ks = self.data["k"]
+        gammas = self.data["gammas"]
         min_p_idx = np.where(freqs == self.data["stopband_freqs"][1])[0][0]
         max_p_idx = -1
         min_s_idx = np.where(freqs == self.data["stopband_freqs"][0])[0][0]
@@ -236,8 +330,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         signal_k = ks[:min_s_idx:thin]
         pump_f = freqs[min_p_idx:max_p_idx:thin]
         pump_k = ks[min_p_idx:max_p_idx:thin]
+        pump_gamma = gammas[min_p_idx:max_p_idx:thin]
         deltas, f_triplets, k_triplets = compute_phase_matching(
-            signal_f, pump_f, signal_k, pump_k, self.twpa.chi
+            signal_f, pump_f, signal_k, pump_k, self.twpa.chi, pump_gamma
         )
         return {
             "delta": deltas,
@@ -302,6 +397,85 @@ class TWPAnalysis(Analyzer, Frequencies):
             self.twpa.epsilon,
         )
         gain_db = 10 * np.log10(np.abs(I_triplets[:, 1, -1] / y0[1]) ** 2)
+
+        return {
+            "pump_freq": pump,
+            "signal_freqs": signal_freqs,
+            "x": x,
+            "I_triplets": I_triplets,
+            "gain_db": gain_db,
+        }
+
+    @analysis_function
+    def gain_general(
+        self,
+        mode_array: ModeArray,
+        signal_freqs: FloatArray,
+        pump: Optional[float] = None,
+        y0: list[float] = [1e-5, 1e-12, 0],
+        Ip0: Optional[float] = None,
+        thin: int = 1,
+    ) -> dict[str, Any]:
+        """
+        Compute expected gain with generalized coupled mode equations.
+
+        Args:
+            mode_array (ModeArray): Array of modes to consider in the simulation.
+            signal_freqs (FloatArray): Array of signal frequencies to consider.
+            pump (Optional[float]): The pump frequency. If None, uses the optimal pump frequency from data.
+            y0 (list[float]): Initial conditions for the simulation [Pump, Signal, Idler, ...].
+            Ip0 (Optional[float]): Initial pump current (in A). If None, uses the current TWPA's Ip0.
+            thin (int): The step size to thin out the position array.
+                        Otherwise, the currents are computed at every cell in the TWPA
+
+        Returns:
+            dict: A dictionary containing:
+                - "pump_freq" (float): The pump frequency used in the calculation.
+                - "signal_freqs" (array): The array of signal frequencies.
+                - "x" (array): The thinned cell position array along the TWPA.
+                - "I_triplets" (array): Array of currents for each mode at each computed cell.
+                - "gain_db" (array): The final signal gain in dB.
+        """
+        all_data = []
+        N_tot = self.twpa.N_tot
+        gammas = []
+        ts = []
+        thin = min(thin, N_tot)
+        if Ip0 is not None:
+            self.twpa.Ip0 = Ip0
+        if pump is None:
+            pump = self.data["optimal_pump_freq"]
+        y0[0] = self.twpa.Ip0
+        y0 = np.array(y0, dtype=np.complex128)
+
+        for s_freq in signal_freqs:
+            mode_array.update_frequencies({"s": s_freq, "p": pump})
+            all_data.append(get_cme_data(mode_array, N_tot)[1:])
+            gammas.append(all_data[-1][1][1])
+            ts.append(all_data[-1][3][1])
+        gammas, ts = np.array(gammas), np.array(ts)
+
+        x = np.linspace(0, N_tot, int(N_tot / thin), endpoint=True)
+
+        # Get RWA terms for 3-wave and 4-wave mixing
+        terms_3wm = mode_array.analyzer.find_rwa_terms(power=2)
+        terms_4wm = mode_array.analyzer.find_rwa_terms(power=3)
+        relations_coefficients = prepare_relations_coefficients(
+            terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
+        )
+
+        I_triplets = []
+        for dat in all_data:
+            I_triplets.append(
+                cme_general_solve(x, y0, dat, relations_coefficients, thin=thin)
+            )
+        I_triplets = np.real(np.array(I_triplets))
+
+        gain_db = 10 * np.log10(
+            np.abs(I_triplets[:, 1, -1] / y0[1]) ** 2
+            * (1 - np.abs(gammas) ** 2) ** 2
+            * np.abs(ts) ** 2
+        )
 
         return {
             "pump_freq": pump,

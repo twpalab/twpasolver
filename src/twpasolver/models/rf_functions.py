@@ -3,7 +3,7 @@
 import numpy as np
 from numba import njit
 
-from twpasolver.typing import ComplexArray, FloatArray
+from twpasolver.bonus_types import ComplexArray, FloatArray
 
 
 @njit

@@ -14,10 +14,10 @@ from typing import Annotated, Literal, Union
 import numpy as np
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 
+from twpasolver.bonus_types import all_subclasses
 from twpasolver.matrices_arrays import ABCDArray, abcd_identity
 from twpasolver.models.modelarray import ModelArray
 from twpasolver.twoport import TwoPortModel
-from twpasolver.typing import all_subclasses
 
 
 class TwoPortArray(ModelArray):

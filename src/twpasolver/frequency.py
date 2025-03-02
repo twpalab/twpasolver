@@ -11,7 +11,7 @@ import numpy as np
 from pydantic import Field, PrivateAttr
 
 from twpasolver.basemodel import BaseModel
-from twpasolver.typing import FrequencyArange, FrequencyList
+from twpasolver.bonus_types import FrequencyArange, FrequencyList
 
 
 class Frequencies(BaseModel):
