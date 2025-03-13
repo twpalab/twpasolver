@@ -1,9 +1,11 @@
 """Analysis classes."""
+"""Enhanced analysis classes with integrated ModeArray support."""
 
+import enum
 from abc import ABC, abstractmethod
 from functools import partial, wraps
 from time import strftime
-from typing import Any, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 from matplotlib.axes import Axes
@@ -15,10 +17,16 @@ from twpasolver.cmes import cme_general_solve, cme_solve
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.frequency import Frequencies
 from twpasolver.logger import log
-from twpasolver.mathutils import compute_phase_matching
 from twpasolver.models import TWPA
-from twpasolver.modes_rwa import ModeArray
+from twpasolver.modes_rwa import Mode, ModeArray
 from twpasolver.plotting import plot_gain, plot_phase_matching, plot_response
+
+
+class GainModel(str, enum.Enum):
+    """Available gain computation models."""
+
+    STANDARD_3WM = "standard_3wm"
+    GENERAL = "general"
 
 
 def get_cme_data(mode_array: ModeArray, num_cells: int):
@@ -87,11 +95,13 @@ def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
     def calculate_coefficients(terms, scaling_factor):
         return np.array([term[-1] * 1j * scaling_factor / 4 for term in terms])
 
-    relations_3wm = extract_indices(terms_3wm)
-    relations_4wm = extract_indices(terms_4wm)
+    relations_3wm = extract_indices(terms_3wm) if terms_3wm else []
+    relations_4wm = extract_indices(terms_4wm) if terms_4wm else []
 
-    coeffs_3wm = calculate_coefficients(terms_3wm, epsilon)
-    coeffs_4wm = calculate_coefficients(terms_4wm, xi)
+    coeffs_3wm = (
+        calculate_coefficients(terms_3wm, epsilon) if terms_3wm else np.array([])
+    )
+    coeffs_4wm = calculate_coefficients(terms_4wm, xi) if terms_4wm else np.array([])
 
     return relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm
 
@@ -207,15 +217,135 @@ class Analyzer(BaseModel, ABC):
         return results
 
 
+class ModeArrayFactory:
+    """Factory for creating standard ModeArray configurations."""
+
+    @staticmethod
+    def create_basic_3wm(
+        freqs: np.ndarray,
+        kappas: np.ndarray,
+        gammas: np.ndarray,
+        forward_modes: bool = True,
+    ) -> ModeArray:
+        """
+        Create a basic 3WM ModeArray with pump, signal, and idler modes.
+
+        Args:
+            freqs: Array of frequency points for interpolation
+            kappas: Array of kappa values corresponding to frequencies
+            gammas: Array of gamma values corresponding to frequencies
+            forward_modes: Whether to create forward (True) or backward (False) propagating modes
+
+        Returns:
+            ModeArray: Configured for basic 3WM operation
+        """
+        direction = 1 if forward_modes else -1
+        modes = [
+            Mode(label="p", direction=direction),
+            Mode(label="s", direction=direction),
+            Mode(label="i", direction=direction),
+        ]
+
+        relations = [["i", "p-s"]]  # Idler is pump minus signal
+
+        return ModeArray(modes, relations, freqs, kappas, gammas)
+
+    @staticmethod
+    def create_extended_3wm(
+        freqs: np.ndarray,
+        kappas: np.ndarray,
+        gammas: np.ndarray,
+        n_pump_harmonics: int = 2,
+        n_frequency_conversion: int = 1,
+        forward_modes: bool = True,
+    ) -> ModeArray:
+        """
+        Create an extended 3WM ModeArray with pump harmonics and conversion terms.
+
+        Args:
+            freqs: Array of frequency points for interpolation
+            kappas: Array of kappa values corresponding to frequencies
+            gammas: Array of gamma values corresponding to frequencies
+            n_pump_harmonics: Number of pump harmonics to include
+            forward_modes: Whether to create forward (True) or backward (False) propagating modes
+
+        Returns:
+            ModeArray: Configured for extended 3WM operation with harmonics
+        """
+        direction = 1 if forward_modes else -1
+
+        # Create basic modes
+        modes = [
+            Mode(label="p", direction=direction),
+            Mode(label="s", direction=direction),
+            Mode(label="i", direction=direction),
+        ]
+
+        # Basic relation
+        relations = [["i", "p-s"]]  # Idler is pump minus signal
+
+        # Add pump harmonics
+        for n in range(2, n_pump_harmonics + 1):
+            modes.append(Mode(label=f"p{n}", direction=direction))
+            relations.append([f"p{n}", f"{n}*p"])
+
+        for n in range(1, n_frequency_conversion + 1):
+            if n == 1:
+                modes.append(Mode(label="ps", direction=direction))  # p+s
+                modes.append(Mode(label="pi", direction=direction))  # p+i
+                relations.append(["ps", "p+s"])
+                relations.append(["pi", "p+i"])
+            else:
+                modes.append(Mode(label=f"p{n}s", direction=direction))  # p+s
+                modes.append(Mode(label=f"p{n}i", direction=direction))  # p+i
+                relations.append([f"p{n}s", f"{n}*p+s"])
+                relations.append([f"p{n}i", f"{n}*p+i"])
+
+        return ModeArray(modes, relations, freqs, kappas, gammas)
+
+    @staticmethod
+    def create_custom(
+        freqs: np.ndarray,
+        kappas: np.ndarray,
+        gammas: np.ndarray,
+        mode_labels: List[str],
+        mode_directions: List[int],
+        relations: List[List[str]],
+    ) -> ModeArray:
+        """
+        Create a custom ModeArray with user-defined modes and relations.
+
+        Args:
+            freqs: Array of frequency points for interpolation
+            kappas: Array of kappa values corresponding to frequencies
+            gammas: Array of gamma values corresponding to frequencies
+            mode_labels: List of mode labels
+            mode_directions: List of mode directions (1 for forward, -1 for backward)
+            relations: List of relations between modes
+
+        Returns:
+            ModeArray: Custom configured ModeArray
+        """
+        if len(mode_labels) != len(mode_directions):
+            raise ValueError(
+                "mode_labels and mode_directions must have the same length"
+            )
+
+        modes = [
+            Mode(label=label, direction=direction)
+            for label, direction in zip(mode_labels, mode_directions)
+        ]
+
+        return ModeArray(modes, relations, freqs, kappas, gammas)
+
+
 class TWPAnalysis(Analyzer, Frequencies):
-    """Runner for standard analysis routines of 3WM twpa models."""
+    """Runner for standard analysis routines of TWPA models with enhanced ModeArray support."""
 
     model_config = ConfigDict(validate_assignment=True)
     twpa: TWPA
-    # freqs_arange: FrequencyArange
-    # freqs_unit: Literal["Hz", "kHz", "MHz", "GHz"] = "GHz"
     _previous_state: dict[str, Any] = PrivateAttr()
-    # _unit_multipliers = PrivateAttr({"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9})
+    _mode_arrays: Dict[str, ModeArray] = PrivateAttr(default_factory=dict)
 
     @field_validator("twpa", mode="before", check_fields=True)
     @classmethod
@@ -282,6 +412,74 @@ class TWPAnalysis(Analyzer, Frequencies):
             self.data["optimal_pump_freq"] = self._estimate_optimal_pump()
             self._previous_state = current_state
 
+            # Now that we have the base data, initialize standard mode arrays
+            self._initialize_standard_mode_array()
+
+    def _initialize_standard_mode_array(self) -> None:
+        """Initialize standard mode arrays using the computed base data."""
+        freqs = self.data["freqs"]
+        kappas = self.data["k"]
+        gammas = self.data["gammas"]
+
+        # Create basic 3WM mode array
+        self._mode_arrays["basic_3wm"] = ModeArrayFactory.create_basic_3wm(
+            freqs, kappas, gammas
+        )
+
+    def get_mode_array(self, config: str = "basic_3wm") -> ModeArray:
+        """
+        Get a mode array by configuration name.
+
+        Args:
+            config: Name of the mode array configuration
+
+        Returns:
+            ModeArray: The requested mode array configuration
+        """
+        if config not in self._mode_arrays:
+            raise ValueError(f"Mode array configuration '{config}' not found")
+        return self._mode_arrays[config]
+
+    def add_mode_array(self, name: str, mode_array: ModeArray) -> None:
+        """
+        Add a custom mode array to the analyzer.
+
+        Args:
+            name: Name to assign to the mode array
+            mode_array: The mode array to add
+        """
+        self._mode_arrays[name] = mode_array
+
+    def create_custom_mode_array(
+        self,
+        name: str,
+        mode_labels: List[str],
+        mode_directions: List[int],
+        relations: List[List[str]],
+    ) -> ModeArray:
+        """
+        Create and add a custom mode array to the analyzer.
+
+        Args:
+            name: Name to assign to the mode array
+            mode_labels: List of mode labels
+            mode_directions: List of mode directions (1 for forward, -1 for backward)
+            relations: List of relations between modes
+
+        Returns:
+            ModeArray: The created mode array
+        """
+        mode_array = ModeArrayFactory.create_custom(
+            self.data["freqs"],
+            self.data["k"],
+            self.data["gammas"],
+            mode_labels,
+            mode_directions,
+            relations,
+        )
+        self.add_mode_array(name, mode_array)
+        return mode_array
+
     def _estimate_optimal_pump(self) -> float:
         """Estimate optimal pump frequency for 3WM."""
         freqs = self.data["freqs"]
@@ -301,44 +499,113 @@ class TWPAnalysis(Analyzer, Frequencies):
         return pump_f[np.argmin(deltas)]
 
     @analysis_function
-    def phase_matching(self, thin: int = 20) -> dict[str, Any]:
+    def phase_matching(
+        self,
+        process: Literal["PA", "FCU", "FCD"] = "PA",
+        signal_mode: str = "s",
+        pump_mode: str = "p",
+        idler_mode: str = "i",
+        mode_array_config: str = "basic_3wm",
+        pump_Ip0: Optional[float] = None,
+        signal_arange: Optional[Tuple[float]] = None,
+        pump_arange: Optional[Tuple[float]] = None,
+        thin: int = 20,
+    ) -> dict[str, Any]:
         """
-        Build phase matching profile.
-
-        The phase matching condition is computed considering all signal frequencies
-        lower than the first stopband and all pump frequencies from the end of the first stopband.
+        Build phase matching profile for specified modes.
 
         Args:
-            thin (int): The step size to thin out the frequency and wavenumber arrays.
+            signal_mode: Label of the signal mode
+            pump_mode: Label of the pump mode
+            idler_mode: Label of the idler mode
+            mode_array_config: Name of the mode array configuration to use
+            thin: The step size to thin out the frequency and wavenumber arrays
 
         Returns:
             dict: A dictionary containing:
-                - "delta" (array): Phase matching condition values.
-                - "triplets" (dict): A dictionary containing triplets satisfying phase matching:
-                    - "f" (array): Frequency triplets.
-                    - "k" (array): Wavenumber triplets.
-                - "pump_freqs" (array): All pump frequencies considered.
-                - "signal_freqs" (array): All signal frequencies considered.
+                - "delta" (array): Phase matching condition values
+                - "triplets" (dict): Triplets satisfying phase matching
+                - "pump_freqs" (array): Pump frequencies considered
+                - "signal_freqs" (array): Signal frequencies considered
+                - "mode_info" (dict): Information about the modes used
         """
+        # Get the mode array
+        mode_array = self.get_mode_array(mode_array_config)
+
         freqs = self.data["freqs"]
         ks = self.data["k"]
         gammas = self.data["gammas"]
-        min_p_idx = np.where(freqs == self.data["stopband_freqs"][1])[0][0]
-        max_p_idx = -1
-        min_s_idx = np.where(freqs == self.data["stopband_freqs"][0])[0][0]
-        signal_f = freqs[:min_s_idx:thin]
-        signal_k = ks[:min_s_idx:thin]
-        pump_f = freqs[min_p_idx:max_p_idx:thin]
-        pump_k = ks[min_p_idx:max_p_idx:thin]
-        pump_gamma = gammas[min_p_idx:max_p_idx:thin]
-        deltas, f_triplets, k_triplets = compute_phase_matching(
-            signal_f, pump_f, signal_k, pump_k, self.twpa.chi, pump_gamma
-        )
+
+        if pump_arange:
+            pump_f = np.arange(*pump_arange)[::thin]
+        else:
+            # Determine frequency ranges for signal and pump
+            min_p_idx = np.where(freqs == self.data["stopband_freqs"][1])[0][0]
+            max_p_idx = -1
+            pump_f = freqs[min_p_idx:max_p_idx:thin]
+
+        if signal_arange:
+            signal_f = np.arange(*signal_arange)[::thin]
+        else:
+            max_s_idx = np.where(freqs == self.data["stopband_freqs"][0])[0][0]
+            signal_f = freqs[:max_s_idx:thin]
+
+        chi = pump_Ip0**2 * self.twpa * xi / 8 if pump_Ip0 else self.twpa.chi
+
+        f_triplets = []
+        k_triplets = []
+
+        deltas = np.empty(shape=(len(signal_f), len(pump_f)))
+
+        if process == "PA":
+            idler_sign = -1
+            signal_sign = -1
+        elif process == "FCD":
+            idler_sign = 1
+            signal_sign = -1
+        else:
+            idler_sign = -1
+            signal_sign = 1
+
+        mode_array_keys = list(mode_array.modes.keys())
+        signal_idx = mode_array_keys.index(signal_mode)
+        pump_idx = mode_array_keys.index(pump_mode)
+        idler_idx = mode_array_keys.index(idler_mode)
+
+        # Compute phase matching
+        for i, p_freq in enumerate(pump_f):
+            for j, s_freq in enumerate(signal_f):
+                mode_array.update_frequencies({pump_mode: p_freq, signal_mode: s_freq})
+                f_triplets.append(
+                    [p_freq, s_freq, mode_array.get_mode(idler_mode).frequency]
+                )
+                # print(f_triplets[-1])
+                pump_k, signal_k, idler_k = (
+                    mode_array.get_mode(m).k
+                    for m in [pump_mode, signal_mode, idler_mode]
+                )
+                k_triplets.append([pump_k, signal_k, idler_k])
+                gamma = mode_array.get_mode(pump_mode).gamma
+                deltas[j, i] = (
+                    pump_k
+                    + signal_sign * signal_k
+                    + idler_sign * idler_k
+                    + chi
+                    * (1 + gamma**2)
+                    * (pump_k + 2 * signal_sign * signal_k + 2 * idler_sign * idler_k)
+                )
+
         return {
             "delta": deltas,
             "triplets": {"f": f_triplets, "k": k_triplets},
             "pump_freqs": pump_f,
             "signal_freqs": signal_f,
+            "mode_info": {
+                "signal": signal_mode,
+                "pump": pump_mode,
+                "idler": idler_mode,
+                "mode_array": mode_array_config,
+            },
         }
 
     @analysis_function
@@ -348,45 +615,92 @@ class TWPAnalysis(Analyzer, Frequencies):
         pump: Optional[float] = None,
         Is0: float = 1e-6,
         Ip0: Optional[float] = None,
+        model: Union[str, GainModel] = GainModel.STANDARD_3WM,
+        mode_array_config: str = "basic_3wm",
+        signal_mode: str = "s",
+        pump_mode: str = "p",
+        idler_mode: str = "i",
+        initial_amplitudes: Optional[List[float]] = None,
         thin: int = 100,
     ) -> dict[str, Any]:
         """
-        Compute expected gain with 3WM as a function of frequency and cell number in the TWPA.
+        Compute expected gain with selected gain model.
 
         Args:
-            signal_freqs (FloatArray): Array of signal frequencies to consider.
-            pump (Optional[float]): The pump frequency. If None, uses the optimal pump frequency from data.
-            Is0 (float): Initial signal current (in A).
-            Ip0 (Optional[float]): Initial pump current (in A). If None, uses the current TWPA's Ip0.
-            thin (int): The step size to thin out the position array.
-                        Otherwise, the currents are computed at every cell in the TWPA
+            signal_freqs: Array of signal frequencies to consider
+            pump: The pump frequency (if None, uses the optimal pump frequency from data)
+            Is0: Initial signal current (in A) for standard 3WM model
+            Ip0: Initial pump current (in A) (if None, uses the current TWPA's Ip0)
+            model: Gain model to use (standard_3wm or general)
+            mode_array_config: Name of the mode array configuration to use
+            signal_mode: Label of the signal mode
+            pump_mode: Label of the pump mode
+            idler_mode: Label of the idler mode (if None, will be determined from mode array relations)
+            initial_amplitudes: Initial amplitudes for all modes in general model (if None, defaults will be used)
+            thin: The step size to thin out the position array
 
         Returns:
-            dict: A dictionary containing:
-                - "pump_freq" (float): The pump frequency used in the calculation.
-                - "signal_freqs" (array): The array of signal frequencies.
-                - "x" (array): The thinned cell position array along the TWPA.
-                - "I_triplets" (array): Array of pump, signal and idler current
-                                        triplets at each computed cell.
-                - "gain_db" (array): The final signal gain in dB.
+            dict: A dictionary containing gain calculation results
         """
-        if isinstance(signal_freqs, list):
-            signal_freqs = np.asarray(signal_freqs)
-        N_tot = self.twpa.N_tot
-        thin = min(thin, N_tot)
+        # Process model parameter
+        if isinstance(model, str):
+            try:
+                model = GainModel(model)
+            except ValueError:
+                raise ValueError(
+                    f"Invalid model: {model}. Must be one of {[m.value for m in GainModel]}"
+                )
+
+        # Set pump current if specified
         if Ip0 is not None:
             self.twpa.Ip0 = Ip0
+
+        # Use optimal pump if not specified
         if pump is None:
             pump = self.data["optimal_pump_freq"]
+
+        # Ensure signal_freqs is a numpy array
+        if isinstance(signal_freqs, list):
+            signal_freqs = np.asarray(signal_freqs)
+
+        # Get total number of cells
+        N_tot = self.twpa.N_tot
+
+        # Get position array
+        x = np.linspace(0, N_tot, int(N_tot / thin), endpoint=True)
+
+        # Use appropriate model for gain calculation
+        if model == GainModel.STANDARD_3WM:
+            return self._compute_standard_3wm_gain(signal_freqs, pump, Is0, x)
+        else:  # model == GainModel.GENERAL
+            return self._compute_general_gain(
+                signal_freqs,
+                pump,
+                mode_array_config,
+                signal_mode,
+                pump_mode,
+                idler_mode,
+                initial_amplitudes,
+                x,
+            )
+
+    def _compute_standard_3wm_gain(
+        self, signal_freqs: FloatArray, pump: float, Is0: float, x: FloatArray
+    ) -> dict[str, Any]:
+        """Compute gain using the standard 3WM model."""
         freqs = self.data["freqs"]
         ks = self.data["k"]
+
+        # Calculate frequencies and wavenumbers
         idler_freqs = pump - signal_freqs
         pump_k = np.interp(pump, freqs, ks)
         signal_k = np.interp(signal_freqs, freqs, ks)
         idler_k = np.interp(idler_freqs, freqs, ks)
-        x = np.linspace(0, N_tot, int(N_tot / thin), endpoint=True)
+
+        # Initial conditions
         y0 = np.array([self.twpa.Ip0, Is0, 0], dtype=np.complex128)
 
+        # Solve coupled mode equations
         I_triplets = cme_solve(
             signal_k,
             idler_k,
@@ -396,9 +710,12 @@ class TWPAnalysis(Analyzer, Frequencies):
             self.twpa.xi,
             self.twpa.epsilon,
         )
+
+        # Calculate gain in dB
         gain_db = 10 * np.log10(np.abs(I_triplets[:, 1, -1] / y0[1]) ** 2)
 
         return {
+            "model": GainModel.STANDARD_3WM.value,
             "pump_freq": pump,
             "signal_freqs": signal_freqs,
             "x": x,
@@ -406,56 +723,46 @@ class TWPAnalysis(Analyzer, Frequencies):
             "gain_db": gain_db,
         }
 
-    @analysis_function
-    def gain_general(
+    def _compute_general_gain(
         self,
-        mode_array: ModeArray,
         signal_freqs: FloatArray,
-        pump: Optional[float] = None,
-        y0: list[float] = [1e-5, 1e-12, 0],
-        Ip0: Optional[float] = None,
-        thin: int = 1,
+        pump: float,
+        mode_array_config: str,
+        signal_mode: str,
+        pump_mode: str,
+        idler_mode: str,
+        initial_amplitudes: Optional[List[float]],
+        x: FloatArray,
     ) -> dict[str, Any]:
-        """
-        Compute expected gain with generalized coupled mode equations.
+        """Compute gain using the general coupled mode equations model."""
+        # Get the mode array
+        mode_array = self.get_mode_array(mode_array_config)
 
-        Args:
-            mode_array (ModeArray): Array of modes to consider in the simulation.
-            signal_freqs (FloatArray): Array of signal frequencies to consider.
-            pump (Optional[float]): The pump frequency. If None, uses the optimal pump frequency from data.
-            y0 (list[float]): Initial conditions for the simulation [Pump, Signal, Idler, ...].
-            Ip0 (Optional[float]): Initial pump current (in A). If None, uses the current TWPA's Ip0.
-            thin (int): The step size to thin out the position array.
-                        Otherwise, the currents are computed at every cell in the TWPA
-
-        Returns:
-            dict: A dictionary containing:
-                - "pump_freq" (float): The pump frequency used in the calculation.
-                - "signal_freqs" (array): The array of signal frequencies.
-                - "x" (array): The thinned cell position array along the TWPA.
-                - "I_triplets" (array): Array of currents for each mode at each computed cell.
-                - "gain_db" (array): The final signal gain in dB.
-        """
+        # Track data for all signal frequencies
         all_data = []
-        N_tot = self.twpa.N_tot
         gammas = []
         ts = []
-        thin = min(thin, N_tot)
-        if Ip0 is not None:
-            self.twpa.Ip0 = Ip0
-        if pump is None:
-            pump = self.data["optimal_pump_freq"]
-        y0[0] = self.twpa.Ip0
-        y0 = np.array(y0, dtype=np.complex128)
+
+        # First element is pump, second is signal, followed by other modes
+        signal_idx = list(mode_array.modes.keys()).index(signal_mode)
+        pump_idx = list(mode_array.modes.keys()).index(pump_mode)
+
+        N_tot = self.twpa.N_tot
+        # Set up default initial conditions if not provided
+        if initial_amplitudes is None:
+            n_modes = len(mode_array.modes)
+            y0 = np.zeros(n_modes, dtype=np.complex128)
+            y0[pump_idx] = self.twpa.Ip0  # Pump amplitude
+            y0[signal_idx] = 1e-12  # Signal amplitude (small)
+        else:
+            y0 = np.array(initial_amplitudes, dtype=np.complex128)
 
         for s_freq in signal_freqs:
-            mode_array.update_frequencies({"s": s_freq, "p": pump})
+            mode_array.update_frequencies({signal_mode: s_freq, pump_mode: pump})
             all_data.append(get_cme_data(mode_array, N_tot)[1:])
-            gammas.append(all_data[-1][1][1])
-            ts.append(all_data[-1][3][1])
+            gammas.append(all_data[-1][1][signal_idx])
+            ts.append(all_data[-1][3][signal_idx])
         gammas, ts = np.array(gammas), np.array(ts)
-
-        x = np.linspace(0, N_tot, int(N_tot / thin), endpoint=True)
 
         # Get RWA terms for 3-wave and 4-wave mixing
         terms_3wm = mode_array.analyzer.find_rwa_terms(power=2)
@@ -467,22 +774,35 @@ class TWPAnalysis(Analyzer, Frequencies):
         I_triplets = []
         for dat in all_data:
             I_triplets.append(
-                cme_general_solve(x, y0, dat, relations_coefficients, thin=thin)
+                cme_general_solve(x, y0, dat, relations_coefficients, thin=1)
             )
         I_triplets = np.real(np.array(I_triplets))
 
         gain_db = 10 * np.log10(
-            np.abs(I_triplets[:, 1, -1] / y0[1]) ** 2
+            np.abs(I_triplets[:, signal_idx, -1] / y0[signal_idx]) ** 2
             * (1 - np.abs(gammas) ** 2) ** 2
             * np.abs(ts) ** 2
         )
 
+        # Create mode maps for better result interpretation
+        mode_map = {label: idx for idx, label in enumerate(mode_array.modes.keys())}
+        reverse_mode_map = {idx: label for label, idx in mode_map.items()}
+
         return {
+            "model": GainModel.GENERAL.value,
             "pump_freq": pump,
             "signal_freqs": signal_freqs,
             "x": x,
             "I_triplets": I_triplets,
             "gain_db": gain_db,
+            "mode_info": {
+                "mode_array": mode_array_config,
+                "mode_map": mode_map,
+                "reverse_mode_map": reverse_mode_map,
+                "signal_mode": signal_mode,
+                "pump_mode": pump_mode,
+                "idler_mode": idler_mode,
+            },
         }
 
     @analysis_function

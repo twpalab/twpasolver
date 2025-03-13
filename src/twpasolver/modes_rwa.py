@@ -12,6 +12,8 @@ import numpy as np
 from scipy.interpolate import interp1d
 from sympy import symbols
 
+from twpasolver.logger import log
+
 
 class RWAAnalyzer:
     """Analyzer class for a set of coupled modes."""
@@ -39,7 +41,7 @@ class RWAAnalyzer:
         """Getter for mode relations."""
         return self._relations
 
-    def update_relations(relations: List[List[str]]):
+    def update_relations(self, relations: List[List[str]]):
         """Update mode relations."""
         self._relations = relations
         self.relations_idx = self._convert_relations_to_indices()
@@ -60,6 +62,7 @@ class RWAAnalyzer:
             expr = "+" + expr
 
         indices = []
+        signs = []
         current_term = ""
         sign = 1
 
@@ -67,7 +70,8 @@ class RWAAnalyzer:
             if char in ["+", "-"]:
                 if current_term:
                     idx = self.mode_to_idx[current_term]
-                    indices.append(sign * idx)
+                    indices.append(idx)
+                    signs.append(sign)
                 current_term = ""
                 sign = 1 if char == "+" else -1
             else:
@@ -75,33 +79,39 @@ class RWAAnalyzer:
 
         if current_term:
             idx = self.mode_to_idx[current_term]
-            indices.append(sign * idx)
+            indices.append(idx)
+            signs.append(sign)
 
-        return tuple(indices)
+        return tuple(indices), tuple(signs)
 
     def _convert_relations_to_indices(self) -> List[Tuple[int, tuple]]:
         """Convert string relations to index-based relations."""
         index_relations = []
         for result, expr in self.relations:
             result_idx = self.mode_to_idx[result]
-            input_indices = self._parse_expression(expr)
-            index_relations.append((result_idx, input_indices))
+            input_indices, input_signs = self._parse_expression(expr)
+            index_relations.append((result_idx, input_indices, input_signs))
         return index_relations
 
     def _compute_substitutions(self) -> List:
         """Compute all mode substitutions based on the relations."""
+        apply = True
         modes_subs = deepcopy(self.modes_symbolic)
-
-        for rel in self.relations_idx:
-            subs_rel = sum(
-                [
-                    int(np.sign(rel_idx + 0.5)) * modes_subs[abs(rel_idx)]
-                    for rel_idx in rel[1]
-                ]
-            )
-
-            for idx, m in enumerate(modes_subs):
-                modes_subs[idx] = m.subs(modes_subs[rel[0]], subs_rel)
+        while apply:
+            modes_subs_old = deepcopy(modes_subs)
+            for output, input_idxs, input_signs in self.relations_idx:
+                subs_rel = sum(
+                    [
+                        input_signs[i] * modes_subs[abs(rel_idx)]
+                        for i, rel_idx in enumerate(input_idxs)
+                    ]
+                )
+                # for idx, m in enumerate(modes_subs):
+                modes_subs[output] = modes_subs[output].subs(
+                    modes_subs[output], subs_rel
+                )
+                if all([m == modes_subs_old[i] for i, m in enumerate(modes_subs)]):
+                    apply = False
 
         return modes_subs
 
@@ -167,7 +177,7 @@ class Mode:
     direction: int = 1  # 1 for forward, -1 for backward
     frequency: Optional[float] = None
     k: Optional[float] = None
-    gamma: Optional[Union[float, complex]] = 1.0
+    gamma: Optional[Union[float, complex]] = 0.0
 
     def __post_init__(self):
         """Initialize derived quantities and validate inputs."""
@@ -302,7 +312,7 @@ class ParameterInterpolator:
             Tuple of (kappa, gamma) at the requested frequency
         """
         if frequency < self.freq_min or frequency > self.freq_max:
-            print(
+            log.warn(
                 f"Warning: Frequency {frequency} is outside the interpolation range "
                 f"[{self.freq_min}, {self.freq_max}]. Using endpoint values."
             )
@@ -472,19 +482,21 @@ class ModeArray:
         changed = True
         while changed:
             changed = False
-            for rel_idx, term_indices in self.analyzer.relations_idx:
+            for rel_idx, term_indices, term_signs in self.analyzer.relations_idx:
                 result_mode = list(self.modes.keys())[rel_idx]
 
                 # Skip if we don't have all required frequencies
                 term_modes = [list(self.modes.keys())[abs(idx)] for idx in term_indices]
                 if not all(frequencies.get(mode) is not None for mode in term_modes):
+                    print(
+                        f"No frequency available for {[mode for label, mode in self.modes.items() if frequencies[label] is None ]}, will be skipped."
+                    )
                     continue
 
                 # Calculate new frequency from relation
                 new_freq = sum(
-                    int(np.sign(idx + 0.5))
-                    * frequencies[list(self.modes.keys())[abs(idx)]]
-                    for idx in term_indices
+                    term_signs[i] * frequencies[list(self.modes.keys())[abs(idx)]]
+                    for i, idx in enumerate(term_indices)
                 )
 
                 # Update if different
