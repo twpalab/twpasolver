@@ -6,7 +6,6 @@ These functions include matrix multiplications, conversions between different pa
 representations, and solutions for coupled mode equations used in RF engineering.
 """
 
-
 import numba as nb
 import numpy as np
 from CyRK import nbrk_ode
@@ -93,39 +92,29 @@ def CMEode_complete(
         nb.float64,
         nb_complex1d,
         nb_float1d,
+        nb_int2d,
+        nb_int2d,
         nb_float1d,
-        nb_complex1d,
-        nb_complex1d,
-        nb_int2d,
-        nb_int2d,
-        nb_complex1d,
-        nb_complex1d,
+        nb_float1d,
     ),
     cache=True,
 )
-def general_cme_numba(
+def general_cme_no_reflections(
     x,
     currents,
     kappas,
-    gammas,
-    gammas_tilde,
-    ts_reflection,
     relations_3wm,
     relations_4wm,
     coeffs_3wm,
     coeffs_4wm,
 ):
-    """Return derivatives of Coupled Mode Equations system including reflection and arbitrary 3WM and 4WM relations."""
+    """Return derivatives of Coupled Mode Equations system including arbitrary 3WM and 4WM relations."""
     num_modes = len(currents)
     exp_pos = np.exp(1j * kappas * x)
-    exp_neg = np.exp(-1j * kappas * x)
-    common_term_pos = ts_reflection * exp_pos
-    common_term_neg = ts_reflection * gammas_tilde * exp_neg
     alphas_rhs = np.empty(2 * num_modes, dtype=np.complex128)
     for i in range(num_modes):
-        alphas_rhs[i] = currents[i] * (common_term_pos[i] + common_term_neg[i])
+        alphas_rhs[i] = currents[i] * exp_pos[i]
         alphas_rhs[i + num_modes] = np.conj(alphas_rhs[i])
-    alphas_from_lhs = ts_reflection * (exp_pos - gammas_tilde * exp_neg) / kappas
     derivs = np.zeros(num_modes, dtype=np.complex128)
 
     for idx, idx1, idx2 in relations_3wm:
@@ -134,9 +123,52 @@ def general_cme_numba(
         derivs[idx] += (
             coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
         )
+    # return derivs
+    return 1j * derivs * np.conj(exp_pos) * kappas
+
+
+@nb.njit(
+    nb_complex1d(
+        nb.float64,
+        nb_complex1d,
+        nb_float1d,
+        nb_complex1d,
+        nb_complex1d,
+        nb_int2d,
+        nb_int2d,
+        nb_float1d,
+        nb_float1d,
+    ),
+    cache=True,
+)
+def general_cme(
+    x,
+    currents,
+    kappas,
+    ts_reflection,
+    ts_reflection_neg,
+    relations_3wm,
+    relations_4wm,
+    coeffs_3wm,
+    coeffs_4wm,
+):
+    """Return derivatives of Coupled Mode Equations system including reflection and arbitrary 3WM and 4WM relations."""
+    num_modes = len(currents)
+    common_term_pos = ts_reflection * np.exp(1j * kappas * x)
+    common_term_neg = 0.0 * np.exp(-1j * kappas * x)
+    alphas_rhs = np.empty(2 * num_modes, dtype=np.complex128)
     for i in range(num_modes):
-        derivs[i] /= alphas_from_lhs[i]
-    return derivs
+        alphas_rhs[i] = currents[i] * (common_term_pos[i] + common_term_neg[i])
+        alphas_rhs[i + num_modes] = np.conj(alphas_rhs[i])
+    derivs = np.zeros(num_modes, dtype=np.complex128)
+
+    for idx, idx1, idx2 in relations_3wm:
+        derivs[idx] += coeffs_3wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2]
+    for idx, idx1, idx2, idx3 in relations_4wm:
+        derivs[idx] += (
+            coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
+        )
+    return 1j * derivs * kappas / (common_term_pos - common_term_neg)
 
 
 def cme_general_solve(
@@ -145,6 +177,7 @@ def cme_general_solve(
     data_kappas_gammas,
     relations_coefficients,
     thin: int = 200,
+    reflections: bool = True,
 ) -> ComplexArray:
     """
     Solve coupled mode equations for multiple frequencies.
@@ -159,18 +192,23 @@ def cme_general_solve(
     Returns:
         ComplexArray: Solution of the coupled mode equations for the given frequencies.
     """
+    if reflections:
+        cme_model = general_cme
+    else:
+        cme_model = general_cme_no_reflections
+
     n_modes = len(y0)
     relations_coefficients = [np.array(rel) for rel in relations_coefficients]
     x_span = (x_array[0], x_array[-1])
     I_triplets = np.empty((n_modes, len(x_array)), dtype=np.complex128)
 
     _, I_triplets, _, _ = nbrk_ode(
-        general_cme_numba,
+        cme_model,
         x_span,
         y0,
         args=(*data_kappas_gammas, *relations_coefficients),
-        atol=1e-12,
-        rtol=1e-12,
+        atol=1e-14,
+        rtol=1e-10,
         max_num_steps=0,
         t_eval=x_array,
         rk_method=1,
@@ -219,7 +257,7 @@ def cme_solve(
                 xi,
                 epsi,
             ),
-            atol=1e-16,
+            atol=1e-14,
             rtol=1e-10,
             max_num_steps=0,
             # first_step=1,

@@ -44,6 +44,23 @@ class TwoPortArray(ModelArray):
             sc = sc @ cell.get_abcd(freqs)
         return sc
 
+    @computed_field
+    @property
+    def N_tot(self) -> NonNegativeInt:
+        """
+        Total number of base cells in the model.
+
+        Returns:
+            NonNegativeInt: The total number of base cells.
+        """
+        N_tot = 0
+        for cell in self.cells:
+            if hasattr(cell, "N_tot"):
+                N_tot += cell.N_tot
+            else:
+                N_tot += cell.N
+        return N_tot * self.N
+
 
 class TWPA(TwoPortArray):
     """Simple model for TWPAs."""
@@ -109,17 +126,6 @@ class TWPA(TwoPortArray):
             NonNegativeFloat: The Iratio value.
         """
         return self.Idc / self.Istar
-
-    @computed_field
-    @property
-    def N_tot(self) -> NonNegativeInt:
-        """
-        Total number of base cells in the model.
-
-        Returns:
-            NonNegativeInt: The total number of base cells.
-        """
-        return sum(cell.N for cell in self.cells) * self.N
 
 
 named_models = [c for c in all_subclasses(TwoPortModel) if "name" in c.model_fields]

@@ -1,4 +1,4 @@
-"""Mode array description with automatic RWA solver."""
+"""Simplified Mode array implementation."""
 
 import itertools as it
 from collections import Counter
@@ -13,206 +13,6 @@ from scipy.interpolate import interp1d
 from sympy import symbols
 
 from twpasolver.logger import log
-
-
-class RWAAnalyzer:
-    """Analyzer class for a set of coupled modes."""
-
-    def __init__(self, modes: List[str], relations: List[List[str]]):
-        """
-        Initialize the RWA analyzer with modes and their relations.
-
-        Args:
-            modes: List of mode names (e.g., ["p", "s", "i", "c", "d", "u", "c2"])
-            relations: List of relations [result, expression] where expression can be
-                      any combination of terms with + and - (e.g., ["c2", "c+c"])
-        """
-        self.modes = modes
-        self.modes_ext_str = modes + [f"-{m}" for m in modes]
-        self.modes_symbolic = [symbols(m) for m in modes]
-        self.modes_extended = self.modes_symbolic + [-m for m in self.modes_symbolic]
-        self.mode_to_idx = {mode: idx for idx, mode in enumerate(modes)}
-        self._relations = relations
-        self.relations_idx = self._convert_relations_to_indices()
-        self.modes_subs = self._compute_substitutions()
-
-    @property
-    def relations(self):
-        """Getter for mode relations."""
-        return self._relations
-
-    def update_relations(self, relations: List[List[str]]):
-        """Update mode relations."""
-        self._relations = relations
-        self.relations_idx = self._convert_relations_to_indices()
-        self.modes_subs = self._compute_substitutions()
-
-    def _parse_expression(self, expr: str) -> tuple:
-        """
-        Parse an expression string into a list of indices with proper signs.
-
-        Args:
-            expr: String expression like "p+s-i"
-
-        Returns:
-            Tuple of indices with signs indicating conjugation
-        """
-        expr = expr.replace(" ", "")
-        if not expr.startswith("-"):
-            expr = "+" + expr
-
-        indices = []
-        signs = []
-        current_term = ""
-        sign = 1
-
-        for char in expr:
-            if char in ["+", "-"]:
-                if current_term:
-                    idx = self.mode_to_idx[current_term]
-                    indices.append(idx)
-                    signs.append(sign)
-                current_term = ""
-                sign = 1 if char == "+" else -1
-            else:
-                current_term += char
-
-        if current_term:
-            idx = self.mode_to_idx[current_term]
-            indices.append(idx)
-            signs.append(sign)
-
-        return tuple(indices), tuple(signs)
-
-    def _convert_relations_to_indices(self) -> List[Tuple[int, tuple]]:
-        """Convert string relations to index-based relations."""
-        index_relations = []
-        for result, expr in self.relations:
-            result_idx = self.mode_to_idx[result]
-            input_indices, input_signs = self._parse_expression(expr)
-            index_relations.append((result_idx, input_indices, input_signs))
-        return index_relations
-
-    def _compute_substitutions(self) -> List:
-        """Compute all mode substitutions based on the relations."""
-        apply = True
-        modes_subs = deepcopy(self.modes_symbolic)
-        while apply:
-            modes_subs_old = deepcopy(modes_subs)
-            for output, input_idxs, input_signs in self.relations_idx:
-                subs_rel = sum(
-                    [
-                        input_signs[i] * modes_subs[abs(rel_idx)]
-                        for i, rel_idx in enumerate(input_idxs)
-                    ]
-                )
-                # for idx, m in enumerate(modes_subs):
-                modes_subs[output] = modes_subs[output].subs(
-                    modes_subs[output], subs_rel
-                )
-                if all([m == modes_subs_old[i] for i, m in enumerate(modes_subs)]):
-                    apply = False
-
-        return modes_subs
-
-    def _calculate_coefficient(self, terms: List[str]) -> float:
-        """Calculate coefficient based on term repetitions."""
-        coeff = 1
-        if len(set(terms)) != len(terms):
-            for repetitions in Counter(terms).values():
-                coeff = coeff / factorial(repetitions)
-        return coeff
-
-    def find_rwa_terms(self, power: int = 3) -> List[Tuple]:
-        """
-        Find all valid RWA terms of given power.
-
-        Args:
-            power: Order of the interaction (default: 3 for three-wave mixing)
-
-        Returns:
-            List of tuples (mode_idx, combination, mode_name, rhs_terms, coefficient)
-        """
-        modes_subs_extended = self.modes_subs + [-m for m in self.modes_subs]
-        rwa_terms = []
-
-        for comb in it.combinations_with_replacement(
-            range(len(self.modes_extended)), power
-        ):
-            terms = [modes_subs_extended[i] for i in comb]
-            sum_terms = sum(terms)
-
-            for j, mode in enumerate(self.modes_subs):
-                if sum_terms == mode:
-                    rhs = [self.modes_ext_str[k] for k in comb]
-                    coeff = self._calculate_coefficient(rhs)
-                    rwa_terms.append((j, comb, self.modes[j], rhs, coeff))
-
-        return sorted(rwa_terms, key=lambda x: x[0])
-
-    def print_rwa_terms(self, terms: List[Tuple]) -> None:
-        """Pretty print the RWA terms with their coefficients."""
-        for term in terms:
-            mode_name = term[2]
-            rhs_terms = term[3]
-            coeff = term[4]
-            print(f"{mode_name} = {rhs_terms} {coeff}")
-        print(f"\nTotal matches: {len(terms)}")
-
-
-@dataclass
-class Mode:
-    """
-    Represents a single optical mode with its physical properties.
-
-    Attributes:
-        label: Mode identifier (e.g., 'p' for pump)
-        frequency: Angular frequency (ω)
-        direction: 1 for forward, -1 for backward
-        gamma: Reflection coefficient
-        k: Wavenumber (calculated from frequency)
-    """
-
-    label: str
-    direction: int = 1  # 1 for forward, -1 for backward
-    frequency: Optional[float] = None
-    k: Optional[float] = None
-    gamma: Optional[Union[float, complex]] = 0.0
-
-    def __post_init__(self):
-        """Initialize derived quantities and validate inputs."""
-        # Ensure direction is ±1
-        if abs(self.direction) != 1:
-            raise ValueError("Direction must be either 1 (forward) or -1 (backward)")
-        if self.k is not None:
-            self.k *= self.direction
-
-    def __eq__(self, other):
-        """Compare modes based on their physical properties."""
-        if not isinstance(other, Mode):
-            return False
-        return (
-            self.frequency == other.frequency
-            and self.direction == other.direction
-            and self.gamma == other.gamma
-            and self.k == other.k
-        )
-
-    def __hash__(self):
-        """Get hash based on immutable properties."""
-        return hash((self.label, str(self.frequency), self.direction))
-
-    def __str__(self):
-        """Get string representation showing direction and label."""
-        direction_str = "→" if self.direction == 1 else "←"
-        return f"{direction_str}{self.label}"
-
-    def __repr__(self):
-        """Get representation of class."""
-        return (
-            f'Mode("{self.label}", freq={self.frequency}, '
-            f"dir={self.direction}, gamma={self.gamma}, k={self.k})"
-        )
 
 
 class ParameterInterpolator:
@@ -301,116 +101,265 @@ class ParameterInterpolator:
             )
             self.gamma_imag = None
 
-    def get_parameters(self, frequency: float) -> Tuple[complex, complex]:
+    def get_parameters(
+        self, frequency: Union[float, np.ndarray]
+    ) -> Tuple[Union[complex, np.ndarray], Union[complex, np.ndarray]]:
         """
-        Get interpolated kappa and gamma for a given frequency.
+        Get interpolated kappa and gamma for a given frequency or array of frequencies.
 
         Args:
-            frequency: Frequency point for interpolation
+            frequency: Frequency point(s) for interpolation, can be a single value or array
 
         Returns:
-            Tuple of (kappa, gamma) at the requested frequency
+            Tuple of (kappa, gamma) at the requested frequency/frequencies
         """
-        if frequency < self.freq_min or frequency > self.freq_max:
-            log.warn(
-                f"Warning: Frequency {frequency} is outside the interpolation range "
-                f"[{self.freq_min}, {self.freq_max}]. Using endpoint values."
-            )
+        # Check if we're processing a single value or array
+        is_array = isinstance(frequency, np.ndarray)
+
+        # Handle out-of-range warning
+        if is_array:
+            if np.any((frequency < self.freq_min) | (frequency > self.freq_max)):
+                log.warn(
+                    f"Warning: Some frequencies are outside the interpolation range "
+                    f"[{self.freq_min}, {self.freq_max}]. Using endpoint values."
+                )
+        else:
+            if frequency < self.freq_min or frequency > self.freq_max:
+                log.warn(
+                    f"Warning: Frequency {frequency} is outside the interpolation range "
+                    f"[{self.freq_min}, {self.freq_max}]. Using endpoint values."
+                )
 
         # Interpolate kappa
         if self.kappa_imag is not None:
-            kappa = complex(self.kappa_real(frequency), self.kappa_imag(frequency))
+            kappa_real = self.kappa_real(frequency)
+            kappa_imag = self.kappa_imag(frequency)
+            kappa = kappa_real + 1j * kappa_imag
         else:
             kappa = self.kappa_real(frequency)
 
         # Interpolate gamma
         if self.gamma_imag is not None:
-            gamma = complex(self.gamma_real(frequency), self.gamma_imag(frequency))
+            gamma_real = self.gamma_real(frequency)
+            gamma_imag = self.gamma_imag(frequency)
+            gamma = gamma_real + 1j * gamma_imag
         else:
             gamma = self.gamma_real(frequency)
 
         return kappa, gamma
 
-    def plot_interpolation(self, num_points: int = 1000) -> None:
+
+@dataclass
+class Mode:
+    """
+    Represents a single optical mode with its physical properties.
+
+    Attributes:
+        label: Mode identifier (e.g., 'p' for pump)
+        frequency: Angular frequency (ω)
+        direction: 1 for forward, -1 for backward
+        gamma: Reflection coefficient
+        k: Wavenumber (calculated from frequency)
+    """
+
+    label: str
+    direction: int = 1  # 1 for forward, -1 for backward
+    frequency: Optional[float] = None
+    k: Optional[float] = None
+    gamma: Optional[Union[float, complex]] = 0.0
+
+    def __post_init__(self):
+        """Initialize derived quantities and validate inputs."""
+        # Ensure direction is ±1
+        if abs(self.direction) != 1:
+            raise ValueError("Direction must be either 1 (forward) or -1 (backward)")
+        if self.k is not None:
+            self.k *= self.direction
+
+    def __eq__(self, other):
+        """Compare modes based on their physical properties."""
+        if not isinstance(other, Mode):
+            return False
+        return (
+            self.frequency == other.frequency
+            and self.direction == other.direction
+            and self.gamma == other.gamma
+            and self.k == other.k
+        )
+
+    def __hash__(self):
+        """Get hash based on immutable properties."""
+        return hash((self.label, str(self.frequency), self.direction))
+
+    def __str__(self):
+        """Get string representation showing direction and label."""
+        direction_str = "→" if self.direction == 1 else "←"
+        return f"{direction_str}{self.label}"
+
+    def __repr__(self):
+        """Get representation of class."""
+        return (
+            f'Mode("{self.label}", freq={self.frequency}, '
+            f"dir={self.direction}, gamma={self.gamma}, k={self.k})"
+        )
+
+
+class RWAAnalyzer:
+    """Analyzer class for a set of coupled modes."""
+
+    def __init__(self, modes: List[str], relations: List[List[str]]):
         """
-        Plot the interpolation results for visualization.
+        Initialize the RWA analyzer with modes and their relations.
 
         Args:
-            num_points: Number of points for plotting
+            modes: List of mode names (e.g., ["p", "s", "i", "c", "d", "u", "c2"])
+            relations: List of relations [result, expression] where expression can be
+                      any combination of terms with + and - (e.g., ["c2", "c+c"])
         """
-        import matplotlib.pyplot as plt
+        self.modes = modes
+        self.modes_ext_str = modes + [f"-{m}" for m in modes]
+        self.modes_symbolic = [symbols(m) for m in modes]
+        self.modes_extended = self.modes_symbolic + [-m for m in self.modes_symbolic]
+        self.mode_to_idx = {mode: idx for idx, mode in enumerate(modes)}
+        # self.idx_to_mode = {idm: mode for idx, mode in enumerate(modes)}
+        self._relations = relations
+        self.relations_idx = self._convert_relations_to_indices()
+        self.modes_subs = self._compute_substitutions()
 
-        # Generate frequency points for plotting
-        freq_plot = np.linspace(self.freq_min, self.freq_max, num_points)
-        kappas_plot = []
-        gammas_plot = []
+        # Cache for RWA terms
+        self._rwa_terms_cache = {}
 
-        # Get interpolated values
-        for f in freq_plot:
-            k, g = self.get_parameters(f)
-            kappas_plot.append(k)
-            gammas_plot.append(g)
+    @property
+    def relations(self):
+        """Getter for mode relations."""
+        return self._relations
 
-        kappas_plot = np.array(kappas_plot)
-        gammas_plot = np.array(gammas_plot)
+    def update_relations(self, relations: List[List[str]]):
+        """Update mode relations."""
+        self._relations = relations
+        self.relations_idx = self._convert_relations_to_indices()
+        self.modes_subs = self._compute_substitutions()
+        # Clear cache when relations are updated
+        self._rwa_terms_cache = {}
 
-        # Create figure with subplots
-        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 8))
+    def _parse_expression(self, expr: str) -> tuple:
+        """
+        Parse an expression string into a list of indices with proper signs.
 
-        # Get original points for kappa
-        orig_kappas = self.orig_kappas
-        orig_freqs = self.orig_freqs
+        Args:
+            expr: String expression like "p+s-i"
 
-        # Plot kappa
-        if self.kappa_imag is not None:
-            ax1.plot(freq_plot, np.real(kappas_plot), "b-", label="Interpolation")
-            ax1.plot(orig_freqs, np.real(orig_kappas), "bo", label="Original Points")
-            ax2.plot(freq_plot, np.imag(kappas_plot), "r-", label="Interpolation")
-            ax2.plot(orig_freqs, np.imag(orig_kappas), "ro", label="Original Points")
-        else:
-            ax1.plot(freq_plot, kappas_plot, "b-", label="Interpolation")
-            ax1.plot(orig_freqs, orig_kappas, "bo", label="Original Points")
-            ax2.text(
-                0.5,
-                0.5,
-                "No Imaginary Part",
-                horizontalalignment="center",
-                transform=ax2.transAxes,
-            )
+        Returns:
+            Tuple of indices with signs indicating conjugation
+        """
+        expr = expr.replace(" ", "")
+        if not expr.startswith("-"):
+            expr = "+" + expr
 
-        # Get original points for gamma
-        orig_gammas = self.orig_gammas
+        indices = []
+        signs = []
+        current_term = ""
+        sign = 1
 
-        # Plot gamma
-        if self.gamma_imag is not None:
-            ax3.plot(freq_plot, np.real(gammas_plot), "b-", label="Interpolation")
-            ax3.plot(orig_freqs, np.real(orig_gammas), "bo", label="Original Points")
-            ax4.plot(freq_plot, np.imag(gammas_plot), "r-", label="Interpolation")
-            ax4.plot(orig_freqs, np.imag(orig_gammas), "ro", label="Original Points")
-        else:
-            ax3.plot(freq_plot, gammas_plot, "b-", label="Interpolation")
-            ax3.plot(orig_freqs, orig_gammas, "bo", label="Original Points")
-            ax4.text(
-                0.5,
-                0.5,
-                "No Imaginary Part",
-                horizontalalignment="center",
-                transform=ax4.transAxes,
-            )
+        for char in expr:
+            if char in ["+", "-"]:
+                if current_term:
+                    idx = self.mode_to_idx[current_term]
+                    indices.append(idx)
+                    signs.append(sign)
+                current_term = ""
+                sign = 1 if char == "+" else -1
+            else:
+                current_term += char
 
-        # Labels and titles
-        ax1.set_title("κ (Real Part)")
-        ax2.set_title("κ (Imaginary Part)")
-        ax3.set_title("γ (Real Part)")
-        ax4.set_title("γ (Imaginary Part)")
+        if current_term:
+            idx = self.mode_to_idx[current_term]
+            indices.append(idx)
+            signs.append(sign)
 
-        for ax in (ax1, ax2, ax3, ax4):
-            ax.set_xlabel("Frequency")
-            ax.grid(True)
-            ax.legend()
+        return tuple(indices), tuple(signs)
 
-        plt.tight_layout()
-        plt.show()
+    def _convert_relations_to_indices(self) -> List[Tuple[int, tuple, tuple]]:
+        """Convert string relations to index-based relations."""
+        index_relations = []
+        for result, expr in self.relations:
+            result_idx = self.mode_to_idx[result]
+            input_indices, input_signs = self._parse_expression(expr)
+            index_relations.append((result_idx, input_indices, input_signs))
+        return index_relations
+
+    def _compute_substitutions(self) -> List:
+        """Compute all mode substitutions based on the relations."""
+        apply = True
+        modes_subs = deepcopy(self.modes_symbolic)
+        while apply:
+            modes_subs_old = deepcopy(modes_subs)
+            for output, input_idxs, input_signs in self.relations_idx:
+                subs_rel = sum(
+                    [
+                        input_signs[i] * modes_subs[abs(rel_idx)]
+                        for i, rel_idx in enumerate(input_idxs)
+                    ]
+                )
+                modes_subs[output] = modes_subs[output].subs(
+                    modes_subs[output], subs_rel
+                )
+                if all([m == modes_subs_old[i] for i, m in enumerate(modes_subs)]):
+                    apply = False
+
+        return modes_subs
+
+    def _calculate_coefficient(self, terms: List[str]) -> float:
+        """Calculate coefficient based on term repetitions."""
+        coeff = 1
+        if len(set(terms)) != len(terms):
+            for repetitions in Counter(terms).values():
+                coeff = coeff / factorial(repetitions)
+        return coeff
+
+    def find_rwa_terms(self, power: int = 3) -> List[Tuple]:
+        """
+        Find all valid RWA terms of given power.
+
+        Args:
+            power: Order of the interaction (default: 3 for three-wave mixing)
+
+        Returns:
+            List of tuples (mode_idx, combination, mode_name, rhs_terms, coefficient)
+        """
+        # Check if cached result exists
+        if power in self._rwa_terms_cache:
+            return self._rwa_terms_cache[power]
+
+        modes_subs_extended = self.modes_subs + [-m for m in self.modes_subs]
+        rwa_terms = []
+
+        for comb in it.combinations_with_replacement(
+            range(len(self.modes_extended)), power
+        ):
+            terms = [modes_subs_extended[i] for i in comb]
+            sum_terms = sum(terms)
+
+            for j, mode in enumerate(self.modes_subs):
+                if sum_terms == mode:
+                    rhs = [self.modes_ext_str[k] for k in comb]
+                    coeff = self._calculate_coefficient(rhs)
+                    rwa_terms.append((j, comb, self.modes[j], rhs, coeff))
+
+        result = sorted(rwa_terms, key=lambda x: x[0])
+        # Cache the result
+        self._rwa_terms_cache[power] = result
+
+        return result
+
+    def print_rwa_terms(self, terms: List[Tuple]) -> None:
+        """Pretty print the RWA terms with their coefficients."""
+        for term in terms:
+            mode_name = term[2]
+            rhs_terms = term[3]
+            coeff = term[4]
+            print(f"{mode_name} = {rhs_terms} {coeff}")
+        print(f"\nTotal matches: {len(terms)}")
 
 
 class ModeArray:
@@ -442,6 +391,10 @@ class ModeArray:
 
         # Initialize parameter interpolator
         self.interpolator = ParameterInterpolator(freq_data, kappa_data, gamma_data)
+
+        # Cache for computed mixing coefficients
+        self._rwa_terms_3wm = None
+        self._rwa_terms_4wm = None
 
         # Validate initial state
         self._validate_modes()
@@ -488,9 +441,6 @@ class ModeArray:
                 # Skip if we don't have all required frequencies
                 term_modes = [list(self.modes.keys())[abs(idx)] for idx in term_indices]
                 if not all(frequencies.get(mode) is not None for mode in term_modes):
-                    print(
-                        f"No frequency available for {[mode for label, mode in self.modes.items() if frequencies[label] is None ]}, will be skipped."
-                    )
                     continue
 
                 # Calculate new frequency from relation
@@ -531,9 +481,84 @@ class ModeArray:
                 mode.gamma = gamma
                 mode.k = kappa * mode.direction
 
+    def process_frequency_array(
+        self, mode_label: str, frequencies: np.ndarray
+    ) -> Dict[str, Dict[str, np.ndarray]]:
+        """
+        Process an array of frequencies for a single mode, propagating to all related modes.
+
+        Args:
+            mode_label: Label of the mode to update with array of frequencies
+            frequencies: Array of frequencies to process
+
+        Returns:
+            Dictionary with mode parameters for all related modes
+        """
+        # Validate mode exists
+        if mode_label not in self.modes:
+            raise ValueError(f"Unknown mode: {mode_label}")
+
+        # Initialize result containers
+        all_frequencies = {}
+        mode_params = {}
+
+        # Process each frequency point
+        for i, freq in enumerate(frequencies):
+            # Update with this single frequency
+            freq_results = self._propagate_frequencies({mode_label: freq})
+
+            # Store results for each mode
+            for label, value in freq_results.items():
+                if label not in all_frequencies:
+                    # Initialize array for this mode
+                    all_frequencies[label] = np.zeros(len(frequencies))
+                all_frequencies[label][i] = value
+
+        # Get all parameters for the computed frequencies
+        for label, freqs in all_frequencies.items():
+            # Get direction for this mode
+            mode = self.modes[label]
+            direction = mode.direction
+
+            # Get parameters for all frequencies of this mode
+            kappas, gammas = self.interpolator.get_parameters(np.abs(freqs))
+
+            # Apply direction to kappas
+            if isinstance(kappas, np.ndarray):
+                kappas = kappas * direction
+            else:
+                kappas = np.array([kappas * direction])
+
+            # Store parameters
+            mode_params[label] = {"freqs": freqs, "k": kappas, "gamma": gammas}
+
+        return mode_params
+
     def get_mode(self, label: str) -> Mode:
         """Get mode by label."""
         return self.modes[label]
+
+    def get_rwa_terms(self, power: int = 3) -> List[Tuple]:
+        """
+        Get RWA terms for the specified mixing order with caching.
+
+        Args:
+            power: Order of the interaction (2 for 3WM, 3 for 4WM)
+
+        Returns:
+            List of RWA terms
+        """
+        if power == 2:
+            if self._rwa_terms_3wm is None:
+                self._rwa_terms_3wm = self.analyzer.find_rwa_terms(power)
+            return self._rwa_terms_3wm
+        elif power == 3:
+            if self._rwa_terms_4wm is None:
+                self._rwa_terms_4wm = self.analyzer.find_rwa_terms(power)
+            return self._rwa_terms_4wm
+        else:
+            # For other powers, go directly to the analyzer without caching
+            return self.analyzer.find_rwa_terms(power)
 
     def print_modes(self):
         """Print current state of all modes."""
@@ -608,3 +633,131 @@ class ModeArray:
 
         plt.tight_layout()
         plt.show()
+
+
+class ModeArrayFactory:
+    """Factory for creating standard ModeArray configurations."""
+
+    @staticmethod
+    def create_basic_3wm(
+        freqs: np.ndarray,
+        kappas: np.ndarray,
+        gammas: np.ndarray,
+        forward_modes: bool = True,
+    ) -> ModeArray:
+        """
+        Create a basic 3WM ModeArray with pump, signal, and idler modes.
+
+        Args:
+            freqs: Array of frequency points for interpolation
+            kappas: Array of kappa values corresponding to frequencies
+            gammas: Array of gamma values corresponding to frequencies
+            forward_modes: Whether to create forward (True) or backward (False) propagating modes
+
+        Returns:
+            ModeArray: Configured for basic 3WM operation
+        """
+        direction = 1 if forward_modes else -1
+        modes = [
+            Mode(label="p", direction=direction),
+            Mode(label="s", direction=direction),
+            Mode(label="i", direction=direction),
+        ]
+
+        relations = [["i", "p-s"]]  # Idler is pump minus signal
+
+        return ModeArray(modes, relations, freqs, kappas, gammas)
+
+    @staticmethod
+    def create_extended_3wm(
+        freqs: np.ndarray,
+        kappas: np.ndarray,
+        gammas: np.ndarray,
+        n_pump_harmonics: int = 1,
+        n_frequency_conversion: int = 1,
+        n_signal_harmonics: int = 1,
+        forward_modes: bool = True,
+    ) -> ModeArray:
+        """
+        Create an extended 3WM ModeArray with pump harmonics and conversion terms.
+
+        Args:
+            freqs: Array of frequency points for interpolation
+            kappas: Array of kappa values corresponding to frequencies
+            gammas: Array of gamma values corresponding to frequencies
+            n_pump_harmonics: Number of pump harmonics to include
+            forward_modes: Whether to create forward (True) or backward (False) propagating modes
+
+        Returns:
+            ModeArray: Configured for extended 3WM operation with harmonics
+        """
+        direction = 1 if forward_modes else -1
+
+        # Create basic modes
+        modes = [
+            Mode(label="p", direction=direction),
+            Mode(label="s", direction=direction),
+            Mode(label="i", direction=direction),
+        ]
+
+        # Basic relation
+        relations = [["i", "p-s"]]  # Idler is pump minus signal
+
+        for n in range(2, n_signal_harmonics + 2):
+            modes.append(Mode(label=f"s{n}", direction=direction))
+            relations.append([f"s{n}", "s+" * (n - 1) + "s"])
+            modes.append(Mode(label=f"i{n}", direction=direction))
+            relations.append([f"i{n}", "i+" * (n - 1) + "i"])
+
+        for n in range(1, n_frequency_conversion + 1):
+            if n == 1:
+                modes.append(Mode(label="ps", direction=direction))  # p+s
+                modes.append(Mode(label="pi", direction=direction))  # p+i
+                relations.append(["ps", "p+s"])
+                relations.append(["pi", "p+i"])
+            else:
+                modes.append(Mode(label=f"p{n}s", direction=direction))  # p+s
+                modes.append(Mode(label=f"p{n}i", direction=direction))  # p+i
+                relations.append([f"p{n}s", "p+" * (n - 1) + "p+s"])
+                relations.append([f"p{n}i", "p+" * (n - 1) + "p+i"])
+
+        for n in range(2, n_pump_harmonics + 2):
+            modes.append(Mode(label=f"p{n}", direction=direction))
+            relations.append([f"p{n}", "p+" * (n - 1) + "p"])
+
+        return ModeArray(modes, relations, freqs, kappas, gammas)
+
+    @staticmethod
+    def create_custom(
+        freqs: np.ndarray,
+        kappas: np.ndarray,
+        gammas: np.ndarray,
+        mode_labels: List[str],
+        mode_directions: List[int],
+        relations: List[List[str]],
+    ) -> ModeArray:
+        """
+        Create a custom ModeArray with user-defined modes and relations.
+
+        Args:
+            freqs: Array of frequency points for interpolation
+            kappas: Array of kappa values corresponding to frequencies
+            gammas: Array of gamma values corresponding to frequencies
+            mode_labels: List of mode labels
+            mode_directions: List of mode directions (1 for forward, -1 for backward)
+            relations: List of relations between modes
+
+        Returns:
+            ModeArray: Custom configured ModeArray
+        """
+        if len(mode_labels) != len(mode_directions):
+            raise ValueError(
+                "mode_labels and mode_directions must have the same length"
+            )
+
+        modes = [
+            Mode(label=label, direction=direction)
+            for label, direction in zip(mode_labels, mode_directions)
+        ]
+
+        return ModeArray(modes, relations, freqs, kappas, gammas)
