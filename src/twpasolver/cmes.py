@@ -155,7 +155,7 @@ def general_cme(
     """Return derivatives of Coupled Mode Equations system including reflection and arbitrary 3WM and 4WM relations."""
     num_modes = len(currents)
     common_term_pos = ts_reflection * np.exp(1j * kappas * x)
-    common_term_neg = 0.0 * np.exp(-1j * kappas * x)
+    common_term_neg = ts_reflection_neg * np.exp(-1j * kappas * x)
     alphas_rhs = np.empty(2 * num_modes, dtype=np.complex128)
     for i in range(num_modes):
         alphas_rhs[i] = currents[i] * (common_term_pos[i] + common_term_neg[i])
