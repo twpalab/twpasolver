@@ -171,6 +171,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
@@ -191,14 +192,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -319,22 +322,21 @@ specific to TWPA models.</p>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.analysis_function"><code class="docutils literal notranslate"><span class="pre">analysis_function()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.ExecutionRequest"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.ExecutionRequest.name"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest.name</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.ExecutionRequest.args"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest.args</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.ExecutionRequest.kwargs"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest.kwargs</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.GainModel"><code class="docutils literal notranslate"><span class="pre">GainModel</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.GainModel.MINIMAL_3WM"><code class="docutils literal notranslate"><span class="pre">GainModel.MINIMAL_3WM</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.GainModel.GENERAL_IDEAL"><code class="docutils literal notranslate"><span class="pre">GainModel.GENERAL_IDEAL</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.GainModel.GENERAL_LOSS_ONLY"><code class="docutils literal notranslate"><span class="pre">GainModel.GENERAL_LOSS_ONLY</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.GainModel.GENERAL"><code class="docutils literal notranslate"><span class="pre">GainModel.GENERAL</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.prepare_relations_coefficients"><code class="docutils literal notranslate"><span class="pre">prepare_relations_coefficients()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.analysis_function"><code class="docutils literal notranslate"><span class="pre">analysis_function()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer"><code class="docutils literal notranslate"><span class="pre">Analyzer</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer.data_file"><code class="docutils literal notranslate"><span class="pre">Analyzer.data_file</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer.run"><code class="docutils literal notranslate"><span class="pre">Analyzer.run</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer.data"><code class="docutils literal notranslate"><span class="pre">Analyzer.data</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer.model_post_init"><code class="docutils literal notranslate"><span class="pre">Analyzer.model_post_init()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer.update_base_data"><code class="docutils literal notranslate"><span class="pre">Analyzer.update_base_data()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer.save_data"><code class="docutils literal notranslate"><span class="pre">Analyzer.save_data()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer.load_data"><code class="docutils literal notranslate"><span class="pre">Analyzer.load_data()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer.execute"><code class="docutils literal notranslate"><span class="pre">Analyzer.execute()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.Analyzer.parameter_sweep"><code class="docutils literal notranslate"><span class="pre">Analyzer.parameter_sweep()</span></code></a></li>
 </ul>
 </li>
@@ -342,11 +344,14 @@ specific to TWPA models.</p>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.twpa"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.twpa</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.load_model_from_file"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.load_model_from_file</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.update_base_data"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.update_base_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.get_mode_array"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.get_mode_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.add_mode_array"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.add_mode_array()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.phase_matching"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.phase_matching()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.gain"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.gain()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.bandwidth"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.bandwidth()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_response"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_response()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_gain"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_gain()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_mode_currents"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_mode_currents()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_phase_matching"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_phase_matching()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.model_post_init"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.model_post_init()</span></code></a></li>
 </ul>
@@ -360,6 +365,23 @@ specific to TWPA models.</p>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html#twpasolver.basemodel.BaseModel.dump_to_file"><code class="docutils literal notranslate"><span class="pre">BaseModel.dump_to_file()</span></code></a></li>
 </ul>
 </li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="twpasolver.bonus_types.html">twpasolver.bonus_types module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.bonus_types.html#twpasolver.bonus_types.all_subclasses"><code class="docutils literal notranslate"><span class="pre">all_subclasses()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.bonus_types.html#twpasolver.bonus_types.validate_impedance"><code class="docutils literal notranslate"><span class="pre">validate_impedance()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="twpasolver.cmes.html">twpasolver.cmes module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.cmes.html#twpasolver.cmes.CMEode_complete"><code class="docutils literal notranslate"><span class="pre">CMEode_complete()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.cmes.html#twpasolver.cmes.general_cme_ideal"><code class="docutils literal notranslate"><span class="pre">general_cme_ideal()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.cmes.html#twpasolver.cmes.general_cme_loss_only"><code class="docutils literal notranslate"><span class="pre">general_cme_loss_only()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.cmes.html#twpasolver.cmes.general_cme"><code class="docutils literal notranslate"><span class="pre">general_cme()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.cmes.html#twpasolver.cmes.cme_general_solve_freq_array_ideal"><code class="docutils literal notranslate"><span class="pre">cme_general_solve_freq_array_ideal()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.cmes.html#twpasolver.cmes.cme_general_solve_freq_array_loss"><code class="docutils literal notranslate"><span class="pre">cme_general_solve_freq_array_loss()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.cmes.html#twpasolver.cmes.cme_general_solve_freq_array_full"><code class="docutils literal notranslate"><span class="pre">cme_general_solve_freq_array_full()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.cmes.html#twpasolver.cmes.cme_general_solve_freq_array"><code class="docutils literal notranslate"><span class="pre">cme_general_solve_freq_array()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.cmes.html#twpasolver.cmes.cme_solve"><code class="docutils literal notranslate"><span class="pre">cme_solve()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a><ul>
@@ -390,9 +412,9 @@ specific to TWPA models.</p>
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.logging.html#twpasolver.logging.CustomHandler"><code class="docutils literal notranslate"><span class="pre">CustomHandler</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html#twpasolver.logging.CustomHandler.format"><code class="docutils literal notranslate"><span class="pre">CustomHandler.format()</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="twpasolver.logger.html">twpasolver.logger module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.logger.html#twpasolver.logger.CustomHandler"><code class="docutils literal notranslate"><span class="pre">CustomHandler</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.logger.html#twpasolver.logger.CustomHandler.format"><code class="docutils literal notranslate"><span class="pre">CustomHandler.format()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -402,12 +424,12 @@ specific to TWPA models.</p>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.matpow_2x2"><code class="docutils literal notranslate"><span class="pre">matpow_2x2()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.a2s"><code class="docutils literal notranslate"><span class="pre">a2s()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.s2a"><code class="docutils literal notranslate"><span class="pre">s2a()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.a2z"><code class="docutils literal notranslate"><span class="pre">a2z()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.z2a"><code class="docutils literal notranslate"><span class="pre">z2a()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.to_dB"><code class="docutils literal notranslate"><span class="pre">to_dB()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.dBm_to_I"><code class="docutils literal notranslate"><span class="pre">dBm_to_I()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.I_to_dBm"><code class="docutils literal notranslate"><span class="pre">I_to_dBm()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.compute_phase_matching"><code class="docutils literal notranslate"><span class="pre">compute_phase_matching()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.CMEode_complete"><code class="docutils literal notranslate"><span class="pre">CMEode_complete()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.mathutils.html#twpasolver.mathutils.cme_solve"><code class="docutils literal notranslate"><span class="pre">cme_solve()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a><ul>
@@ -430,10 +452,58 @@ specific to TWPA models.</p>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.SMatrixArray.S22"><code class="docutils literal notranslate"><span class="pre">SMatrixArray.S22</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray"><code class="docutils literal notranslate"><span class="pre">ZMatrixArray</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray.Z11"><code class="docutils literal notranslate"><span class="pre">ZMatrixArray.Z11</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray.Z12"><code class="docutils literal notranslate"><span class="pre">ZMatrixArray.Z12</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray.Z21"><code class="docutils literal notranslate"><span class="pre">ZMatrixArray.Z21</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray.Z22"><code class="docutils literal notranslate"><span class="pre">ZMatrixArray.Z22</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.abcd_identity"><code class="docutils literal notranslate"><span class="pre">abcd_identity()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ParameterInterpolator"><code class="docutils literal notranslate"><span class="pre">ParameterInterpolator</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ParameterInterpolator.get_parameters"><code class="docutils literal notranslate"><span class="pre">ParameterInterpolator.get_parameters()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode"><code class="docutils literal notranslate"><span class="pre">Mode</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.label"><code class="docutils literal notranslate"><span class="pre">Mode.label</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.direction"><code class="docutils literal notranslate"><span class="pre">Mode.direction</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.frequency"><code class="docutils literal notranslate"><span class="pre">Mode.frequency</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.k"><code class="docutils literal notranslate"><span class="pre">Mode.k</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.gamma"><code class="docutils literal notranslate"><span class="pre">Mode.gamma</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.alpha"><code class="docutils literal notranslate"><span class="pre">Mode.alpha</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.RWAAnalyzer"><code class="docutils literal notranslate"><span class="pre">RWAAnalyzer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.RWAAnalyzer.relations"><code class="docutils literal notranslate"><span class="pre">RWAAnalyzer.relations</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.RWAAnalyzer.update_relations"><code class="docutils literal notranslate"><span class="pre">RWAAnalyzer.update_relations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.RWAAnalyzer.find_rwa_terms"><code class="docutils literal notranslate"><span class="pre">RWAAnalyzer.find_rwa_terms()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.RWAAnalyzer.print_rwa_terms"><code class="docutils literal notranslate"><span class="pre">RWAAnalyzer.print_rwa_terms()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray"><code class="docutils literal notranslate"><span class="pre">ModeArray</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.update_frequencies"><code class="docutils literal notranslate"><span class="pre">ModeArray.update_frequencies()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.update_base_data"><code class="docutils literal notranslate"><span class="pre">ModeArray.update_base_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.process_frequency_array"><code class="docutils literal notranslate"><span class="pre">ModeArray.process_frequency_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.plot_mode_relations"><code class="docutils literal notranslate"><span class="pre">ModeArray.plot_mode_relations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.get_mode"><code class="docutils literal notranslate"><span class="pre">ModeArray.get_mode()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.get_rwa_terms"><code class="docutils literal notranslate"><span class="pre">ModeArray.get_rwa_terms()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.print_modes"><code class="docutils literal notranslate"><span class="pre">ModeArray.print_modes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.print_symbolic_expressions"><code class="docutils literal notranslate"><span class="pre">ModeArray.print_symbolic_expressions()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory"><code class="docutils literal notranslate"><span class="pre">ModeArrayFactory</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory.create_basic_3wm"><code class="docutils literal notranslate"><span class="pre">ModeArrayFactory.create_basic_3wm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory.create_extended_3wm"><code class="docutils literal notranslate"><span class="pre">ModeArrayFactory.create_extended_3wm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory.create_custom"><code class="docutils literal notranslate"><span class="pre">ModeArrayFactory.create_custom()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.plotting.html#twpasolver.plotting.plot_mode_currents"><code class="docutils literal notranslate"><span class="pre">plot_mode_currents()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.plotting.html#twpasolver.plotting.plot_response"><code class="docutils literal notranslate"><span class="pre">plot_response()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.plotting.html#twpasolver.plotting.plot_gain"><code class="docutils literal notranslate"><span class="pre">plot_gain()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.plotting.html#twpasolver.plotting.plot_phase_matching"><code class="docutils literal notranslate"><span class="pre">plot_phase_matching()</span></code></a></li>
@@ -442,11 +512,13 @@ specific to TWPA models.</p>
 <li class="toctree-l1"><a class="reference internal" href="twpasolver.twoport.html">twpasolver.twoport module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell"><code class="docutils literal notranslate"><span class="pre">TwoPortCell</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.from_s"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.from_s()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.from_z"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.from_z()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.from_file"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.from_file()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.freqs"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.freqs</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.Z0"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.Z0</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.to_network"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.to_network()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.s"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.s</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.z"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.z</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.as_dict"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.as_dict()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.dump_to_file"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.dump_to_file()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.interpolate"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.interpolate()</span></code></a></li>
@@ -462,11 +534,6 @@ specific to TWPA models.</p>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortModel.get_network"><code class="docutils literal notranslate"><span class="pre">TwoPortModel.get_network()</span></code></a></li>
 </ul>
 </li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="twpasolver.typing.html">twpasolver.typing module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.typing.html#twpasolver.typing.all_subclasses"><code class="docutils literal notranslate"><span class="pre">all_subclasses()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="twpasolver.typing.html#twpasolver.typing.validate_impedance"><code class="docutils literal notranslate"><span class="pre">validate_impedance()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -503,7 +570,7 @@ specific to TWPA models.</p>
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

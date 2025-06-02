@@ -3,7 +3,7 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="twpasolver.typing module" href="twpasolver.typing.html" /><link rel="prev" title="twpasolver.plotting module" href="twpasolver.plotting.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="prev" title="twpasolver.plotting module" href="twpasolver.plotting.html" />
 
     <link rel="shortcut icon" href="../_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
         <title>twpasolver.twoport module - twpasolver · 0.0.1</title>
@@ -171,6 +171,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
@@ -191,14 +192,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3 current current-page"><a class="current reference internal" href="#">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -270,19 +273,40 @@ operations on two-port networks.</p>
 </div>
 <dl class="py class">
 <dt class="sig sig-object py" id="twpasolver.twoport.TwoPortCell">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.twoport.</span></span><span class="sig-name descname"><span class="pre">TwoPortCell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">freqs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">abcd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ABCDArray" title="twpasolver.matrices_arrays.ABCDArray"><span class="pre">ABCDArray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">Z0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.12)"><span class="pre">complex</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell" title="Permalink to this definition">#</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.twoport.</span></span><span class="sig-name descname"><span class="pre">TwoPortCell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">freqs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">abcd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ABCDArray" title="twpasolver.matrices_arrays.ABCDArray"><span class="pre">ABCDArray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">Z0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.13)"><span class="pre">complex</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell" title="Permalink to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Class representing a two-port RF cell.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.twoport.TwoPortCell.from_s">
-<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_s</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">freqs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s_mat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Z0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#twpasolver.twoport.TwoPortCell" title="twpasolver.twoport.TwoPortCell"><span class="pre">TwoPortCell</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.from_s"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.from_s" title="Permalink to this definition">#</a></dt>
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_s</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">freqs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s_mat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Z0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#twpasolver.twoport.TwoPortCell" title="twpasolver.twoport.TwoPortCell"><span class="pre">TwoPortCell</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.from_s"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.from_s" title="Permalink to this definition">#</a></dt>
 <dd><p>Instantiate from array of S-parameters.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>freqs</strong> (<em>numpy.ndarray</em>) – Frequencies of the network.</p></li>
 <li><p><strong>s_mat</strong> (<em>numpy.ndarray</em>) – S-parameter matrix.</p></li>
-<li><p><strong>Z0</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><em>float</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>) – Reference line impedance.</p></li>
+<li><p><strong>Z0</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a>) – Reference line impedance.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Instance of TwoPortCell.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#twpasolver.twoport.TwoPortCell" title="twpasolver.twoport.TwoPortCell">TwoPortCell</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="twpasolver.twoport.TwoPortCell.from_z">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_z</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">freqs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z_mat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Z0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#twpasolver.twoport.TwoPortCell" title="twpasolver.twoport.TwoPortCell"><span class="pre">TwoPortCell</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.from_z"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.from_z" title="Permalink to this definition">#</a></dt>
+<dd><p>Instantiate from array of Z-parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>freqs</strong> (<em>numpy.ndarray</em>) – Frequencies of the network.</p></li>
+<li><p><strong>z_mat</strong> (<em>numpy.ndarray</em>) – Z-parameter matrix.</p></li>
+<li><p><strong>Z0</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a>) – Reference line impedance.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -296,13 +320,13 @@ operations on two-port networks.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.twoport.TwoPortCell.from_file">
-<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">writer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hdf5'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#twpasolver.twoport.TwoPortCell" title="twpasolver.twoport.TwoPortCell"><span class="pre">TwoPortCell</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.from_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.from_file" title="Permalink to this definition">#</a></dt>
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">writer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hdf5'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#twpasolver.twoport.TwoPortCell" title="twpasolver.twoport.TwoPortCell"><span class="pre">TwoPortCell</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.from_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.from_file" title="Permalink to this definition">#</a></dt>
 <dd><p>Load model from file.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – Name of the file.</p></li>
-<li><p><strong>writer</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – File format.</p></li>
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – Name of the file.</p></li>
+<li><p><strong>writer</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – File format.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -330,7 +354,7 @@ operations on two-port networks.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="twpasolver.twoport.TwoPortCell.Z0">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Z0</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.12)"><span class="pre">complex</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><span class="pre">float</span></a></em><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.Z0" title="Permalink to this definition">#</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Z0</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.13)"><span class="pre">complex</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></em><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.Z0" title="Permalink to this definition">#</a></dt>
 <dd><p>Get the reference line impedance.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -370,29 +394,43 @@ operations on two-port networks.</p>
 </dl>
 </dd></dl>
 
+<dl class="py property">
+<dt class="sig sig-object py" id="twpasolver.twoport.TwoPortCell.z">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">z</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray" title="twpasolver.matrices_arrays.ZMatrixArray"><span class="pre">ZMatrixArray</span></a></em><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.z" title="Permalink to this definition">#</a></dt>
+<dd><p>Get the Z-parameter matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Z-parameter matrix.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray" title="twpasolver.matrices_arrays.ZMatrixArray">ZMatrixArray</a></p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.twoport.TwoPortCell.as_dict">
-<span class="sig-name descname"><span class="pre">as_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.as_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.as_dict" title="Permalink to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">as_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><span class="pre">dict</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.as_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.as_dict" title="Permalink to this definition">#</a></dt>
 <dd><p>Return cell contents as dictionary.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Dictionary containing cell contents.</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)">dict</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)">dict</a></p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.twoport.TwoPortCell.dump_to_file">
-<span class="sig-name descname"><span class="pre">dump_to_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">writer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hdf5'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.dump_to_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.dump_to_file" title="Permalink to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">dump_to_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">writer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hdf5'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.dump_to_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.dump_to_file" title="Permalink to this definition">#</a></dt>
 <dd><p>Dump cell to file.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – Name of the file.</p></li>
-<li><p><strong>writer</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – File format.</p></li>
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – Name of the file.</p></li>
+<li><p><strong>writer</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – File format.</p></li>
 </ul>
 </dd>
 </dl>
@@ -400,13 +438,13 @@ operations on two-port networks.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.twoport.TwoPortCell.interpolate">
-<span class="sig-name descname"><span class="pre">interpolate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">freqs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#twpasolver.twoport.TwoPortCell" title="twpasolver.twoport.TwoPortCell"><span class="pre">TwoPortCell</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.interpolate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.interpolate" title="Permalink to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">interpolate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">freqs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#twpasolver.twoport.TwoPortCell" title="twpasolver.twoport.TwoPortCell"><span class="pre">TwoPortCell</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortCell.interpolate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortCell.interpolate" title="Permalink to this definition">#</a></dt>
 <dd><p>Return abcd matrix of internal cell interpolating the given frequencies.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>freqs</strong> (<em>numpy.ndarray</em>) – Frequencies array to interpolate.</p></li>
-<li><p><strong>polar</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a>) – Interpolate magnitude and phase instead of real and imaginary part.</p></li>
+<li><p><strong>polar</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><em>bool</em></a>) – Interpolate magnitude and phase instead of real and imaginary part.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -423,7 +461,7 @@ operations on two-port networks.</p>
 <dl class="py class pydantic_model">
 <dt class="sig sig-object py" id="twpasolver.twoport.TwoPortModel">
 <em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.twoport.</span></span><span class="sig-name descname"><span class="pre">TwoPortModel</span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortModel" title="Permalink to this definition">#</a></dt>
-<dd><p>Bases: <a class="reference internal" href="twpasolver.basemodel.html#twpasolver.basemodel.BaseModel" title="twpasolver.basemodel.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<dd><p>Bases: <a class="reference internal" href="twpasolver.basemodel.html#twpasolver.basemodel.BaseModel" title="twpasolver.basemodel.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
 <p>Base class for models of two-port networks.</p>
 <p><details  class="autodoc_pydantic_collapsable_json">
 <summary>Show JSON schema</summary><div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
@@ -463,12 +501,13 @@ operations on two-port networks.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Constraints<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>__module__</strong> = twpasolver.typing</p></li>
-<li><p><strong>__get_pydantic_core_schema__</strong> = &lt;bound method _Impedance2PydanticAnnotation.__get_pydantic_core_schema__ of &lt;class ‘twpasolver.typing._Impedance2PydanticAnnotation’&gt;&gt;</p></li>
-<li><p><strong>__get_pydantic_json_schema__</strong> = &lt;bound method _Impedance2PydanticAnnotation.__get_pydantic_json_schema__ of &lt;class ‘twpasolver.typing._Impedance2PydanticAnnotation’&gt;&gt;</p></li>
-<li><p><strong>__dict__</strong> = {‘__module__’: ‘twpasolver.typing’, ‘__get_pydantic_core_schema__’: &lt;classmethod(&lt;function _Impedance2PydanticAnnotation.__get_pydantic_core_schema__ at 0x7f8b26257d00&gt;)&gt;, ‘__get_pydantic_json_schema__’: &lt;classmethod(&lt;function _Impedance2PydanticAnnotation.__get_pydantic_json_schema__ at 0x7f8b26257d90&gt;)&gt;, ‘__dict__’: &lt;attribute ‘__dict__’ of ‘_Impedance2PydanticAnnotation’ objects&gt;, ‘__weakref__’: &lt;attribute ‘__weakref__’ of ‘_Impedance2PydanticAnnotation’ objects&gt;, ‘__doc__’: None}</p></li>
+<li><p><strong>__module__</strong> = twpasolver.bonus_types</p></li>
+<li><p><strong>__get_pydantic_core_schema__</strong> = &lt;bound method _Impedance2PydanticAnnotation.__get_pydantic_core_schema__ of &lt;class ‘twpasolver.bonus_types._Impedance2PydanticAnnotation’&gt;&gt;</p></li>
+<li><p><strong>__get_pydantic_json_schema__</strong> = &lt;bound method _Impedance2PydanticAnnotation.__get_pydantic_json_schema__ of &lt;class ‘twpasolver.bonus_types._Impedance2PydanticAnnotation’&gt;&gt;</p></li>
+<li><p><strong>__dict__</strong> = {‘__module__’: ‘twpasolver.bonus_types’, ‘__get_pydantic_core_schema__’: &lt;classmethod(&lt;function _Impedance2PydanticAnnotation.__get_pydantic_core_schema__ at 0x7f606d22a200&gt;)&gt;, ‘__get_pydantic_json_schema__’: &lt;classmethod(&lt;function _Impedance2PydanticAnnotation.__get_pydantic_json_schema__ at 0x7f606d22a290&gt;)&gt;, ‘__dict__’: &lt;attribute ‘__dict__’ of ‘_Impedance2PydanticAnnotation’ objects&gt;, ‘__weakref__’: &lt;attribute ‘__weakref__’ of ‘_Impedance2PydanticAnnotation’ objects&gt;, ‘__doc__’: None}</p></li>
 <li><p><strong>__weakref__</strong> = &lt;attribute ‘__weakref__’ of ‘_Impedance2PydanticAnnotation’ objects&gt;</p></li>
-<li><p><strong>func</strong> = &lt;function validate_impedance at 0x7f8b26257be0&gt;</p></li>
+<li><p><strong>func</strong> = &lt;function validate_impedance at 0x7f606d22a0e0&gt;</p></li>
+<li><p><strong>json_schema_input_type</strong> = PydanticUndefined</p></li>
 </ul>
 </dd>
 </dl>
@@ -489,7 +528,7 @@ operations on two-port networks.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.twoport.TwoPortModel.update">
-<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortModel.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortModel.update" title="Permalink to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/twoport.html#TwoPortModel.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.twoport.TwoPortModel.update" title="Permalink to this definition">#</a></dt>
 <dd><p>Update multiple attributes of the model.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -575,15 +614,7 @@ operations on two-port networks.</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="twpasolver.typing.html">
-              <div class="page-info">
-                <div class="context">
-                  <span>Next</span>
-                </div>
-                <div class="title">twpasolver.typing module</div>
-              </div>
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
-            </a>
+          
           <a class="prev-page" href="twpasolver.plotting.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
@@ -599,7 +630,7 @@ operations on two-port networks.</p>
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             
@@ -635,11 +666,13 @@ operations on two-port networks.</p>
 <li><a class="reference internal" href="#">twpasolver.twoport module</a><ul>
 <li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell"><code class="docutils literal notranslate"><span class="pre">TwoPortCell</span></code></a><ul>
 <li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.from_s"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.from_s()</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.from_z"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.from_z()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.from_file"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.from_file()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.freqs"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.freqs</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.Z0"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.Z0</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.to_network"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.to_network()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.s"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.s</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.z"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.z</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.as_dict"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.as_dict()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.dump_to_file"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.dump_to_file()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.twoport.TwoPortCell.interpolate"><code class="docutils literal notranslate"><span class="pre">TwoPortCell.interpolate()</span></code></a></li>

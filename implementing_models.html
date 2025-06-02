@@ -3,7 +3,7 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
-<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="twpasolver" href="api-reference/modules.html" /><link rel="prev" title="3WM gain and TWPAnalysis" href="notebooks/03_analysis.html" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="twpasolver" href="api-reference/modules.html" /><link rel="prev" title="Advanced Coupled Mode Equations models" href="notebooks/04_generalized_cmes.html" />
 
     <link rel="shortcut icon" href="_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
         <title>Implementing New Models - twpasolver · 0.0.1</title>
@@ -171,6 +171,7 @@
 <li class="toctree-l2"><a class="reference internal" href="notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Implementing New Models</a></li>
@@ -191,14 +192,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -253,12 +256,12 @@
 <p>To define a new two-port model by subclassing <code class="docutils literal notranslate"><span class="pre">TwoPortModel</span></code>, you must implement the <strong>get_single_abcd(freqs: numpy.ndarray) -&gt; ABCDArray</strong> method. This method requires a 1-D array of frequencies as input and returns the ABCD matrix of a single iteration of the model as a function of frequency using an <code class="docutils literal notranslate"><span class="pre">ABCDArray</span></code> object.</p>
 <p>Additionally, to make the model available for integration with <code class="docutils literal notranslate"><span class="pre">TwoPortArray</span></code>, it is necessary to add a <strong>name: Literal[new_model_class_name]</strong> attribute. This attribute is used by Pydantic to discriminate between different models when constructing the array. Since all models in the library must have a unique name, it is recommended to set this attribute to the name of the implemented class.</p>
 <p>Example:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyTwoPortModel</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MyTwoPortModel</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom two-port model.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;MyTwoPortModel&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;MyTwoPortModel&quot;</span>
 
-    <span class="k">def</span> <span class="nf">get_single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get ABCD matrix for the custom model.</span>
 
@@ -278,13 +281,13 @@
 <p>All network models in <code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> are derived from the <code class="docutils literal notranslate"><span class="pre">TwoPortModel</span></code> class, with <code class="docutils literal notranslate"><span class="pre">OnePortModel</span></code> being a specialization of it. In this case, the <code class="docutils literal notranslate"><span class="pre">get_single_abcd()</span></code> method is already implemented in the class, which constructs the ABCD matrix of the circuit element by inserting it in series or in parallel into a two-port network according to the <code class="docutils literal notranslate"><span class="pre">twoport_parallel</span></code> attribute.</p>
 <p>To add a new one-port model, you need to provide a concrete implementation of the <strong>Z(freqs: numpy.ndarray) -&gt; numpy.ndarray</strong> property. This property takes a 1-D array of frequencies as input and returns another 1-D array containing the impedance of the component.</p>
 <p>Example:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">Resistance</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Resistance</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Model of a resistor.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;Resistance&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Resistance&quot;</span>
     <span class="n">R</span><span class="p">:</span> <span class="n">NonNegativeFloat</span>
 
-    <span class="k">def</span> <span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get impedance of resistor.</span>
 
@@ -314,14 +317,14 @@
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="notebooks/03_analysis.html">
+          <a class="prev-page" href="notebooks/04_generalized_cmes.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">3WM gain and TWPAnalysis</div>
+                <div class="title">Advanced Coupled Mode Equations models</div>
                 
               </div>
             </a>
@@ -329,7 +332,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

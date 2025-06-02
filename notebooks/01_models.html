@@ -172,6 +172,7 @@
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
@@ -192,14 +193,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -266,15 +269,15 @@
 <section id="Example:-Capacitor">
 <h2>Example: Capacitor<a class="headerlink" href="#Example:-Capacitor" title="Permalink to this heading">#</a></h2>
 <p>Let’s start with a simple example of analyzing a capacitor. We will create a capacitor model, compute its response over a frequency range, and plot the S-parameters.</p>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.mathutils</span> <span class="kn">import</span> <span class="n">to_dB</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models</span> <span class="kn">import</span> <span class="n">Capacitance</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.mathutils</span><span class="w"> </span><span class="kn">import</span> <span class="n">to_dB</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Capacitance</span>
 
 <span class="c1"># Define frequency range</span>
 <span class="n">freqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">1e9</span><span class="p">,</span> <span class="mf">10e9</span><span class="p">,</span> <span class="mf">1e6</span><span class="p">)</span>
@@ -296,16 +299,9 @@
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/notebooks_01_models_2_0.png" src="../_images/notebooks_01_models_2_0.png" />
-</div>
-</div>
 <p>Dump the model to a json file and recover it.</p>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">C</span><span class="o">.</span><span class="n">dump_to_file</span><span class="p">(</span><span class="s2">&quot;Capacitor.json&quot;</span><span class="p">)</span>
@@ -314,27 +310,6 @@
 <span class="n">C</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()</span>
 </pre></div>
 </div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-True
-</pre></div></div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
-</pre></div>
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-{&#39;Z0_ref&#39;: 50.0,
- &#39;N&#39;: 1,
- &#39;twoport_parallel&#39;: False,
- &#39;name&#39;: &#39;Capacitance&#39;,
- &#39;C&#39;: 1e-12}
-</pre></div></div>
 </div>
 </section>
 <section id="ModelArrays">
@@ -355,15 +330,15 @@ more complex elements to insert into a two-port circuit.</p></li>
 <section id="Example:-LC-Resonator-and-resonators-array">
 <h2>Example: LC Resonator and resonators array<a class="headerlink" href="#Example:-LC-Resonator-and-resonators-array" title="Permalink to this heading">#</a></h2>
 <p>Now let’s create an LC resonator by combining an inductor and a capacitor, which returns a <code class="docutils literal notranslate"><span class="pre">OnePortArray</span></code>, and plotting its frequency response.</p>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.mathutils</span> <span class="kn">import</span> <span class="n">to_dB</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models</span> <span class="kn">import</span> <span class="n">Capacitance</span><span class="p">,</span> <span class="n">Inductance</span><span class="p">,</span> <span class="n">Resistance</span><span class="p">,</span> <span class="n">compose</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.mathutils</span><span class="w"> </span><span class="kn">import</span> <span class="n">to_dB</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Capacitance</span><span class="p">,</span> <span class="n">Inductance</span><span class="p">,</span> <span class="n">Resistance</span><span class="p">,</span> <span class="n">compose</span>
 
 <span class="c1"># Define frequency range</span>
 <span class="n">freqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">1e9</span><span class="p">,</span> <span class="mf">10e9</span><span class="p">,</span> <span class="mf">2e6</span><span class="p">)</span>
@@ -386,19 +361,12 @@ more complex elements to insert into a two-port circuit.</p></li>
 </pre></div>
 </div>
 </div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/notebooks_01_models_6_0.png" src="../_images/notebooks_01_models_6_0.png" />
-</div>
-</div>
 <p>Finally, we create an array of LC resonators with different resonance frequencies inserted in parallel in a two-port network and observe their combined response.</p>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">twpasolver.models</span> <span class="kn">import</span> <span class="n">TwoPortArray</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">TwoPortArray</span>
 
 <span class="c1"># Create array of LC resonators with different resonance frequencies</span>
 <span class="n">LCarray</span> <span class="o">=</span> <span class="n">TwoPortArray</span><span class="p">()</span>
@@ -414,13 +382,6 @@ more complex elements to insert into a two-port circuit.</p></li>
 <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;S21 (dB)&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
-</div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="../_images/notebooks_01_models_8_0.png" src="../_images/notebooks_01_models_8_0.png" />
 </div>
 </div>
 </section>
@@ -455,7 +416,7 @@ more complex elements to insert into a two-port circuit.</p></li>
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

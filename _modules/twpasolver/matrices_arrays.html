@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -238,16 +241,16 @@
           <h1>Source code for twpasolver.matrices_arrays</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;ABCD matrices array module.&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">typing_extensions</span> <span class="kn">import</span> <span class="n">Self</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Self</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.mathutils</span> <span class="kn">import</span> <span class="n">matmul_2x2</span><span class="p">,</span> <span class="n">matpow_2x2</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.mathutils</span><span class="w"> </span><span class="kn">import</span> <span class="n">matmul_2x2</span><span class="p">,</span> <span class="n">matpow_2x2</span>
 
 
-<div class="viewcode-block" id="TwoByTwoArray"><a class="viewcode-back" href="../../api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.TwoByTwoArray">[docs]</a><span class="k">class</span> <span class="nc">TwoByTwoArray</span><span class="p">:</span>
+<div class="viewcode-block" id="TwoByTwoArray"><a class="viewcode-back" href="../../api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.TwoByTwoArray">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">TwoByTwoArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A class representing an array of 2x2 matrices.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mat</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mat</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Initialize the TwoByTwoArray instance.</span>
 
@@ -265,7 +268,7 @@
             <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span> <span class="o">=</span> <span class="n">mat</span>
 
-    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return a string representation of the TwoByTwoArray.</span>
 
@@ -274,11 +277,11 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span><span class="si">}</span><span class="s2">)&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__array__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">__array__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert the TwoByTwoArray to a numpy array.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span>
 
-    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get value at indices.</span>
 
@@ -292,7 +295,7 @@
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span><span class="p">[</span><span class="n">indices</span><span class="p">])</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
 
-    <span class="k">def</span> <span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">int</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Set value at indices.</span>
 
@@ -303,16 +306,16 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Shape of the internal array.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span><span class="o">.</span><span class="n">shape</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">len</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">len</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Length of the internal array.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
-    <span class="k">def</span> <span class="nf">_get_parameter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_parameter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get the specified parameter of the 2x2 matrices.</span>
 
@@ -325,7 +328,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span><span class="p">[:,</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span>
 
-    <span class="k">def</span> <span class="nf">_set_parameter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">values</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_set_parameter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">values</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Set the specified parameter of the 2x2 matrices.</span>
 
@@ -339,10 +342,10 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span><span class="p">[:,</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="ABCDArray"><a class="viewcode-back" href="../../api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ABCDArray">[docs]</a><span class="k">class</span> <span class="nc">ABCDArray</span><span class="p">(</span><span class="n">TwoByTwoArray</span><span class="p">):</span>
+<div class="viewcode-block" id="ABCDArray"><a class="viewcode-back" href="../../api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ABCDArray">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">ABCDArray</span><span class="p">(</span><span class="n">TwoByTwoArray</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A class representing an array of ABCD matrices.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__matmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__matmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Efficient matrix multiplication with another ABCDArray.</span>
 
@@ -354,7 +357,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">(</span><span class="n">matmul_2x2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">_matarray</span><span class="p">))</span>
 
-    <span class="k">def</span> <span class="fm">__pow__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exponent</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__pow__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exponent</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Efficient matrix exponentiation of the ABCDArray.</span>
 
@@ -367,12 +370,12 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">(</span><span class="n">matpow_2x2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_matarray</span><span class="p">,</span> <span class="n">exponent</span><span class="p">))</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">A</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">A</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;A parameter (element (0,0)) of the 2x2 matrices.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 
     <span class="nd">@A</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">A</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">A</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Setter for the A parameter.</span>
 
@@ -382,12 +385,12 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">B</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">B</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;B parameter (element (0,1)) of the 2x2 matrices.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="nd">@B</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">B</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">B</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Setter for the B parameter.</span>
 
@@ -397,12 +400,12 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">C</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">C</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;C parameter (element (1,0)) of the 2x2 matrices.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 
     <span class="nd">@C</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">C</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">C</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Setter for the C parameter.</span>
 
@@ -412,12 +415,12 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">D</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">D</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;D parameter (element (1,1)) of the 2x2 matrices.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="nd">@D</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">D</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">D</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Setter for the D parameter.</span>
 
@@ -427,16 +430,16 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="SMatrixArray"><a class="viewcode-back" href="../../api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.SMatrixArray">[docs]</a><span class="k">class</span> <span class="nc">SMatrixArray</span><span class="p">(</span><span class="n">TwoByTwoArray</span><span class="p">):</span>
+<div class="viewcode-block" id="SMatrixArray"><a class="viewcode-back" href="../../api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.SMatrixArray">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">SMatrixArray</span><span class="p">(</span><span class="n">TwoByTwoArray</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A class representing an array of two-ports S parameters matrices.&quot;&quot;&quot;</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">S11</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">S11</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;S11 parameter (element (0,0)) of the 2x2 matrices.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 
     <span class="nd">@S11</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">S11</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">S11</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Setter for the S11 parameter.</span>
 
@@ -446,12 +449,12 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">S12</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">S12</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;S12 parameter (element (0,1)) of the 2x2 matrices.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="nd">@S12</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">S12</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">S12</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Setter for the S12 parameter.</span>
 
@@ -461,12 +464,12 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">S21</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">S21</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;S21 parameter (element (1,0)) of the 2x2 matrices.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 
     <span class="nd">@S21</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">S21</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">S21</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Setter for the S21 parameter.</span>
 
@@ -476,12 +479,12 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">S22</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">S22</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;S22 parameter (element (1,1)) of the 2x2 matrices.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="nd">@S22</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">S22</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">S22</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Setter for the S22 parameter.</span>
 
@@ -491,7 +494,71 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="abcd_identity"><a class="viewcode-back" href="../../api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.abcd_identity">[docs]</a><span class="k">def</span> <span class="nf">abcd_identity</span><span class="p">(</span><span class="n">N_abcd</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
+<div class="viewcode-block" id="ZMatrixArray"><a class="viewcode-back" href="../../api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">ZMatrixArray</span><span class="p">(</span><span class="n">TwoByTwoArray</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A class representing an array of two-ports Z parameters matrices.&quot;&quot;&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Z11</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Z11 parameter (element (0,0)) of the 2x2 matrices.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="nd">@Z11</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Z11</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Zetter for the Z11 parameter.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            value (numpy.ndarray): Values to set for the Z11 parameter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Z12</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Z12 parameter (element (0,1)) of the 2x2 matrices.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="nd">@Z12</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Z12</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Zetter for the Z12 parameter.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            value (numpy.ndarray): Values to set for the Z12 parameter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Z21</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Z21 parameter (element (1,0)) of the 2x2 matrices.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="nd">@Z21</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Z21</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Zetter for the Z21 parameter.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            value (numpy.ndarray): Values to set for the Z21 parameter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Z22</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Z22 parameter (element (1,1)) of the 2x2 matrices.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="nd">@Z22</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Z22</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Zetter for the Z22 parameter.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            value (numpy.ndarray): Values to set for the Z22 parameter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_parameter</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="abcd_identity"><a class="viewcode-back" href="../../api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.abcd_identity">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">abcd_identity</span><span class="p">(</span><span class="n">N_abcd</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Get abcd array of identity matrices.</span>
 
@@ -514,7 +581,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

@@ -171,6 +171,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
@@ -191,14 +192,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -250,7 +253,7 @@ Otherwise a TwoPortArray will be returned.</p>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>*args</strong> (<em>AnyModel</em>) – Any number of OnePortModel or TwoPortModel instances to be composed.</p></li>
-<li><p><strong>parallel</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a><em>, </em><em>optional</em>) – Indicates if the OnePortModels should be composed in parallel.
+<li><p><strong>parallel</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><em>bool</em></a><em>, </em><em>optional</em>) – Indicates if the OnePortModels should be composed in parallel.
 Defaults to False. Applies only if a composition to OnePortModel is possible.</p></li>
 <li><p><strong>**kwargs</strong> – Additional keyword arguments to pass to the OnePortArray or TwoPortArray constructors.</p></li>
 </ul>
@@ -289,7 +292,7 @@ Defaults to False. Applies only if a composition to OnePortModel is possible.</p
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

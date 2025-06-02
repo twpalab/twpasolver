@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Advanced Coupled Mode Equations models" href="04_generalized_cmes.html" /><link rel="prev" title="Constructing twpas" href="02_twpas.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Implementing New Models" href="../implementing_models.html" /><link rel="prev" title="3WM gain and TWPAnalysis" href="03_analysis.html" />
 
     <link rel="shortcut icon" href="../_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
-        <title>3WM gain and TWPAnalysis - twpasolver · 0.0.1</title>
+        <title>Advanced Coupled Mode Equations models - twpasolver · 0.0.1</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?digest=369552022d0b975c8e74270ce6eabe0fb7978f24" />
     <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
@@ -171,8 +171,8 @@
 <li class="toctree-l1 current has-children"><a class="reference internal" href="../tutorials.html">Tutorials</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Tutorials</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="02_twpas.html">Constructing twpas</a></li>
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">3WM gain and TWPAnalysis</a></li>
-<li class="toctree-l2"><a class="reference internal" href="04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
@@ -227,7 +227,7 @@
         </a>
         <div class="content-icon-container">
           <div class="edit-this-page">
-  <a class="muted-link" href="https://github.com/twpalab/twpasolver/edit/main/docs/source/notebooks/03_analysis.ipynb" title="Edit this page">
+  <a class="muted-link" href="https://github.com/twpalab/twpasolver/edit/main/docs/source/notebooks/04_generalized_cmes.ipynb" title="Edit this page">
     <svg aria-hidden="true" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
       <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
       <path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4" />
@@ -249,28 +249,12 @@
           </label>
         </div>
         <article role="main">
-          <section id="3WM-gain-and-TWPAnalysis">
-<h1>3WM gain and TWPAnalysis<a class="headerlink" href="#3WM-gain-and-TWPAnalysis" title="Permalink to this heading">#</a></h1>
-<p>This tutorial demonstrates how to utilize the <code class="docutils literal notranslate"><span class="pre">twpasolver.TWPAnalysis</span></code> class to simulate the gain response of a TWPA by solving the Coupled Mode Equations (CMEs) with a minimal model.</p>
-<section id="Overivew">
-<h2>Overivew<a class="headerlink" href="#Overivew" title="Permalink to this heading">#</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">twpasolver.TWPAnalysis</span></code> automates the procedures required to compute the gain characteristics of a TWPA model.</p>
-<p>Implemented features:</p>
-<ul class="simple">
-<li><p>Calculation of phase-matching profile, gain and bandwidth.</p></li>
-<li><p>Automatic caching of data from the respectve <code class="docutils literal notranslate"><span class="pre">phase_matching()</span></code>, <code class="docutils literal notranslate"><span class="pre">gain()</span></code> and <code class="docutils literal notranslate"><span class="pre">bandwidth()</span></code> methods.</p></li>
-<li><p>Sweeps over lists of input parameters for the analysis functions.</p></li>
-<li><p>Simple plots.</p></li>
-</ul>
-</section>
-<section id="Example---Setup">
-<h2>Example - Setup<a class="headerlink" href="#Example---Setup" title="Permalink to this heading">#</a></h2>
-<p>Let’s start by importing the required libraries and initializing the <code class="docutils literal notranslate"><span class="pre">TWPAnalysis</span></code> instance. This object requires:</p>
-<ul class="simple">
-<li><p>A <code class="docutils literal notranslate"><span class="pre">TWPA</span></code> instance or the name of a json file containing the definition of the model</p></li>
-<li><p>A frequency span which determines the full region that will be considered in the analysis, which can be provided either as a list of values or a tuple that will be passed to <code class="docutils literal notranslate"><span class="pre">numpy.arange</span></code>. Some precautions in choosing the frequency span must be taken to correctly unwrap the phase response of the device. Namely, the frequency array should be dense enough and should start from frequencies much lower than the position of the stopband.</p></li>
-</ul>
-<p>The computed response and results of the following analysis functions are stored in the internal <code class="docutils literal notranslate"><span class="pre">data</span></code> dictionary, which can be accessed and saved to an hdf5 file through the <code class="docutils literal notranslate"><span class="pre">save_data()</span></code> method.</p>
+          <section id="Advanced-Coupled-Mode-Equations-models">
+<h1>Advanced Coupled Mode Equations models<a class="headerlink" href="#Advanced-Coupled-Mode-Equations-models" title="Permalink to this heading">#</a></h1>
+<p>This tutorial demonstrates how to use the more advanced CMEs models to simulate the nonlinear response of a TWPA.</p>
+<section id="Initialize-TWPAnalysis">
+<h2>Initialize TWPAnalysis<a class="headerlink" href="#Initialize-TWPAnalysis" title="Permalink to this heading">#</a></h2>
+<p>First, let’s load a KITWPA model and plot its reponse. Since we are going to consider higher order processes, we will initialize TWPAnalysis with a larger frequency span</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -290,113 +274,139 @@
 <span class="n">plt</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.axisbelow&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
 
 <span class="n">twpa_file</span> <span class="o">=</span> <span class="s2">&quot;model_cpw_dartwars_13nm_Lk8_5.json&quot;</span>
-<span class="n">a</span> <span class="o">=</span> <span class="n">TWPAnalysis</span><span class="p">(</span><span class="n">twpa</span><span class="o">=</span><span class="n">twpa_file</span><span class="p">,</span> <span class="n">f_arange</span><span class="o">=</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mf">0.5e-3</span><span class="p">))</span>
-<span class="n">a</span><span class="o">.</span><span class="n">update_base_data</span><span class="p">()</span>  <span class="c1"># compute response, estimate stopband position and optimal pump frequency</span>
-<span class="n">ax</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">plot_response</span><span class="p">(</span><span class="n">pump_freq</span><span class="o">=</span><span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;optimal_pump_freq&quot;</span><span class="p">])</span>
+<span class="n">a</span> <span class="o">=</span> <span class="n">TWPAnalysis</span><span class="p">(</span><span class="n">twpa</span><span class="o">=</span><span class="n">twpa_file</span><span class="p">,</span> <span class="n">f_arange</span><span class="o">=</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mf">0.5e-3</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">a</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">cells</span><span class="p">:</span>
+    <span class="n">c</span><span class="o">.</span><span class="n">delta</span> <span class="o">=</span> <span class="mf">0e-4</span>
+<span class="n">a</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">Z0_ref</span> <span class="o">=</span> <span class="mi">50</span>
+<span class="n">a</span><span class="o">.</span><span class="n">update_base_data</span><span class="p">()</span>
+<span class="n">optimal_pump</span> <span class="o">=</span> <span class="mf">7.4735</span>
+<span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;optimal_pump_freq&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">optimal_pump</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">plot_response</span><span class="p">(</span><span class="n">pump_freq</span><span class="o">=</span><span class="n">optimal_pump</span><span class="p">)</span>
+
+<span class="c1"># plot first and second pump harmonic</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">optimal_pump</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">optimal_pump</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="n">optimal_pump</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="n">optimal_pump</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
 <span class="n">a</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()</span>
+<span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;optimal_pump_freq&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<section id="ModeArrays-and-ModeArrayFactory">
+<h3>ModeArrays and ModeArrayFactory<a class="headerlink" href="#ModeArrays-and-ModeArrayFactory" title="Permalink to this heading">#</a></h3>
+<p>Properly describing the nonlinear response of TWPAs requires going beyond the basic CMEs system that considers only pump, signal and idler. <code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> is able to automatically build and solve CMEs systems including an arbitrary number of physical modes connected by relations between their frequencies. A collection of related modes is represented in a <code class="docutils literal notranslate"><span class="pre">ModeArray</span></code> object, which has the following notable features:</p>
+<ul class="simple">
+<li><p>Organize the mode relations in a dependency graph, identifying the independent modes</p></li>
+<li><p>Automatically extrapolate and propagate the physical propertie of the modes (frequency, wavenumber…) according to the relations</p></li>
+<li><p>Automatically select the 3WM and 4WM terms that satisfy the Rotating Wave Approximation (RWA) when solving the CMEs</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">ModeArray</span></code> factory helps to set up custom mode arrays or create standard extended mode collections useful to improve the accuracy of your simulations.</p>
+<p>Here is to setup a ModeArray with custom defined modes and relations</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.modes_rwa</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModeArrayFactory</span>
+
+<span class="n">mode_labels</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;p&quot;</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="s2">&quot;i&quot;</span><span class="p">,</span> <span class="s2">&quot;p2&quot;</span><span class="p">]</span>
+<span class="n">mode_relations</span> <span class="o">=</span> <span class="p">[[</span><span class="s2">&quot;i&quot;</span><span class="p">,</span> <span class="s2">&quot;p-s&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;p2&quot;</span><span class="p">,</span> <span class="s2">&quot;p+p&quot;</span><span class="p">]]</span>
+<span class="n">mode_array_p2</span> <span class="o">=</span> <span class="n">ModeArrayFactory</span><span class="o">.</span><span class="n">create_custom</span><span class="p">(</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+    <span class="n">mode_labels</span><span class="o">=</span><span class="n">mode_labels</span><span class="p">,</span>
+    <span class="n">mode_directions</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">relations</span><span class="o">=</span><span class="n">mode_relations</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">mode_array_p2</span><span class="o">.</span><span class="n">plot_mode_relations</span><span class="p">(</span><span class="n">layout</span><span class="o">=</span><span class="s2">&quot;circular&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>For obtaining more realistic simulations, you should consider pump harmonics, frequency conversion processes and signal/idler harmonics. The <code class="docutils literal notranslate"><span class="pre">create_extended_3wm</span></code> method helps you to do so. Let’s also add this more complete set of mode to the analysis class</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mode_array</span> <span class="o">=</span> <span class="n">ModeArrayFactory</span><span class="o">.</span><span class="n">create_extended_3wm</span><span class="p">(</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">n_pump_harmonics</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_frequency_conversion</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_signal_harmonics</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span>
+<span class="n">mode_array</span><span class="o">.</span><span class="n">plot_mode_relations</span><span class="p">(</span><span class="n">show_frequencies</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">a</span><span class="o">.</span><span class="n">add_mode_array</span><span class="p">(</span><span class="s2">&quot;gain_extended&quot;</span><span class="p">,</span> <span class="n">mode_array</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 </section>
-<section id="Phase-matching">
-<h2>Phase matching<a class="headerlink" href="#Phase-matching" title="Permalink to this heading">#</a></h2>
-<p>This is the first analysis function implemented by the class. It computes the phase matching condition as a function of pump and signal frequency. By default, the signal range is chosen from the start of the total frequency span to the beginning of the stopband, while the pump range is chosen from the end of the stopband to the maximum of the full span.</p>
+<section id="Gain-comparison-with-different-models">
+<h3>Gain comparison with different models<a class="headerlink" href="#Gain-comparison-with-different-models" title="Permalink to this heading">#</a></h3>
+<p>You can use the attributes of the <code class="docutils literal notranslate"><span class="pre">gain</span></code> analysis function to specify which CME model and array of modes you want to include in the simulation. Once compied, even simulations with quite a large number of modes compared to the basic CMEs system should still be quite fast</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">_</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">phase_matching</span><span class="p">()</span>
-<span class="n">ax</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">plot_phase_matching</span><span class="p">(</span><span class="n">thin</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</section>
-<section id="Gain-and-bandwidth">
-<h2>Gain and bandwidth<a class="headerlink" href="#Gain-and-bandwidth" title="Permalink to this heading">#</a></h2>
-<p>Since <code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> uses a numba-based implementation of the Runge-Kutta algorithm to solve the CMEs, it may take some seconds to compile all the functions when the <code class="docutils literal notranslate"><span class="pre">gain</span></code> method is called for the first time, becoming much faster afterwards.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">s_arange</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">gain</span><span class="p">(</span><span class="n">signal_freqs</span><span class="o">=</span><span class="n">s_arange</span><span class="p">,</span> <span class="n">Is0</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">)</span>
-<span class="n">a</span><span class="o">.</span><span class="n">plot_gain</span><span class="p">()</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-<p>The <code class="docutils literal notranslate"><span class="pre">bandwidth</span></code> analysis function computes the bandwidth by finding all the regions between the maximum gain value and a certain threshold, by default defined as 3 dB lower than the maximum gain. It is designed to keep track of the asymmetry and formation of lobes in the gain profile due to depleted pump effects and high pump frequency choice, potentially computing the bandwidth over discontinuous regions.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">_</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">gain</span><span class="p">(</span><span class="n">signal_freqs</span><span class="o">=</span><span class="n">s_arange</span><span class="p">,</span> <span class="n">Is0</span><span class="o">=</span><span class="mf">3e-5</span><span class="p">,</span> <span class="n">pump</span><span class="o">=</span><span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;optimal_pump_freq&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">0.15</span><span class="p">)</span>
-<span class="n">a</span><span class="o">.</span><span class="n">plot_gain</span><span class="p">()</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">bandwidth</span><span class="p">()</span>
-<span class="k">for</span> <span class="n">edg</span> <span class="ow">in</span> <span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;bandwidth&quot;</span><span class="p">][</span><span class="s2">&quot;bandwidth_edges&quot;</span><span class="p">]:</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">edg</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;bandwidth&quot;</span><span class="p">][</span><span class="s2">&quot;reduced_gain&quot;</span><span class="p">],</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;bandwidth&quot;</span><span class="p">][</span><span class="s2">&quot;mean_gain&quot;</span><span class="p">],</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-</section>
-<section id="Parameter-sweeps">
-<h2>Parameter sweeps<a class="headerlink" href="#Parameter-sweeps" title="Permalink to this heading">#</a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">parameter_sweep</span></code> analysis method allows performing sweeps over an input variable for one of the other analysis functions. Basic usage involves passing as the first three positional arguments of a sweep the name of the target function, the name of the target variable and its list of values.</p>
-<section id="Gain-as-a-function-of-pump-frequency">
-<h3>Gain as a function of pump frequency<a class="headerlink" href="#Gain-as-a-function-of-pump-frequency" title="Permalink to this heading">#</a></h3>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">optimal</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;optimal_pump_freq&quot;</span><span class="p">]</span>
-<span class="n">pumps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">optimal</span> <span class="o">-</span> <span class="mf">0.2</span><span class="p">,</span> <span class="n">optimal</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">)</span>
-<span class="n">pumpsweep_res</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">parameter_sweep</span><span class="p">(</span>
-    <span class="s2">&quot;gain&quot;</span><span class="p">,</span> <span class="s2">&quot;pump&quot;</span><span class="p">,</span> <span class="n">pumps</span><span class="p">,</span> <span class="n">signal_freqs</span><span class="o">=</span><span class="n">s_arange</span><span class="p">,</span> <span class="n">save_name</span><span class="o">=</span><span class="s2">&quot;pump_profile&quot;</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">s_arange</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">6.5</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)</span>
+
+<span class="n">res_gain_base</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">gain</span><span class="p">(</span><span class="n">signal_freqs</span><span class="o">=</span><span class="n">s_arange</span><span class="p">,</span> <span class="n">Is0</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">pump</span><span class="o">=</span><span class="n">optimal_pump</span><span class="p">)</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">plot_gain</span><span class="p">()</span>
+<span class="n">res_gain_extended</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">gain</span><span class="p">(</span>
+    <span class="n">signal_freqs</span><span class="o">=</span><span class="n">s_arange</span><span class="p">,</span>
+    <span class="n">Is0</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span>
+    <span class="n">pump</span><span class="o">=</span><span class="n">optimal_pump</span><span class="p">,</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;general_ideal&quot;</span><span class="p">,</span>
+    <span class="n">mode_array_config</span><span class="o">=</span><span class="s2">&quot;gain_extended&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">res_gain_with_loss</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">gain</span><span class="p">(</span>
+    <span class="n">signal_freqs</span><span class="o">=</span><span class="n">s_arange</span><span class="p">,</span>
+    <span class="n">Is0</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span>
+    <span class="n">pump</span><span class="o">=</span><span class="n">optimal_pump</span><span class="p">,</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;general_loss_only&quot;</span><span class="p">,</span>
+    <span class="n">mode_array_config</span><span class="o">=</span><span class="s2">&quot;gain_extended&quot;</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="n">plt</span><span class="o">.</span><span class="n">pcolor</span><span class="p">(</span><span class="n">pumpsweep_res</span><span class="p">[</span><span class="s2">&quot;signal_freqs&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">pumps</span><span class="p">,</span> <span class="n">pumpsweep_res</span><span class="p">[</span><span class="s2">&quot;gain_db&quot;</span><span class="p">])</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Signal frequency [GHz]&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Pump frequency [GHz]&quot;</span><span class="p">)</span>
-<span class="n">c</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">()</span>
-<span class="n">c</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="s2">&quot;Gain [dB]&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-</section>
-<section id="Compression-point">
-<h3>Compression point<a class="headerlink" href="#Compression-point" title="Permalink to this heading">#</a></h3>
-<p>Since the default CMEs system considers pump depletion effects, it is possible to simulate power-dependent measurements such as the compression point.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">signals_db</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="o">-</span><span class="mi">40</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="n">signals</span> <span class="o">=</span> <span class="n">dBm_to_I</span><span class="p">(</span><span class="n">signals_db</span><span class="p">)</span>
-<span class="n">edges</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;bandwidth&quot;</span><span class="p">][</span><span class="s2">&quot;bandwidth_edges&quot;</span><span class="p">]</span>
-<span class="n">s_arange</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;bandwidth&quot;</span><span class="p">][</span><span class="s2">&quot;bw_freqs&quot;</span><span class="p">]</span>  <span class="c1"># (edges[0], edges[-1], 0.1)</span>
-<span class="n">compression_res</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">parameter_sweep</span><span class="p">(</span>
-    <span class="s2">&quot;gain&quot;</span><span class="p">,</span> <span class="s2">&quot;Is0&quot;</span><span class="p">,</span> <span class="n">signals</span><span class="p">,</span> <span class="n">signal_freqs</span><span class="o">=</span><span class="n">s_arange</span><span class="p">,</span> <span class="n">thin</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">save_name</span><span class="o">=</span><span class="s2">&quot;compression&quot;</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">s_arange</span><span class="p">,</span> <span class="n">res_gain_extended</span><span class="p">[</span><span class="s2">&quot;gain_db&quot;</span><span class="p">])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">s_arange</span><span class="p">,</span> <span class="n">res_gain_with_loss</span><span class="p">[</span><span class="s2">&quot;gain_db&quot;</span><span class="p">])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">&quot;basic&quot;</span><span class="p">,</span> <span class="s2">&quot;extended, ideal&quot;</span><span class="p">,</span> <span class="s2">&quot;extended, with loss&quot;</span><span class="p">],</span> <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.1</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">)</span>
 <span class="p">)</span>
 </pre></div>
 </div>
 </div>
+<p>The most realistic model takes into account both losses and reflections in the device, but it is more difficult to integrate for the ODE solver and usually takes around 10X more time to run than the other three models.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mean_gains</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">compression_res</span><span class="p">[</span><span class="s2">&quot;gain_db&quot;</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-<span class="n">reduced_1db</span> <span class="o">=</span> <span class="n">mean_gains</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span>
-<span class="n">cp_1db</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">reduced_1db</span><span class="p">,</span> <span class="n">mean_gains</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">signals_db</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">signals_db</span><span class="p">,</span> <span class="n">mean_gains</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Signal power [dBm]&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Gain [dB]&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">reduced_1db</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">cp_1db</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">res_gain_with_reflections_wide</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">gain</span><span class="p">(</span>
+    <span class="n">signal_freqs</span><span class="o">=</span><span class="n">s_arange</span><span class="p">,</span>
+    <span class="n">Is0</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span>
+    <span class="n">pump</span><span class="o">=</span><span class="n">optimal_pump</span><span class="p">,</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;general&quot;</span><span class="p">,</span>
+    <span class="n">mode_array_config</span><span class="o">=</span><span class="s2">&quot;gain_extended&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">plot_gain</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">s_arange</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mf">3.5</span><span class="p">,</span> <span class="mf">0.005</span><span class="p">)</span>
+<span class="n">res_gain_with_reflections_narrow</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">gain</span><span class="p">(</span>
+    <span class="n">signal_freqs</span><span class="o">=</span><span class="n">s_arange</span><span class="p">,</span>
+    <span class="n">Is0</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span>
+    <span class="n">pump</span><span class="o">=</span><span class="n">optimal_pump</span><span class="p">,</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;general&quot;</span><span class="p">,</span>
+    <span class="n">mode_array_config</span><span class="o">=</span><span class="s2">&quot;gain_extended&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">plot_gain</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<p>Another useful feature of <code class="docutils literal notranslate"><span class="pre">TWPAnalysis</span></code> is the ability to plot the average currents for each mode as a function of the position along the line. This is helpful to identify which processes are most relevant to the simulated response.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">a</span><span class="o">.</span><span class="n">plot_mode_currents</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
@@ -409,23 +419,23 @@
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="04_generalized_cmes.html">
+          <a class="next-page" href="../implementing_models.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Advanced Coupled Mode Equations models</div>
+                <div class="title">Implementing New Models</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="02_twpas.html">
+          <a class="prev-page" href="03_analysis.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Constructing twpas</div>
+                <div class="title">3WM gain and TWPAnalysis</div>
                 
               </div>
             </a>
@@ -466,14 +476,10 @@
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">3WM gain and TWPAnalysis</a><ul>
-<li><a class="reference internal" href="#Overivew">Overivew</a></li>
-<li><a class="reference internal" href="#Example---Setup">Example - Setup</a></li>
-<li><a class="reference internal" href="#Phase-matching">Phase matching</a></li>
-<li><a class="reference internal" href="#Gain-and-bandwidth">Gain and bandwidth</a></li>
-<li><a class="reference internal" href="#Parameter-sweeps">Parameter sweeps</a><ul>
-<li><a class="reference internal" href="#Gain-as-a-function-of-pump-frequency">Gain as a function of pump frequency</a></li>
-<li><a class="reference internal" href="#Compression-point">Compression point</a></li>
+<li><a class="reference internal" href="#">Advanced Coupled Mode Equations models</a><ul>
+<li><a class="reference internal" href="#Initialize-TWPAnalysis">Initialize TWPAnalysis</a><ul>
+<li><a class="reference internal" href="#ModeArrays-and-ModeArrayFactory">ModeArrays and ModeArrayFactory</a></li>
+<li><a class="reference internal" href="#Gain-comparison-with-different-models">Gain comparison with different models</a></li>
 </ul>
 </li>
 </ul>

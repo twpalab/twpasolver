@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -245,20 +248,20 @@
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="c1"># mypy: ignore-errors</span>
-<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Union</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">NonNegativeInt</span><span class="p">,</span> <span class="n">computed_field</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">NonNegativeInt</span><span class="p">,</span> <span class="n">computed_field</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.matrices_arrays</span> <span class="kn">import</span> <span class="n">ABCDArray</span><span class="p">,</span> <span class="n">abcd_identity</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models.modelarray</span> <span class="kn">import</span> <span class="n">ModelArray</span>
-<span class="kn">from</span> <span class="nn">twpasolver.twoport</span> <span class="kn">import</span> <span class="n">TwoPortModel</span>
-<span class="kn">from</span> <span class="nn">twpasolver.typing</span> <span class="kn">import</span> <span class="n">all_subclasses</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.bonus_types</span><span class="w"> </span><span class="kn">import</span> <span class="n">all_subclasses</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.matrices_arrays</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABCDArray</span><span class="p">,</span> <span class="n">abcd_identity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models.modelarray</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelArray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.twoport</span><span class="w"> </span><span class="kn">import</span> <span class="n">TwoPortModel</span>
 
 
-<div class="viewcode-block" id="TwoPortArray"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TwoPortArray">[docs]</a><span class="k">class</span> <span class="nc">TwoPortArray</span><span class="p">(</span><span class="n">ModelArray</span><span class="p">):</span>
+<div class="viewcode-block" id="TwoPortArray"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TwoPortArray">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">TwoPortArray</span><span class="p">(</span><span class="n">ModelArray</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Generic container for arrays of TwoPortModels.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;TwoPortArray&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;TwoPortArray&quot;</span><span class="p">)</span>
@@ -267,7 +270,7 @@
         <span class="n">description</span><span class="o">=</span><span class="s2">&quot;List of TwoPortModels representing the basic cells. Nested lists are allowed.&quot;</span><span class="p">,</span>
     <span class="p">)</span>
 
-<div class="viewcode-block" id="TwoPortArray.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TwoPortArray.single_abcd">[docs]</a>    <span class="k">def</span> <span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
+<div class="viewcode-block" id="TwoPortArray.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TwoPortArray.single_abcd">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Compute abcd of combined models.</span>
 
@@ -280,10 +283,27 @@
         <span class="n">sc</span> <span class="o">=</span> <span class="n">abcd_identity</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">freqs</span><span class="p">))</span>
         <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">:</span>
             <span class="n">sc</span> <span class="o">=</span> <span class="n">sc</span> <span class="o">@</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">sc</span></div></div>
+        <span class="k">return</span> <span class="n">sc</span></div>
+
+    <span class="nd">@computed_field</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">N_tot</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeInt</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Total number of base cells in the model.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            NonNegativeInt: The total number of base cells.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">N_tot</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="s2">&quot;N_tot&quot;</span><span class="p">):</span>
+                <span class="n">N_tot</span> <span class="o">+=</span> <span class="n">cell</span><span class="o">.</span><span class="n">N_tot</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">N_tot</span> <span class="o">+=</span> <span class="n">cell</span><span class="o">.</span><span class="n">N</span>
+        <span class="k">return</span> <span class="n">N_tot</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">N</span></div>
 
 
-<div class="viewcode-block" id="TWPA"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA">[docs]</a><span class="k">class</span> <span class="nc">TWPA</span><span class="p">(</span><span class="n">TwoPortArray</span><span class="p">):</span>
+<div class="viewcode-block" id="TWPA"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">TWPA</span><span class="p">(</span><span class="n">TwoPortArray</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Simple model for TWPAs.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;TWPA&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;TWPA&quot;</span><span class="p">)</span>
@@ -295,7 +315,7 @@
 
     <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">epsilon</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">epsilon</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Coefficient of first-order term in inductance.</span>
 
@@ -306,7 +326,7 @@
 
     <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">xi</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">xi</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Coefficient of second-order term in inductance.</span>
 
@@ -317,7 +337,7 @@
 
     <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">chi</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">chi</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Coefficient for second term of phase matching relation.</span>
 
@@ -328,7 +348,7 @@
 
     <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">alpha</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">alpha</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Second-order correction term for inductance as function of dc current.</span>
 
@@ -339,25 +359,14 @@
 
     <span class="nd">@computed_field</span>
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">Iratio</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Iratio</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeFloat</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Ratio between bias and nonlinearity current parameter.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            NonNegativeFloat: The Iratio value.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">Idc</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">Istar</span>
-
-    <span class="nd">@computed_field</span>
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">N_tot</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NonNegativeInt</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Total number of base cells in the model.</span>
-
-<span class="sd">        Returns:</span>
-<span class="sd">            NonNegativeInt: The total number of base cells.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">N</span> <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">N</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">Idc</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">Istar</span></div>
 
 
 <span class="n">named_models</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">all_subclasses</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">in</span> <span class="n">c</span><span class="o">.</span><span class="n">model_fields</span><span class="p">]</span>
@@ -374,7 +383,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -236,28 +239,95 @@
         </div>
         <article role="main">
           <h1>Source code for twpasolver.analysis</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Analysis classes.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;Analysis class to simulate and plot the nonlinear behavior of TWPAs.&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
-<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span><span class="p">,</span> <span class="n">wraps</span>
-<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">strftime</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span><span class="p">,</span> <span class="n">wraps</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">time</span><span class="w"> </span><span class="kn">import</span> <span class="n">strftime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">matplotlib.axes</span> <span class="kn">import</span> <span class="n">Axes</span>
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">PrivateAttr</span><span class="p">,</span> <span class="n">field_validator</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.axes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Axes</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">PrivateAttr</span><span class="p">,</span> <span class="n">field_validator</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.basemodel</span> <span class="kn">import</span> <span class="n">BaseModel</span>
-<span class="kn">from</span> <span class="nn">twpasolver.file_utils</span> <span class="kn">import</span> <span class="n">read_file</span><span class="p">,</span> <span class="n">save_to_file</span>
-<span class="kn">from</span> <span class="nn">twpasolver.frequency</span> <span class="kn">import</span> <span class="n">Frequencies</span>
-<span class="kn">from</span> <span class="nn">twpasolver.logging</span> <span class="kn">import</span> <span class="n">log</span>
-<span class="kn">from</span> <span class="nn">twpasolver.mathutils</span> <span class="kn">import</span> <span class="n">cme_solve</span><span class="p">,</span> <span class="n">compute_phase_matching</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models</span> <span class="kn">import</span> <span class="n">TWPA</span>
-<span class="kn">from</span> <span class="nn">twpasolver.plotting</span> <span class="kn">import</span> <span class="n">plot_gain</span><span class="p">,</span> <span class="n">plot_phase_matching</span><span class="p">,</span> <span class="n">plot_response</span>
-<span class="kn">from</span> <span class="nn">twpasolver.typing</span> <span class="kn">import</span> <span class="n">FloatArray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.basemodel</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.bonus_types</span><span class="w"> </span><span class="kn">import</span> <span class="n">FloatArray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.cmes</span><span class="w"> </span><span class="kn">import</span> <span class="n">cme_general_solve_freq_array</span><span class="p">,</span> <span class="n">cme_solve</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.file_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_file</span><span class="p">,</span> <span class="n">save_to_file</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.frequency</span><span class="w"> </span><span class="kn">import</span> <span class="n">Frequencies</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.logger</span><span class="w"> </span><span class="kn">import</span> <span class="n">log</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">TWPA</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.modes_rwa</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModeArray</span><span class="p">,</span> <span class="n">ModeArrayFactory</span><span class="p">,</span> <span class="n">ParameterInterpolator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.plotting</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">plot_gain</span><span class="p">,</span>
+    <span class="n">plot_mode_currents</span><span class="p">,</span>
+    <span class="n">plot_phase_matching</span><span class="p">,</span>
+    <span class="n">plot_response</span><span class="p">,</span>
+<span class="p">)</span>
 
 
-<div class="viewcode-block" id="analysis_function"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.analysis_function">[docs]</a><span class="k">def</span> <span class="nf">analysis_function</span><span class="p">(</span>
+<div class="viewcode-block" id="GainModel"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.GainModel">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">GainModel</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">enum</span><span class="o">.</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Available CMEs models.</span>
+
+<span class="sd">    Available Models:</span>
+<span class="sd">        MINIMAL_3WM: Consider only pump, signal and ider. Faster simulation, but usually not accurate.</span>
+<span class="sd">        GENERAL_IDEAL: Solve CMEs with arbitrary set of modes, without considering losses nor reflections.</span>
+<span class="sd">        GENERAL_LOSS_ONLY: Solve CMEs with arbitrary set of modes, considering losses but not reflections.</span>
+<span class="sd">        GENERAL: Solve CMEs with arbitrary set of modes, including losses and reflections. Most accurate, but slowest.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">MINIMAL_3WM</span> <span class="o">=</span> <span class="s2">&quot;minimal_3wm&quot;</span>
+    <span class="n">GENERAL_IDEAL</span> <span class="o">=</span> <span class="s2">&quot;general_ideal&quot;</span>
+    <span class="n">GENERAL_LOSS_ONLY</span> <span class="o">=</span> <span class="s2">&quot;general_loss_only&quot;</span>
+    <span class="n">GENERAL</span> <span class="o">=</span> <span class="s2">&quot;general&quot;</span></div>
+
+
+<div class="viewcode-block" id="prepare_relations_coefficients"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.prepare_relations_coefficients">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">prepare_relations_coefficients</span><span class="p">(</span><span class="n">terms_3wm</span><span class="p">,</span> <span class="n">terms_4wm</span><span class="p">,</span> <span class="n">epsilon</span><span class="p">,</span> <span class="n">xi</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Prepare relation terms and coefficients for 3-wave and 4-wave mixing.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    terms_3wm : list</span>
+<span class="sd">        List of 3-wave mixing terms, each containing mode indices and coefficient</span>
+<span class="sd">    terms_4wm : list</span>
+<span class="sd">        List of 4-wave mixing terms, each containing mode indices and coefficient</span>
+<span class="sd">    epsilon : float</span>
+<span class="sd">        Scaling factor for 3-wave mixing coefficients</span>
+<span class="sd">    xi : float</span>
+<span class="sd">        Scaling factor for 4-wave mixing coefficients</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple</span>
+<span class="sd">        Contains:</span>
+<span class="sd">        - relations_3wm : List of mode indices for 3-wave mixing</span>
+<span class="sd">        - relations_4wm : List of mode indices for 4-wave mixing</span>
+<span class="sd">        - coeffs_3wm : numpy array of scaled coefficients for 3-wave mixing</span>
+<span class="sd">        - coeffs_4wm : numpy array of scaled coefficients for 4-wave mixing</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_indices</span><span class="p">(</span><span class="n">terms</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[[</span><span class="n">term</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">*</span><span class="n">term</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_coefficients</span><span class="p">(</span><span class="n">terms</span><span class="p">,</span> <span class="n">scaling_factor</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">term</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">scaling_factor</span> <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">])</span>
+
+    <span class="n">relations_3wm</span> <span class="o">=</span> <span class="n">extract_indices</span><span class="p">(</span><span class="n">terms_3wm</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_3wm</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="n">relations_4wm</span> <span class="o">=</span> <span class="n">extract_indices</span><span class="p">(</span><span class="n">terms_4wm</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_4wm</span> <span class="k">else</span> <span class="p">[]</span>
+
+    <span class="n">coeffs_3wm</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">calculate_coefficients</span><span class="p">(</span><span class="n">terms_3wm</span><span class="p">,</span> <span class="n">epsilon</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_3wm</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+    <span class="p">)</span>
+    <span class="n">coeffs_4wm</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">calculate_coefficients</span><span class="p">(</span><span class="n">terms_4wm</span><span class="p">,</span> <span class="n">xi</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_4wm</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">relations_3wm</span><span class="p">,</span> <span class="n">relations_4wm</span><span class="p">,</span> <span class="n">coeffs_3wm</span><span class="p">,</span> <span class="n">coeffs_4wm</span></div>
+
+
+<div class="viewcode-block" id="analysis_function"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.analysis_function">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">analysis_function</span><span class="p">(</span>
     <span class="n">func</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -268,7 +338,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>  <span class="c1"># Necessary for correct functioning of sphinx autodoc</span>
-    <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">save_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">update_base_data</span><span class="p">()</span>
         <span class="n">function_name</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="vm">__name__</span>
         <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">function_name</span><span class="p">)</span>
@@ -288,47 +358,26 @@
     <span class="k">return</span> <span class="n">wrapper</span></div>
 
 
-<div class="viewcode-block" id="ExecutionRequest"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.ExecutionRequest">[docs]</a><span class="k">class</span> <span class="nc">ExecutionRequest</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;General stucture of function execution request.&quot;&quot;&quot;</span>
-
-    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">arbitrary_types_allowed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">args</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-    <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="Analyzer"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer">[docs]</a><span class="k">class</span> <span class="nc">Analyzer</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<div class="viewcode-block" id="Analyzer"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">Analyzer</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for structured analysis.&quot;&quot;&quot;</span>
 
     <span class="n">data_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">partial</span><span class="p">(</span><span class="n">strftime</span><span class="p">,</span> <span class="s2">&quot;data_%m_</span><span class="si">%d</span><span class="s2">_%H_%M_%S&quot;</span><span class="p">))</span>
-    <span class="n">run</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExecutionRequest</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
     <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">exclude</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<div class="viewcode-block" id="Analyzer.model_post_init"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.model_post_init">[docs]</a>    <span class="k">def</span> <span class="nf">model_post_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">__context</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run analysis if list of ExecutionRequest is not empty.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">execute</span><span class="p">()</span></div>
-
 <div class="viewcode-block" id="Analyzer.update_base_data"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.update_base_data">[docs]</a>    <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">update_base_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_base_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Check and update base data of the class if necessary.&quot;&quot;&quot;</span></div>
 
-<div class="viewcode-block" id="Analyzer.save_data"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.save_data">[docs]</a>    <span class="k">def</span> <span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">writer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="Analyzer.save_data"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.save_data">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">save_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">writer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Save data to file.&quot;&quot;&quot;</span>
         <span class="n">save_to_file</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_file</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="n">writer</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Analyzer.load_data"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.load_data">[docs]</a>    <span class="k">def</span> <span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;hdf5&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="Analyzer.load_data"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.load_data">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">load_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;hdf5&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Load data from file.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">read_file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="n">writer</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Analyzer.execute"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run analysis.&quot;&quot;&quot;</span>
-        <span class="k">for</span> <span class="n">request</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">:</span>
-            <span class="n">function</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-            <span class="n">_</span> <span class="o">=</span> <span class="n">function</span><span class="p">(</span><span class="o">*</span><span class="n">request</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">request</span><span class="o">.</span><span class="n">kwargs</span><span class="p">)</span></div>
-
 <div class="viewcode-block" id="Analyzer.parameter_sweep"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.parameter_sweep">[docs]</a>    <span class="nd">@analysis_function</span>
-    <span class="k">def</span> <span class="nf">parameter_sweep</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">parameter_sweep</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">values</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -368,19 +417,17 @@
         <span class="k">return</span> <span class="n">results</span></div></div>
 
 
-<div class="viewcode-block" id="TWPAnalysis"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis">[docs]</a><span class="k">class</span> <span class="nc">TWPAnalysis</span><span class="p">(</span><span class="n">Analyzer</span><span class="p">,</span> <span class="n">Frequencies</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Runner for standard analysis routines of 3WM twpa models.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="TWPAnalysis"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">TWPAnalysis</span><span class="p">(</span><span class="n">Analyzer</span><span class="p">,</span> <span class="n">Frequencies</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Runner for standard analysis routines of TWPA models with enhanced ModeArray support.&quot;&quot;&quot;</span>
 
     <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">validate_assignment</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">twpa</span><span class="p">:</span> <span class="n">TWPA</span>
-    <span class="c1"># freqs_arange: FrequencyArange</span>
-    <span class="c1"># freqs_unit: Literal[&quot;Hz&quot;, &quot;kHz&quot;, &quot;MHz&quot;, &quot;GHz&quot;] = &quot;GHz&quot;</span>
     <span class="n">_previous_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">PrivateAttr</span><span class="p">()</span>
-    <span class="c1"># _unit_multipliers = PrivateAttr({&quot;Hz&quot;: 1, &quot;kHz&quot;: 1e3, &quot;MHz&quot;: 1e6, &quot;GHz&quot;: 1e9})</span>
+    <span class="n">_mode_arrays</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ModeArray</span><span class="p">]</span> <span class="o">=</span> <span class="n">PrivateAttr</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
 
 <div class="viewcode-block" id="TWPAnalysis.load_model_from_file"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.load_model_from_file">[docs]</a>    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;twpa&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">,</span> <span class="n">check_fields</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">load_model_from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">twpa</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">TWPA</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TWPA</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_model_from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">twpa</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">TWPA</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TWPA</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Try loading twpa model from file if filename string is provided.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">twpa</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
             <span class="k">try</span><span class="p">:</span>
@@ -388,10 +435,10 @@
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                     <span class="s2">&quot;Input string mut be valid path to model file.&quot;</span>
-                <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+                <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
         <span class="k">return</span> <span class="n">twpa</span>  <span class="c1"># type: ignore[return-value]</span></div>
 
-<div class="viewcode-block" id="TWPAnalysis.update_base_data"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.update_base_data">[docs]</a>    <span class="k">def</span> <span class="nf">update_base_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="TWPAnalysis.update_base_data"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.update_base_data">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">update_base_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Update data extracted from the twpa model.</span>
 
@@ -408,6 +455,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;freqs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">freqs</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;abcd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">abcd</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S21&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">s</span><span class="o">.</span><span class="n">S21</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S11&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">s</span><span class="o">.</span><span class="n">S11</span>
             <span class="n">s21_db</span> <span class="o">=</span> <span class="mi">20</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S21&quot;</span><span class="p">]))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S21_db&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">s21_db</span>
             <span class="n">s21_db_diff</span> <span class="o">=</span> <span class="n">s21_db</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">s21_db</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -416,6 +464,28 @@
                 <span class="n">freqs</span><span class="p">[</span><span class="n">stopband_start_idx</span><span class="p">],</span>
                 <span class="n">freqs</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">s21_db_diff</span><span class="p">)],</span>
             <span class="p">]</span>
+            <span class="n">Z0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">Z0_ref</span>
+            <span class="n">ac</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">d</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;abcd&quot;</span><span class="p">][:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;abcd&quot;</span><span class="p">][:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;abcd&quot;</span><span class="p">][:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;abcd&quot;</span><span class="p">][:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="n">Zbp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">b</span> <span class="o">/</span> <span class="p">(</span><span class="n">ac</span> <span class="o">-</span> <span class="n">d</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">((</span><span class="n">ac</span> <span class="o">+</span> <span class="n">d</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">-</span> <span class="mi">4</span><span class="p">)))</span>
+            <span class="n">gammas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">Z0</span> <span class="o">-</span> <span class="n">Zbp</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">Z0</span> <span class="o">+</span> <span class="n">Zbp</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;Zb&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Zbp</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;gammas&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">s</span><span class="o">.</span><span class="n">S11</span>
+
+            <span class="c1"># Compute attenuation constant from S21</span>
+            <span class="n">N_tot</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">N_tot</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S21&quot;</span><span class="p">]))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">N_tot</span><span class="p">)</span>
+            <span class="n">freqs_mask</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;freqs&quot;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">1</span>
+            <span class="n">twpa_loss_ghz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;freqs&quot;</span><span class="p">][</span><span class="n">freqs_mask</span><span class="p">],</span>
+                <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;S21_db&quot;</span><span class="p">][</span><span class="n">freqs_mask</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="mi">20</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">N_tot</span><span class="p">),</span>
+                <span class="mi">1</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;alpha&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">alpha</span>  <span class="c1"># np.polyval(twpa_loss_ghz, self.data[&quot;freqs&quot;])</span>
 
             <span class="c1"># Fit low frequency phase response to correctly unrwap at f=0 Hz</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">unit_multiplier</span> <span class="o">&gt;</span> <span class="n">freqs</span><span class="p">[</span><span class="n">stopband_start_idx</span><span class="p">]</span> <span class="o">/</span> <span class="mi">10</span><span class="p">:</span>
@@ -431,9 +501,59 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">k_full</span> <span class="o">-</span> <span class="n">k_pars</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;k_star&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">k_full</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">polyval</span><span class="p">(</span><span class="n">k_pars</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">freqs</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;optimal_pump_freq&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_estimate_optimal_pump</span><span class="p">()</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_previous_state</span> <span class="o">=</span> <span class="n">current_state</span></div>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_previous_state</span> <span class="o">=</span> <span class="n">current_state</span>
 
-    <span class="k">def</span> <span class="nf">_estimate_optimal_pump</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+            <span class="c1"># Update all registered mode arrays with new base data</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_update_all_mode_arrays</span><span class="p">()</span>
+
+            <span class="c1"># Initialize standard mode arrays if they don&#39;t exist</span>
+            <span class="k">if</span> <span class="s2">&quot;basic_3wm&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode_arrays</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_initialize_standard_mode_arrays</span><span class="p">()</span></div>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_initialize_standard_mode_arrays</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize standard mode arrays using the computed base data.&quot;&quot;&quot;</span>
+        <span class="c1"># Create basic 3WM mode array</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mode_arrays</span><span class="p">[</span><span class="s2">&quot;basic_3wm&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ModeArrayFactory</span><span class="o">.</span><span class="n">create_basic_3wm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_update_all_mode_arrays</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update all registered mode arrays with current base data.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode_arrays</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="c1"># Create new interpolator with current base data</span>
+        <span class="n">interpolator</span> <span class="o">=</span> <span class="n">ParameterInterpolator</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;freqs&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;gammas&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;alpha&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Update all mode arrays</span>
+        <span class="k">for</span> <span class="n">mode_array</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode_arrays</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">mode_array</span><span class="o">.</span><span class="n">update_base_data</span><span class="p">(</span><span class="n">interpolator</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TWPAnalysis.get_mode_array"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.get_mode_array">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_mode_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;basic_3wm&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ModeArray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get a mode array by configuration name.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config: Name of the mode array configuration</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ModeArray: The requested mode array configuration</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">config</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode_arrays</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mode array configuration &#39;</span><span class="si">{</span><span class="n">config</span><span class="si">}</span><span class="s2">&#39; not found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode_arrays</span><span class="p">[</span><span class="n">config</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="TWPAnalysis.add_mode_array"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.add_mode_array">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">add_mode_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">mode_array</span><span class="p">:</span> <span class="n">ModeArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add a custom mode array to the analyzer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name: Name to assign to the mode array</span>
+<span class="sd">            mode_array: The mode array to add</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mode_arrays</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">mode_array</span></div>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_estimate_optimal_pump</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Estimate optimal pump frequency for 3WM.&quot;&quot;&quot;</span>
         <span class="n">freqs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;freqs&quot;</span><span class="p">]</span>
         <span class="n">ks</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">]</span>
@@ -442,115 +562,435 @@
         <span class="n">pump_k</span> <span class="o">=</span> <span class="n">ks</span><span class="p">[</span><span class="n">min_p_idx</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">signal_f</span> <span class="o">=</span> <span class="n">pump_f</span> <span class="o">/</span> <span class="mi">2</span>
         <span class="n">signal_k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">signal_f</span><span class="p">,</span> <span class="n">freqs</span><span class="p">,</span> <span class="n">ks</span><span class="p">)</span>
-        <span class="n">deltas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">pump_k</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">signal_k</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">chi</span> <span class="o">*</span> <span class="p">(</span><span class="n">pump_k</span> <span class="o">-</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">signal_k</span><span class="p">))</span>
+        <span class="n">deltas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span>
+            <span class="n">pump_k</span>
+            <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">signal_k</span>
+            <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;gammas&quot;</span><span class="p">][</span><span class="n">min_p_idx</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">chi</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">pump_k</span> <span class="o">-</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">signal_k</span><span class="p">)</span>
+        <span class="p">)</span>
         <span class="k">return</span> <span class="n">pump_f</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">deltas</span><span class="p">)]</span>
 
 <div class="viewcode-block" id="TWPAnalysis.phase_matching"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.phase_matching">[docs]</a>    <span class="nd">@analysis_function</span>
-    <span class="k">def</span> <span class="nf">phase_matching</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">phase_matching</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">process</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;PA&quot;</span><span class="p">,</span> <span class="s2">&quot;FCU&quot;</span><span class="p">,</span> <span class="s2">&quot;FCD&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;PA&quot;</span><span class="p">,</span>
+        <span class="n">signal_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span>
+        <span class="n">pump_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;p&quot;</span><span class="p">,</span>
+        <span class="n">idler_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;i&quot;</span><span class="p">,</span>
+        <span class="n">mode_array_config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;basic_3wm&quot;</span><span class="p">,</span>
+        <span class="n">pump_Ip0</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">signal_arange</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">pump_arange</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Build phase matching profile.</span>
-
-<span class="sd">        The phase matching condition is computed considering all signal frequencies</span>
-<span class="sd">        lower than the first stopband and all pump frequencies from the end of the first stopband.</span>
+<span class="sd">        Build phase matching profile for specified modes.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            thin (int): The step size to thin out the frequency and wavenumber arrays.</span>
+<span class="sd">            process: Type of process (&quot;PA&quot;, &quot;FCU&quot;, &quot;FCD&quot;)</span>
+<span class="sd">            signal_mode: Label of the signal mode</span>
+<span class="sd">            pump_mode: Label of the pump mode</span>
+<span class="sd">            idler_mode: Label of the idler mode</span>
+<span class="sd">            mode_array_config: Name of the mode array configuration to use</span>
+<span class="sd">            pump_Ip0: Optional pump current</span>
+<span class="sd">            signal_arange: Signal frequency range as (start, stop, step)</span>
+<span class="sd">            pump_arange: Pump frequency range as (start, stop, step)</span>
+<span class="sd">            thin: The step size to thin out the frequency and wavenumber arrays</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            dict: A dictionary containing:</span>
-<span class="sd">                - &quot;delta&quot; (array): Phase matching condition values.</span>
-<span class="sd">                - &quot;triplets&quot; (dict): A dictionary containing triplets satisfying phase matching:</span>
-<span class="sd">                    - &quot;f&quot; (array): Frequency triplets.</span>
-<span class="sd">                    - &quot;k&quot; (array): Wavenumber triplets.</span>
-<span class="sd">                - &quot;pump_freqs&quot; (array): All pump frequencies considered.</span>
-<span class="sd">                - &quot;signal_freqs&quot; (array): All signal frequencies considered.</span>
+<span class="sd">            dict: A dictionary containing phase matching analysis results</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Get the mode array</span>
+        <span class="n">mode_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_mode_array</span><span class="p">(</span><span class="n">mode_array_config</span><span class="p">)</span>
+
         <span class="n">freqs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;freqs&quot;</span><span class="p">]</span>
-        <span class="n">ks</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">]</span>
-        <span class="n">min_p_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">freqs</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;stopband_freqs&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-        <span class="n">max_p_idx</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
-        <span class="n">min_s_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">freqs</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;stopband_freqs&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-        <span class="n">signal_f</span> <span class="o">=</span> <span class="n">freqs</span><span class="p">[:</span><span class="n">min_s_idx</span><span class="p">:</span><span class="n">thin</span><span class="p">]</span>
-        <span class="n">signal_k</span> <span class="o">=</span> <span class="n">ks</span><span class="p">[:</span><span class="n">min_s_idx</span><span class="p">:</span><span class="n">thin</span><span class="p">]</span>
-        <span class="n">pump_f</span> <span class="o">=</span> <span class="n">freqs</span><span class="p">[</span><span class="n">min_p_idx</span><span class="p">:</span><span class="n">max_p_idx</span><span class="p">:</span><span class="n">thin</span><span class="p">]</span>
-        <span class="n">pump_k</span> <span class="o">=</span> <span class="n">ks</span><span class="p">[</span><span class="n">min_p_idx</span><span class="p">:</span><span class="n">max_p_idx</span><span class="p">:</span><span class="n">thin</span><span class="p">]</span>
-        <span class="n">deltas</span><span class="p">,</span> <span class="n">f_triplets</span><span class="p">,</span> <span class="n">k_triplets</span> <span class="o">=</span> <span class="n">compute_phase_matching</span><span class="p">(</span>
-            <span class="n">signal_f</span><span class="p">,</span> <span class="n">pump_f</span><span class="p">,</span> <span class="n">signal_k</span><span class="p">,</span> <span class="n">pump_k</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">chi</span>
-        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">pump_arange</span><span class="p">:</span>
+            <span class="n">pump_f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">*</span><span class="n">pump_arange</span><span class="p">)[::</span><span class="n">thin</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Determine frequency ranges for signal and pump</span>
+            <span class="n">min_p_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">freqs</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;stopband_freqs&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">max_p_idx</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+            <span class="n">pump_f</span> <span class="o">=</span> <span class="n">freqs</span><span class="p">[</span><span class="n">min_p_idx</span><span class="p">:</span><span class="n">max_p_idx</span><span class="p">:</span><span class="n">thin</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">signal_arange</span><span class="p">:</span>
+            <span class="n">signal_f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">*</span><span class="n">signal_arange</span><span class="p">)[::</span><span class="n">thin</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">max_s_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">freqs</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;stopband_freqs&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">signal_f</span> <span class="o">=</span> <span class="n">freqs</span><span class="p">[:</span><span class="n">max_s_idx</span><span class="p">:</span><span class="n">thin</span><span class="p">]</span>
+
+        <span class="n">chi</span> <span class="o">=</span> <span class="n">pump_Ip0</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">xi</span> <span class="o">/</span> <span class="mi">8</span> <span class="k">if</span> <span class="n">pump_Ip0</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">chi</span>
+
+        <span class="n">f_triplets</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">k_triplets</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">deltas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">signal_f</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">pump_f</span><span class="p">)))</span>
+
+        <span class="k">if</span> <span class="n">process</span> <span class="o">==</span> <span class="s2">&quot;PA&quot;</span><span class="p">:</span>
+            <span class="n">idler_sign</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+            <span class="n">signal_sign</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">process</span> <span class="o">==</span> <span class="s2">&quot;FCD&quot;</span><span class="p">:</span>
+            <span class="n">idler_sign</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="n">signal_sign</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">idler_sign</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+            <span class="n">signal_sign</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="n">mode_array_keys</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">mode_array</span><span class="o">.</span><span class="n">modes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="n">signal_idx</span> <span class="o">=</span> <span class="n">mode_array_keys</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">signal_mode</span><span class="p">)</span>
+        <span class="n">pump_idx</span> <span class="o">=</span> <span class="n">mode_array_keys</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">pump_mode</span><span class="p">)</span>
+        <span class="n">idler_idx</span> <span class="o">=</span> <span class="n">mode_array_keys</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">idler_mode</span><span class="p">)</span>
+
+        <span class="c1"># Compute phase matching - optimized version</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">p_freq</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pump_f</span><span class="p">):</span>
+            <span class="c1"># Update pump frequency once per pump frequency</span>
+            <span class="n">mode_array</span><span class="o">.</span><span class="n">update_frequencies</span><span class="p">({</span><span class="n">pump_mode</span><span class="p">:</span> <span class="n">p_freq</span><span class="p">})</span>
+
+            <span class="c1"># Process all signal frequencies at once</span>
+            <span class="n">mode_params</span> <span class="o">=</span> <span class="n">mode_array</span><span class="o">.</span><span class="n">process_frequency_array</span><span class="p">(</span><span class="n">signal_mode</span><span class="p">,</span> <span class="n">signal_f</span><span class="p">)</span>
+
+            <span class="c1"># Extract parameters for all signal frequencies</span>
+            <span class="n">signal_freqs</span> <span class="o">=</span> <span class="n">mode_params</span><span class="p">[</span><span class="n">signal_mode</span><span class="p">][</span><span class="s2">&quot;freqs&quot;</span><span class="p">]</span>
+            <span class="n">idler_freqs</span> <span class="o">=</span> <span class="n">mode_params</span><span class="p">[</span><span class="n">idler_mode</span><span class="p">][</span><span class="s2">&quot;freqs&quot;</span><span class="p">]</span>
+
+            <span class="n">pump_k</span> <span class="o">=</span> <span class="n">mode_array</span><span class="o">.</span><span class="n">get_mode</span><span class="p">(</span><span class="n">pump_mode</span><span class="p">)</span><span class="o">.</span><span class="n">k</span>
+            <span class="n">signal_k_array</span> <span class="o">=</span> <span class="n">mode_params</span><span class="p">[</span><span class="n">signal_mode</span><span class="p">][</span><span class="s2">&quot;k&quot;</span><span class="p">]</span>
+            <span class="n">idler_k_array</span> <span class="o">=</span> <span class="n">mode_params</span><span class="p">[</span><span class="n">idler_mode</span><span class="p">][</span><span class="s2">&quot;k&quot;</span><span class="p">]</span>
+            <span class="n">gamma</span> <span class="o">=</span> <span class="n">mode_array</span><span class="o">.</span><span class="n">get_mode</span><span class="p">(</span><span class="n">pump_mode</span><span class="p">)</span><span class="o">.</span><span class="n">gamma</span>
+
+            <span class="c1"># Store triplets for this pump frequency</span>
+            <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="p">(</span><span class="n">s_freq</span><span class="p">,</span> <span class="n">i_freq</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">signal_freqs</span><span class="p">,</span> <span class="n">idler_freqs</span><span class="p">)):</span>
+                <span class="n">f_triplets</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">p_freq</span><span class="p">,</span> <span class="n">s_freq</span><span class="p">,</span> <span class="n">i_freq</span><span class="p">])</span>
+                <span class="n">k_triplets</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">pump_k</span><span class="p">,</span> <span class="n">signal_k_array</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">idler_k_array</span><span class="p">[</span><span class="n">j</span><span class="p">]])</span>
+
+            <span class="c1"># Compute phase mismatch for all signal frequencies at once</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">gamma</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">pump_k</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">signal_k_array</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">idler_k_array</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="p">):</span>
+                <span class="n">deltas</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">pump_k</span>
+                    <span class="o">+</span> <span class="n">signal_sign</span> <span class="o">*</span> <span class="n">signal_k_array</span>
+                    <span class="o">+</span> <span class="n">idler_sign</span> <span class="o">*</span> <span class="n">idler_k_array</span>
+                    <span class="o">+</span> <span class="n">chi</span>
+                    <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">gamma</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+                    <span class="o">*</span> <span class="p">(</span>
+                        <span class="n">pump_k</span>
+                        <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">signal_sign</span> <span class="o">*</span> <span class="n">signal_k_array</span>
+                        <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">idler_sign</span> <span class="o">*</span> <span class="n">idler_k_array</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;delta&quot;</span><span class="p">:</span> <span class="n">deltas</span><span class="p">,</span>
             <span class="s2">&quot;triplets&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;f&quot;</span><span class="p">:</span> <span class="n">f_triplets</span><span class="p">,</span> <span class="s2">&quot;k&quot;</span><span class="p">:</span> <span class="n">k_triplets</span><span class="p">},</span>
             <span class="s2">&quot;pump_freqs&quot;</span><span class="p">:</span> <span class="n">pump_f</span><span class="p">,</span>
             <span class="s2">&quot;signal_freqs&quot;</span><span class="p">:</span> <span class="n">signal_f</span><span class="p">,</span>
+            <span class="s2">&quot;mode_info&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;signal&quot;</span><span class="p">:</span> <span class="n">signal_mode</span><span class="p">,</span>
+                <span class="s2">&quot;pump&quot;</span><span class="p">:</span> <span class="n">pump_mode</span><span class="p">,</span>
+                <span class="s2">&quot;idler&quot;</span><span class="p">:</span> <span class="n">idler_mode</span><span class="p">,</span>
+                <span class="s2">&quot;mode_array&quot;</span><span class="p">:</span> <span class="n">mode_array_config</span><span class="p">,</span>
+            <span class="p">},</span>
         <span class="p">}</span></div>
 
 <div class="viewcode-block" id="TWPAnalysis.gain"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.gain">[docs]</a>    <span class="nd">@analysis_function</span>
-    <span class="k">def</span> <span class="nf">gain</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">gain</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">signal_freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
         <span class="n">pump</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">Is0</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-6</span><span class="p">,</span>
         <span class="n">Ip0</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">GainModel</span><span class="p">]</span> <span class="o">=</span> <span class="n">GainModel</span><span class="o">.</span><span class="n">MINIMAL_3WM</span><span class="p">,</span>
+        <span class="n">mode_array_config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;basic_3wm&quot;</span><span class="p">,</span>
+        <span class="n">signal_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span>
+        <span class="n">pump_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;p&quot;</span><span class="p">,</span>
+        <span class="n">idler_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;i&quot;</span><span class="p">,</span>
+        <span class="n">initial_amplitudes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Compute expected gain with 3WM as a function of frequency and cell number in the TWPA.</span>
+<span class="sd">        Compute expected gain with selected gain model.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            signal_freqs (FloatArray): Array of signal frequencies to consider.</span>
-<span class="sd">            pump (Optional[float]): The pump frequency. If None, uses the optimal pump frequency from data.</span>
-<span class="sd">            Is0 (float): Initial signal current (in A).</span>
-<span class="sd">            Ip0 (Optional[float]): Initial pump current (in A). If None, uses the current TWPA&#39;s Ip0.</span>
-<span class="sd">            thin (int): The step size to thin out the position array.</span>
-<span class="sd">                        Otherwise, the currents are computed at every cell in the TWPA</span>
+<span class="sd">            signal_freqs: Array of signal frequencies to consider</span>
+<span class="sd">            pump: The pump frequency (if None, uses the optimal pump frequency from data)</span>
+<span class="sd">            Is0: Initial signal current (in A) for standard 3WM model</span>
+<span class="sd">            Ip0: Initial pump current (in A) (if None, uses the current TWPA&#39;s Ip0)</span>
+<span class="sd">            model: Gain model to use (minimal_3wm, general, general without reflections, or general with loss only)</span>
+<span class="sd">            mode_array_config: Name of the mode array configuration to use</span>
+<span class="sd">            signal_mode: Label of the signal mode</span>
+<span class="sd">            pump_mode: Label of the pump mode</span>
+<span class="sd">            idler_mode: Label of the idler mode (if None, will be determined from mode array relations)</span>
+<span class="sd">            initial_amplitudes: Initial amplitudes for all modes. Can be:</span>
+<span class="sd">                               - 1D array: Same initial conditions for all frequencies</span>
+<span class="sd">                               - 2D array: Different initial conditions for each frequency [n_freq, n_modes]</span>
+<span class="sd">                               - None: Use default values (specified Ip0 and Is0, 1e-14 for all other modes)</span>
+<span class="sd">            thin: The step size to thin out the position array</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            dict: A dictionary containing:</span>
-<span class="sd">                - &quot;pump_freq&quot; (float): The pump frequency used in the calculation.</span>
-<span class="sd">                - &quot;signal_freqs&quot; (array): The array of signal frequencies.</span>
-<span class="sd">                - &quot;x&quot; (array): The thinned cell position array along the TWPA.</span>
-<span class="sd">                - &quot;I_triplets&quot; (array): Array of pump, signal and idler current</span>
-<span class="sd">                                        triplets at each computed cell.</span>
-<span class="sd">                - &quot;gain_db&quot; (array): The final signal gain in dB.</span>
+<span class="sd">            dict: A dictionary containing gain calculation results</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">signal_freqs</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-            <span class="n">signal_freqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">signal_freqs</span><span class="p">)</span>
-        <span class="n">N_tot</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">N_tot</span>
-        <span class="n">thin</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">thin</span><span class="p">,</span> <span class="n">N_tot</span><span class="p">)</span>
+        <span class="c1"># Process model parameter</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">model</span> <span class="o">=</span> <span class="n">GainModel</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Invalid model: </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">. Must be one of </span><span class="si">{</span><span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">value</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">GainModel</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+        <span class="c1"># Set pump current if specified</span>
         <span class="k">if</span> <span class="n">Ip0</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">Ip0</span> <span class="o">=</span> <span class="n">Ip0</span>
+
+        <span class="c1"># Use optimal pump if not specified</span>
         <span class="k">if</span> <span class="n">pump</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">pump</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;optimal_pump_freq&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Ensure signal_freqs is a numpy array</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">signal_freqs</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">signal_freqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">signal_freqs</span><span class="p">)</span>
+
+        <span class="c1"># Get total number of cells</span>
+        <span class="n">N_tot</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">N_tot</span>
+
+        <span class="c1"># Get position array</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">N_tot</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">N_tot</span> <span class="o">/</span> <span class="n">thin</span><span class="p">),</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Use appropriate model for gain calculation</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="n">GainModel</span><span class="o">.</span><span class="n">MINIMAL_3WM</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_minimal_3wm_gain</span><span class="p">(</span>
+                <span class="n">signal_freqs</span><span class="p">,</span> <span class="n">pump</span><span class="p">,</span> <span class="n">Is0</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">initial_amplitudes</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Set up initial conditions</span>
+            <span class="k">if</span> <span class="n">initial_amplitudes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># Default initial conditions</span>
+                <span class="n">mode_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_mode_array</span><span class="p">(</span><span class="n">mode_array_config</span><span class="p">)</span>
+                <span class="n">n_modes</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">mode_array</span><span class="o">.</span><span class="n">modes</span><span class="p">)</span>
+                <span class="n">y0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_modes</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+                <span class="n">mode_labels</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">mode_array</span><span class="o">.</span><span class="n">modes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+                <span class="n">signal_idx</span> <span class="o">=</span> <span class="n">mode_labels</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">signal_mode</span><span class="p">)</span>
+                <span class="n">pump_idx</span> <span class="o">=</span> <span class="n">mode_labels</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">pump_mode</span><span class="p">)</span>
+                <span class="n">y0</span><span class="p">[</span><span class="n">pump_idx</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">Ip0</span>
+                <span class="n">y0</span><span class="p">[</span><span class="n">signal_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">Is0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">y0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">initial_amplitudes</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+
+            <span class="n">reflections</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">with_loss</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="n">GainModel</span><span class="o">.</span><span class="n">GENERAL_IDEAL</span><span class="p">:</span>
+                <span class="n">reflections</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="n">GainModel</span><span class="o">.</span><span class="n">GENERAL_LOSS_ONLY</span><span class="p">:</span>
+                <span class="n">reflections</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="n">with_loss</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_general_gain</span><span class="p">(</span>
+                <span class="n">signal_freqs</span><span class="p">,</span>
+                <span class="n">pump</span><span class="p">,</span>
+                <span class="n">mode_array_config</span><span class="p">,</span>
+                <span class="n">signal_mode</span><span class="p">,</span>
+                <span class="n">pump_mode</span><span class="p">,</span>
+                <span class="n">idler_mode</span><span class="p">,</span>
+                <span class="n">y0</span><span class="p">,</span>
+                <span class="n">x</span><span class="p">,</span>
+                <span class="n">reflections</span><span class="o">=</span><span class="n">reflections</span><span class="p">,</span>
+                <span class="n">with_loss</span><span class="o">=</span><span class="n">with_loss</span><span class="p">,</span>
+            <span class="p">)</span></div>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_general_gain</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">signal_freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
+        <span class="n">pump</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">mode_array_config</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">signal_mode</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">pump_mode</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">idler_mode</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">initial_amplitudes</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">x</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
+        <span class="n">reflections</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">with_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute gain using the general coupled mode equations model with ModeArray interpolation.&quot;&quot;&quot;</span>
+        <span class="c1"># Get the mode array</span>
+        <span class="n">mode_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_mode_array</span><span class="p">(</span><span class="n">mode_array_config</span><span class="p">)</span>
+
+        <span class="c1"># Mode indices for reference</span>
+        <span class="n">mode_labels</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">mode_array</span><span class="o">.</span><span class="n">modes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="n">signal_idx</span> <span class="o">=</span> <span class="n">mode_labels</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">signal_mode</span><span class="p">)</span>
+        <span class="n">pump_idx</span> <span class="o">=</span> <span class="n">mode_labels</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">pump_mode</span><span class="p">)</span>
+        <span class="n">idler_idx</span> <span class="o">=</span> <span class="n">mode_labels</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">idler_mode</span><span class="p">)</span>
+
+        <span class="n">N_tot</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">N_tot</span>
+        <span class="n">n_freq</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">signal_freqs</span><span class="p">)</span>
+        <span class="n">n_modes</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">mode_array</span><span class="o">.</span><span class="n">modes</span><span class="p">)</span>
+
+        <span class="c1"># Update the pump frequency and process signal frequency array using ModeArray capabilities</span>
+        <span class="n">mode_array</span><span class="o">.</span><span class="n">update_frequencies</span><span class="p">({</span><span class="n">pump_mode</span><span class="p">:</span> <span class="n">pump</span><span class="p">})</span>
+        <span class="n">mode_params</span> <span class="o">=</span> <span class="n">mode_array</span><span class="o">.</span><span class="n">process_frequency_array</span><span class="p">(</span><span class="n">signal_mode</span><span class="p">,</span> <span class="n">signal_freqs</span><span class="p">)</span>
+
+        <span class="c1"># Get RWA terms for 3-wave and 4-wave mixing (using cached results)</span>
+        <span class="n">terms_3wm</span> <span class="o">=</span> <span class="n">mode_array</span><span class="o">.</span><span class="n">get_rwa_terms</span><span class="p">(</span><span class="n">power</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">terms_4wm</span> <span class="o">=</span> <span class="n">mode_array</span><span class="o">.</span><span class="n">get_rwa_terms</span><span class="p">(</span><span class="n">power</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+        <span class="c1"># Prepare relations and coefficients</span>
+        <span class="n">relations_coefficients</span> <span class="o">=</span> <span class="n">prepare_relations_coefficients</span><span class="p">(</span>
+            <span class="n">terms_3wm</span><span class="p">,</span> <span class="n">terms_4wm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">epsilon</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">xi</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Build CME data arrays using ModeArray interpolated parameters</span>
+        <span class="n">cme_data_array</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_freq</span><span class="p">):</span>
+            <span class="n">kappas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">mode_params</span><span class="p">[</span><span class="n">mode</span><span class="p">][</span><span class="s2">&quot;k&quot;</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">mode</span> <span class="ow">in</span> <span class="n">mode_labels</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">with_loss</span><span class="p">:</span>
+                <span class="n">alphas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">mode_params</span><span class="p">[</span><span class="n">mode</span><span class="p">][</span><span class="s2">&quot;alpha&quot;</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">mode</span> <span class="ow">in</span> <span class="n">mode_labels</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="n">cme_data_array</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">kappas</span><span class="p">,</span> <span class="n">alphas</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">reflections</span><span class="p">:</span>
+                <span class="n">alphas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">mode_params</span><span class="p">[</span><span class="n">mode</span><span class="p">][</span><span class="s2">&quot;alpha&quot;</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">mode</span> <span class="ow">in</span> <span class="n">mode_labels</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="n">gammas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">mode_params</span><span class="p">[</span><span class="n">mode</span><span class="p">][</span><span class="s2">&quot;gamma&quot;</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">mode</span> <span class="ow">in</span> <span class="n">mode_labels</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="c1"># Calculate reflection terms</span>
+                <span class="n">gammas_tilde</span> <span class="o">=</span> <span class="n">gammas</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">kappas</span> <span class="o">*</span> <span class="n">N_tot</span><span class="p">)</span>
+                <span class="n">gammas_tilde</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">gammas</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.99</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="n">ts_reflection_neg</span> <span class="o">=</span> <span class="n">gammas_tilde</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gammas_tilde</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+                <span class="n">ts_reflection</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gammas_tilde</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+                <span class="c1"># ts_reflection_neg[np.abs(gammas)&gt;0.99]=0</span>
+
+                <span class="n">cme_data_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">kappas</span><span class="p">,</span> <span class="n">alphas</span><span class="p">,</span> <span class="n">ts_reflection</span><span class="p">,</span> <span class="n">ts_reflection_neg</span><span class="p">]</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Ideal case: only kappas needed</span>
+                <span class="n">cme_data_array</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">kappas</span><span class="p">])</span>
+
+        <span class="c1"># Solve the CMEs for all signal frequencies using the parallel solver</span>
+        <span class="n">I_triplets_array</span> <span class="o">=</span> <span class="n">cme_general_solve_freq_array</span><span class="p">(</span>
+            <span class="n">x</span><span class="p">,</span>
+            <span class="n">initial_amplitudes</span><span class="p">,</span>  <span class="c1"># This will be broadcast automatically if 1D</span>
+            <span class="n">cme_data_array</span><span class="p">,</span>
+            <span class="n">relations_coefficients</span><span class="p">,</span>
+            <span class="n">thin</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">reflections</span><span class="o">=</span><span class="n">reflections</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">with_loss</span><span class="p">,</span>
+            <span class="n">with_loss</span><span class="o">=</span><span class="n">with_loss</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">reflections</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Calculate gain handling different conditions.</span>
+        <span class="k">if</span> <span class="n">initial_amplitudes</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">initial_signal</span> <span class="o">=</span> <span class="n">initial_amplitudes</span><span class="p">[</span><span class="n">signal_idx</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">initial_signal</span> <span class="o">=</span> <span class="n">initial_amplitudes</span><span class="p">[:,</span> <span class="n">signal_idx</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">reflections</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">with_loss</span><span class="p">:</span>
+            <span class="c1"># Extract signal mode parameters directly from ModeArray</span>
+            <span class="n">gammas_signal</span> <span class="o">=</span> <span class="n">mode_params</span><span class="p">[</span><span class="n">signal_mode</span><span class="p">][</span><span class="s2">&quot;gamma&quot;</span><span class="p">]</span>
+            <span class="n">kappas_signal</span> <span class="o">=</span> <span class="n">mode_params</span><span class="p">[</span><span class="n">signal_mode</span><span class="p">][</span><span class="s2">&quot;k&quot;</span><span class="p">]</span>
+
+            <span class="c1"># Calculate transmission coefficient for gain calculation</span>
+            <span class="n">ts_signal</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gammas_signal</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">2</span><span class="n">j</span> <span class="o">*</span> <span class="n">kappas_signal</span> <span class="o">*</span> <span class="n">N_tot</span><span class="p">))</span>
+
+            <span class="n">gain_db</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">I_triplets_array</span><span class="p">[:,</span> <span class="n">signal_idx</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">initial_signal</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">gammas_signal</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">ts_signal</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Simple gain calculation for ideal or loss-only cases</span>
+            <span class="n">gain_db</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">I_triplets_array</span><span class="p">[:,</span> <span class="n">signal_idx</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">initial_signal</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Create mode maps for better result interpretation</span>
+        <span class="n">mode_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">label</span><span class="p">:</span> <span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">mode_labels</span><span class="p">)}</span>
+        <span class="n">reverse_mode_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">idx</span><span class="p">:</span> <span class="n">label</span> <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">mode_map</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+        <span class="c1"># Determine which CME model was used</span>
+        <span class="n">model_name</span> <span class="o">=</span> <span class="n">GainModel</span><span class="o">.</span><span class="n">GENERAL</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">reflections</span> <span class="ow">and</span> <span class="n">with_loss</span><span class="p">:</span>
+            <span class="n">model_name</span> <span class="o">=</span> <span class="n">GainModel</span><span class="o">.</span><span class="n">GENERAL_LOSS_ONLY</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="n">reflections</span><span class="p">:</span>
+            <span class="n">model_name</span> <span class="o">=</span> <span class="n">GainModel</span><span class="o">.</span><span class="n">GENERAL_IDEAL</span><span class="o">.</span><span class="n">value</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="n">model_name</span><span class="p">,</span>
+            <span class="s2">&quot;pump_freq&quot;</span><span class="p">:</span> <span class="n">pump</span><span class="p">,</span>
+            <span class="s2">&quot;signal_freqs&quot;</span><span class="p">:</span> <span class="n">signal_freqs</span><span class="p">,</span>
+            <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">,</span>
+            <span class="s2">&quot;I_triplets&quot;</span><span class="p">:</span> <span class="n">I_triplets_array</span><span class="p">,</span>
+            <span class="s2">&quot;gain_db&quot;</span><span class="p">:</span> <span class="n">gain_db</span><span class="p">,</span>
+            <span class="s2">&quot;mode_info&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;mode_array&quot;</span><span class="p">:</span> <span class="n">mode_array_config</span><span class="p">,</span>
+                <span class="s2">&quot;mode_map&quot;</span><span class="p">:</span> <span class="n">mode_map</span><span class="p">,</span>
+                <span class="s2">&quot;reverse_mode_map&quot;</span><span class="p">:</span> <span class="n">reverse_mode_map</span><span class="p">,</span>
+                <span class="s2">&quot;signal_mode&quot;</span><span class="p">:</span> <span class="n">signal_mode</span><span class="p">,</span>
+                <span class="s2">&quot;pump_mode&quot;</span><span class="p">:</span> <span class="n">pump_mode</span><span class="p">,</span>
+                <span class="s2">&quot;idler_mode&quot;</span><span class="p">:</span> <span class="n">idler_mode</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_minimal_3wm_gain</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">signal_freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
+        <span class="n">pump</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">Is0</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">x</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
+        <span class="n">initial_amplitudes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute gain using the standard 3WM model with consistent initial condition handling.&quot;&quot;&quot;</span>
         <span class="n">freqs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;freqs&quot;</span><span class="p">]</span>
         <span class="n">ks</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Calculate frequencies and wavenumbers</span>
         <span class="n">idler_freqs</span> <span class="o">=</span> <span class="n">pump</span> <span class="o">-</span> <span class="n">signal_freqs</span>
         <span class="n">pump_k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">pump</span><span class="p">,</span> <span class="n">freqs</span><span class="p">,</span> <span class="n">ks</span><span class="p">)</span>
         <span class="n">signal_k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">signal_freqs</span><span class="p">,</span> <span class="n">freqs</span><span class="p">,</span> <span class="n">ks</span><span class="p">)</span>
         <span class="n">idler_k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">idler_freqs</span><span class="p">,</span> <span class="n">freqs</span><span class="p">,</span> <span class="n">ks</span><span class="p">)</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">N_tot</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">N_tot</span> <span class="o">/</span> <span class="n">thin</span><span class="p">),</span> <span class="n">endpoint</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="n">y0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">Ip0</span><span class="p">,</span> <span class="n">Is0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
 
+        <span class="c1"># Set up initial conditions</span>
+        <span class="k">if</span> <span class="n">initial_amplitudes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Default initial conditions for 3WM</span>
+            <span class="n">y0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">Ip0</span><span class="p">,</span> <span class="n">Is0</span><span class="p">,</span> <span class="mf">1e-14</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">y0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">initial_amplitudes</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+
+        <span class="c1"># Solve coupled mode equations using the updated solver</span>
         <span class="n">I_triplets</span> <span class="o">=</span> <span class="n">cme_solve</span><span class="p">(</span>
             <span class="n">signal_k</span><span class="p">,</span>
             <span class="n">idler_k</span><span class="p">,</span>
             <span class="n">x</span><span class="p">,</span>
-            <span class="n">y0</span><span class="p">,</span>
+            <span class="n">y0</span><span class="p">,</span>  <span class="c1"># This will be broadcast automatically if 1D</span>
             <span class="n">pump_k</span><span class="p">,</span>  <span class="c1"># type: ignore[arg-type]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">xi</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">epsilon</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="n">gain_db</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">I_triplets</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">y0</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="c1"># Calculate gain in dB</span>
+        <span class="c1"># Handle different initial condition formats</span>
+        <span class="k">if</span> <span class="n">y0</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">initial_signal</span> <span class="o">=</span> <span class="n">y0</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># Signal is at index 1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">initial_signal</span> <span class="o">=</span> <span class="n">y0</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>  <span class="c1"># Signal is at index 1 for each frequency</span>
+
+        <span class="n">gain_db</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">I_triplets</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">initial_signal</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="n">GainModel</span><span class="o">.</span><span class="n">MINIMAL_3WM</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
             <span class="s2">&quot;pump_freq&quot;</span><span class="p">:</span> <span class="n">pump</span><span class="p">,</span>
             <span class="s2">&quot;signal_freqs&quot;</span><span class="p">:</span> <span class="n">signal_freqs</span><span class="p">,</span>
             <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">,</span>
             <span class="s2">&quot;I_triplets&quot;</span><span class="p">:</span> <span class="n">I_triplets</span><span class="p">,</span>
             <span class="s2">&quot;gain_db&quot;</span><span class="p">:</span> <span class="n">gain_db</span><span class="p">,</span>
-        <span class="p">}</span></div>
+        <span class="p">}</span>
 
 <div class="viewcode-block" id="TWPAnalysis.bandwidth"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.bandwidth">[docs]</a>    <span class="nd">@analysis_function</span>
-    <span class="k">def</span> <span class="nf">bandwidth</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">bandwidth</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">gain_reduction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
         <span class="o">**</span><span class="n">gain_kwargs</span><span class="p">,</span>
@@ -600,7 +1040,7 @@
             <span class="s2">&quot;bw_freqs&quot;</span><span class="p">:</span> <span class="n">ok_freqs</span><span class="p">,</span>
         <span class="p">}</span></div>
 
-<div class="viewcode-block" id="TWPAnalysis.plot_response"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_response">[docs]</a>    <span class="k">def</span> <span class="nf">plot_response</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Axes</span><span class="p">:</span>
+<div class="viewcode-block" id="TWPAnalysis.plot_response"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_response">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">plot_response</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Axes</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Plot response of twpa.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="s2">&quot;k_star&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">update_base_data</span><span class="p">()</span>
@@ -612,7 +1052,7 @@
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span></div>
 
-<div class="viewcode-block" id="TWPAnalysis.plot_gain"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_gain">[docs]</a>    <span class="k">def</span> <span class="nf">plot_gain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Axes</span><span class="p">:</span>
+<div class="viewcode-block" id="TWPAnalysis.plot_gain"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_gain">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">plot_gain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Axes</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Plot gain of twpa.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="s2">&quot;gain&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Gain data not found, please run analysis function.&quot;</span><span class="p">)</span>
@@ -624,7 +1064,17 @@
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span></div>
 
-<div class="viewcode-block" id="TWPAnalysis.plot_phase_matching"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_phase_matching">[docs]</a>    <span class="k">def</span> <span class="nf">plot_phase_matching</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Axes</span><span class="p">:</span>
+<div class="viewcode-block" id="TWPAnalysis.plot_mode_currents"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_mode_currents">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">plot_mode_currents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Axes</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Plot mean currents of modes as a function of position along the TWPA line.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="s2">&quot;gain&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Gain data not found, please run analysis function.&quot;</span><span class="p">)</span>
+        <span class="n">gain_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;gain&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">plot_mode_currents</span><span class="p">(</span>
+            <span class="n">gain_data</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="TWPAnalysis.plot_phase_matching"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_phase_matching">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">plot_phase_matching</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Axes</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Plot phase matching profile of twpa.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="s2">&quot;phase_matching&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -650,7 +1100,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

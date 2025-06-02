@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -239,14 +242,140 @@
 <span></span><span class="sd">&quot;&quot;&quot;Collection of plot functions.&quot;&quot;&quot;</span>
 
 <span class="c1"># mypy: ignore-errors</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
 
-<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">matplotlib.axes</span> <span class="kn">import</span> <span class="n">Axes</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.axes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Axes</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.mathutils</span><span class="w"> </span><span class="kn">import</span> <span class="n">I_to_dBm</span>
 
 
-<div class="viewcode-block" id="plot_response"><a class="viewcode-back" href="../../api-reference/twpasolver.plotting.html#twpasolver.plotting.plot_response">[docs]</a><span class="k">def</span> <span class="nf">plot_response</span><span class="p">(</span>
+<div class="viewcode-block" id="plot_mode_currents"><a class="viewcode-back" href="../../api-reference/twpasolver.plotting.html#twpasolver.plotting.plot_mode_currents">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">plot_mode_currents</span><span class="p">(</span>
+    <span class="n">gain_result</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">mode_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">figsize</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="n">log_scale</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">line_styles</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">colors</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">title</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">ylim</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Axes</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Plot the mean current of each mode in dB as a function of cell number.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        gain_result: Dictionary output from the gain analysis function</span>
+<span class="sd">        mode_names: Optional list of mode names for labeling (auto-detected if not provided)</span>
+<span class="sd">        figsize: Figure size tuple (width, height)</span>
+<span class="sd">        log_scale: Whether to plot in dB scale (True) or linear scale (False)</span>
+<span class="sd">        line_styles: Optional list of line styles for different modes</span>
+<span class="sd">        colors: Optional list of colors for different modes</span>
+<span class="sd">        title: Custom title for the plot</span>
+<span class="sd">        ylim: Optional y-axis limits as (min, max)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The matplotlib figure object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Extract data from gain result</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">gain_result</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">gain_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;model&quot;</span><span class="p">,</span> <span class="s2">&quot;minimal_3wm&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Determine the dimensionality and mode names based on the model</span>
+    <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">&quot;minimal_3wm&quot;</span><span class="p">:</span>
+        <span class="c1"># Standard 3WM model with pump, signal, idler</span>
+        <span class="n">I_triplets</span> <span class="o">=</span> <span class="n">gain_result</span><span class="p">[</span><span class="s2">&quot;I_triplets&quot;</span><span class="p">]</span>
+        <span class="n">n_freqs</span> <span class="o">=</span> <span class="n">I_triplets</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">n_modes</span> <span class="o">=</span> <span class="n">I_triplets</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Use default mode names for standard model</span>
+        <span class="k">if</span> <span class="n">mode_names</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">mode_names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Pump&quot;</span><span class="p">,</span> <span class="s2">&quot;Signal&quot;</span><span class="p">,</span> <span class="s2">&quot;Idler&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Compute mean current across all frequencies</span>
+        <span class="n">mean_currents</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">I_triplets</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># general model</span>
+        <span class="c1"># General model with arbitrary number of modes</span>
+        <span class="n">I_triplets</span> <span class="o">=</span> <span class="n">gain_result</span><span class="p">[</span><span class="s2">&quot;I_triplets&quot;</span><span class="p">]</span>
+        <span class="n">n_freqs</span> <span class="o">=</span> <span class="n">I_triplets</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">n_modes</span> <span class="o">=</span> <span class="n">I_triplets</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Extract mode names from the result if available</span>
+        <span class="k">if</span> <span class="n">mode_names</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s2">&quot;mode_info&quot;</span> <span class="ow">in</span> <span class="n">gain_result</span><span class="p">:</span>
+            <span class="n">mode_info</span> <span class="o">=</span> <span class="n">gain_result</span><span class="p">[</span><span class="s2">&quot;mode_info&quot;</span><span class="p">]</span>
+            <span class="n">reverse_mode_map</span> <span class="o">=</span> <span class="n">mode_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;reverse_mode_map&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="k">if</span> <span class="n">reverse_mode_map</span><span class="p">:</span>
+                <span class="n">mode_names</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">reverse_mode_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Mode </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_modes</span><span class="p">)</span>
+                <span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">mode_names</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;Mode </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_modes</span><span class="p">)]</span>
+        <span class="k">elif</span> <span class="n">mode_names</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">mode_names</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;Mode </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_modes</span><span class="p">)]</span>
+
+        <span class="c1"># Compute mean current across all frequencies</span>
+        <span class="n">mean_currents</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">I_triplets</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># Create figure</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="n">figsize</span><span class="p">)</span>
+
+    <span class="c1"># Define line styles and colors if not provided</span>
+    <span class="k">if</span> <span class="n">line_styles</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">line_styles</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="s2">&quot;-.&quot;</span><span class="p">,</span> <span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="s2">&quot;-.&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">3</span>
+
+    <span class="k">if</span> <span class="n">colors</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Use a colormap for many modes</span>
+        <span class="n">colors</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">tab10</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_modes</span><span class="p">))</span>
+
+    <span class="c1"># Plot each mode</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_modes</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">log_scale</span><span class="p">:</span>
+            <span class="c1"># Convert to dB</span>
+            <span class="n">currents_db</span> <span class="o">=</span> <span class="n">I_to_dBm</span><span class="p">(</span><span class="n">mean_currents</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                <span class="n">x</span><span class="p">,</span>
+                <span class="n">currents_db</span><span class="p">,</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">mode_names</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                <span class="n">linestyle</span><span class="o">=</span><span class="n">line_styles</span><span class="p">[</span><span class="n">i</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">line_styles</span><span class="p">)],</span>
+                <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="n">i</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">colors</span><span class="p">)],</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Linear scale</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                <span class="n">x</span><span class="p">,</span>
+                <span class="n">mean_currents</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">mode_names</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                <span class="n">linestyle</span><span class="o">=</span><span class="n">line_styles</span><span class="p">[</span><span class="n">i</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">line_styles</span><span class="p">)],</span>
+                <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="n">i</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">colors</span><span class="p">)],</span>
+            <span class="p">)</span>
+
+    <span class="c1"># Set labels and title</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Cell Number&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">log_scale</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Current (dBm)&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Current (A)&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">title</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">pump_freq</span> <span class="o">=</span> <span class="n">gain_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;pump_freq&quot;</span><span class="p">,</span> <span class="s2">&quot;N/A&quot;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Mean Mode Currents vs Cell Number</span><span class="se">\n</span><span class="s2">Pump Frequency: </span><span class="si">{</span><span class="n">pump_freq</span><span class="si">}</span><span class="s2"> GHz&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ylim</span><span class="p">:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="n">ylim</span><span class="p">)</span>
+
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.2</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">ax</span></div>
+
+
+<div class="viewcode-block" id="plot_response"><a class="viewcode-back" href="../../api-reference/twpasolver.plotting.html#twpasolver.plotting.plot_response">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">plot_response</span><span class="p">(</span>
     <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">s21_db</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">k_star</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
@@ -278,7 +407,7 @@
     <span class="k">return</span> <span class="n">ax</span></div>
 
 
-<div class="viewcode-block" id="plot_gain"><a class="viewcode-back" href="../../api-reference/twpasolver.plotting.html#twpasolver.plotting.plot_gain">[docs]</a><span class="k">def</span> <span class="nf">plot_gain</span><span class="p">(</span>
+<div class="viewcode-block" id="plot_gain"><a class="viewcode-back" href="../../api-reference/twpasolver.plotting.html#twpasolver.plotting.plot_gain">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">plot_gain</span><span class="p">(</span>
     <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">gain_db</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">freqs_unit</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;GHz&quot;</span><span class="p">,</span>
@@ -300,7 +429,7 @@
     <span class="k">return</span> <span class="n">ax</span></div>
 
 
-<div class="viewcode-block" id="plot_phase_matching"><a class="viewcode-back" href="../../api-reference/twpasolver.plotting.html#twpasolver.plotting.plot_phase_matching">[docs]</a><span class="k">def</span> <span class="nf">plot_phase_matching</span><span class="p">(</span>
+<div class="viewcode-block" id="plot_phase_matching"><a class="viewcode-back" href="../../api-reference/twpasolver.plotting.html#twpasolver.plotting.plot_phase_matching">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">plot_phase_matching</span><span class="p">(</span>
     <span class="n">pump_freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">signal_freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">delta_pm</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
@@ -350,7 +479,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

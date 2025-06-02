@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -244,21 +247,16 @@
 <span class="sd">representations, and solutions for coupled mode equations used in RF engineering.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span>
 
-<span class="kn">import</span> <span class="nn">numba</span> <span class="k">as</span> <span class="nn">nb</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">CyRK</span> <span class="kn">import</span> <span class="n">nbrk_ode</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numba</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nb</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.typing</span> <span class="kn">import</span> <span class="n">ComplexArray</span><span class="p">,</span> <span class="n">FloatArray</span>
-
-<span class="n">nb_complex3d</span> <span class="o">=</span> <span class="n">nb</span><span class="o">.</span><span class="n">complex128</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:]</span>
-<span class="n">nb_complex1d</span> <span class="o">=</span> <span class="n">nb</span><span class="o">.</span><span class="n">complex128</span><span class="p">[:]</span>
-<span class="n">nb_float1d</span> <span class="o">=</span> <span class="n">nb</span><span class="o">.</span><span class="n">float64</span><span class="p">[:]</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.bonus_types</span><span class="w"> </span><span class="kn">import</span> <span class="n">ComplexArray</span><span class="p">,</span> <span class="n">FloatArray</span>
 
 
 <div class="viewcode-block" id="matmul_2x2"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.matmul_2x2">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">matmul_2x2</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">matmul_2x2</span><span class="p">(</span>
     <span class="n">matrices_a</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span>
     <span class="n">matrices_b</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
@@ -289,7 +287,7 @@
 
 
 <div class="viewcode-block" id="matpow_2x2"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.matpow_2x2">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">matpow_2x2</span><span class="p">(</span><span class="n">matrices_a</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span> <span class="n">exponent</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">matpow_2x2</span><span class="p">(</span><span class="n">matrices_a</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span> <span class="n">exponent</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Fast exponentiation of arrays of 2x2 matrices using recursion.</span>
 
@@ -323,7 +321,7 @@
 
 
 <div class="viewcode-block" id="a2s"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.a2s">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">a2s</span><span class="p">(</span><span class="n">abcd</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span> <span class="n">Z0</span><span class="p">:</span> <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">a2s</span><span class="p">(</span><span class="n">abcd</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span> <span class="n">Z0</span><span class="p">:</span> <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Convert arrays of ABCD matrices to arrays of S-parameters.</span>
 
@@ -352,7 +350,7 @@
 
 
 <div class="viewcode-block" id="s2a"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.s2a">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">s2a</span><span class="p">(</span><span class="n">spar</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span> <span class="n">Z0</span><span class="p">:</span> <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">s2a</span><span class="p">(</span><span class="n">spar</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span> <span class="n">Z0</span><span class="p">:</span> <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Convert arrays of S-parameters to arrays of ABCD matrices.</span>
 
@@ -379,8 +377,60 @@
     <span class="k">return</span> <span class="n">abcd</span></div>
 
 
+<div class="viewcode-block" id="a2z"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.a2z">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">a2z</span><span class="p">(</span><span class="n">abcd</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert arrays of ABCD matrices to arrays of Z-parameters.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        abcd (ComplexArray): Array of 2x2 ABCD matrices.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ComplexArray: Array of 2x2 Z-parameter matrices.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="n">abcd</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">abcd</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span>
+    <span class="n">n_mat</span> <span class="o">=</span> <span class="n">abcd</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">z_mat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">n_mat</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_mat</span><span class="p">):</span>
+        <span class="n">A</span> <span class="o">=</span> <span class="n">abcd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="n">abcd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">C</span> <span class="o">=</span> <span class="n">abcd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">abcd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">z_mat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">A</span> <span class="o">/</span> <span class="n">C</span>
+        <span class="n">z_mat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">A</span> <span class="o">*</span> <span class="n">D</span> <span class="o">-</span> <span class="n">B</span> <span class="o">*</span> <span class="n">C</span><span class="p">)</span> <span class="o">/</span> <span class="n">C</span>
+        <span class="n">z_mat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">C</span>
+        <span class="n">z_mat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">D</span> <span class="o">/</span> <span class="n">C</span>
+    <span class="k">return</span> <span class="n">z_mat</span></div>
+
+
+<div class="viewcode-block" id="z2a"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.z2a">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">z2a</span><span class="p">(</span><span class="n">z_mat</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert arrays of Z-parameters to arrays of ABCD matrices.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        z_mat (ComplexArray): Array of 2x2 Z-parameter matrices.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ComplexArray: Array of 2x2 ABCD matrices.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="n">z_mat</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">z_mat</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span>
+    <span class="n">n_mat</span> <span class="o">=</span> <span class="n">z_mat</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">abcd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">n_mat</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_mat</span><span class="p">):</span>
+        <span class="n">Z11</span> <span class="o">=</span> <span class="n">z_mat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">Z12</span> <span class="o">=</span> <span class="n">z_mat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">Z21</span> <span class="o">=</span> <span class="n">z_mat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">Z22</span> <span class="o">=</span> <span class="n">z_mat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">abcd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">Z11</span> <span class="o">/</span> <span class="n">Z21</span>
+        <span class="n">abcd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">Z11</span> <span class="o">*</span> <span class="n">Z22</span> <span class="o">-</span> <span class="n">Z12</span> <span class="o">*</span> <span class="n">Z21</span><span class="p">)</span> <span class="o">/</span> <span class="n">Z21</span>
+        <span class="n">abcd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">Z21</span>
+        <span class="n">abcd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">Z22</span> <span class="o">/</span> <span class="n">Z21</span>
+    <span class="k">return</span> <span class="n">abcd</span></div>
+
+
 <div class="viewcode-block" id="to_dB"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.to_dB">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">to_dB</span><span class="p">(</span><span class="n">values</span><span class="p">:</span> <span class="n">FloatArray</span> <span class="o">|</span> <span class="n">ComplexArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FloatArray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">to_dB</span><span class="p">(</span><span class="n">values</span><span class="p">:</span> <span class="n">FloatArray</span> <span class="o">|</span> <span class="n">ComplexArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FloatArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Convert arrays of values to dB.</span>
 
@@ -394,7 +444,7 @@
 
 
 <div class="viewcode-block" id="dBm_to_I"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.dBm_to_I">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">dBm_to_I</span><span class="p">(</span><span class="n">power</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">Z0</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">50</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dBm_to_I</span><span class="p">(</span><span class="n">power</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">Z0</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">50</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Convert power from dBm to current in amperes.</span>
 
@@ -410,7 +460,7 @@
 
 
 <div class="viewcode-block" id="I_to_dBm"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.I_to_dBm">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">I_to_dBm</span><span class="p">(</span><span class="n">curr</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">Z0</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">50</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">I_to_dBm</span><span class="p">(</span><span class="n">curr</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">Z0</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">50</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Convert current in amperes to power in dBm.</span>
 
@@ -426,12 +476,13 @@
 
 
 <div class="viewcode-block" id="compute_phase_matching"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.compute_phase_matching">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">compute_phase_matching</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compute_phase_matching</span><span class="p">(</span>
     <span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
     <span class="n">pump_freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
     <span class="n">k_signal_array</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
     <span class="n">k_pump_array</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
     <span class="n">chi</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">gamma_pump_array</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">FloatArray</span><span class="p">,</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">FloatArray</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Compute phase matching profiles and triplets for given frequencies.</span>
@@ -442,6 +493,7 @@
 <span class="sd">        k_signal_array (FloatArray): Array of signal wave numbers.</span>
 <span class="sd">        k_pump_array (FloatArray): Array of pump wave numbers.</span>
 <span class="sd">        chi (float): Nonlinear coefficient.</span>
+<span class="sd">        gamma_pump_array (ComplexArray): Array of pump reflection coefficients.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Tuple[FloatArray, FloatArray, FloatArray]: Phase matching profile, frequency triplets, and wave number triplets.</span>
@@ -462,7 +514,9 @@
             <span class="n">k_pump</span>
             <span class="o">-</span> <span class="n">k_signal_array</span>
             <span class="o">-</span> <span class="n">k_idler</span>
-            <span class="o">+</span> <span class="n">chi</span> <span class="o">*</span> <span class="p">(</span><span class="n">k_pump</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">k_idler</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">k_signal_array</span><span class="p">)</span>
+            <span class="o">+</span> <span class="n">chi</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">k_pump</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">k_idler</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">k_signal_array</span><span class="p">)</span>
+            <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">gamma_pump_array</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
         <span class="p">)</span>
         <span class="n">delta_k</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">deltas</span>
 
@@ -479,125 +533,6 @@
         <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">delta_k</span><span class="p">,</span> <span class="n">freq_triplets</span><span class="p">,</span> <span class="n">k_triplets</span></div>
-
-
-<div class="viewcode-block" id="CMEode_complete"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.CMEode_complete">[docs]</a><span class="nd">@nb</span><span class="o">.</span><span class="n">njit</span><span class="p">(</span>
-    <span class="n">nb_complex1d</span><span class="p">(</span>
-        <span class="n">nb</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
-        <span class="n">nb_complex1d</span><span class="p">,</span>
-        <span class="n">nb</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
-        <span class="n">nb</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
-        <span class="n">nb</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
-        <span class="n">nb</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
-        <span class="n">nb</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
-    <span class="p">),</span>
-    <span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="k">def</span> <span class="nf">CMEode_complete</span><span class="p">(</span>
-    <span class="n">t</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-    <span class="n">y</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span>
-    <span class="n">kp</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-    <span class="n">ks</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-    <span class="n">ki</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-    <span class="n">xi</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-    <span class="n">epsi</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Complete coupled mode equation model for current amplitudes.</span>
-
-<span class="sd">    y[0] = Ip # pump current</span>
-<span class="sd">    y[1] = Is # signal current</span>
-<span class="sd">    y[2] = Ii # idler current</span>
-<span class="sd">    t    = x  #</span>
-
-<span class="sd">    Equations A5a, A5b and A5c from</span>
-<span class="sd">    `PRX Quantum 2, 010302 (2021) &lt;https://doi.org/10.1103/PRXQuantum.2.010302&gt;`_</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        t (float): Time variable.</span>
-<span class="sd">        y (ComplexArray): Array of current amplitudes [Ip, Is, Ii].</span>
-<span class="sd">        kp (float): Pump wave number.</span>
-<span class="sd">        ks (float): Signal wave number.</span>
-<span class="sd">        ki (float): Idler wave number.</span>
-<span class="sd">        xi (float): Nonlinear coefficient.</span>
-<span class="sd">        epsi (float): Small perturbation parameter.</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        ComplexArray: Derivatives of current amplitudes [dIp/dt, dIs/dt, dIi/dt].</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">dk</span> <span class="o">=</span> <span class="n">kp</span> <span class="o">-</span> <span class="n">ks</span> <span class="o">-</span> <span class="n">ki</span>
-
-    <span class="n">a</span> <span class="o">=</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">epsi</span> <span class="o">/</span> <span class="mi">4</span>
-    <span class="n">b</span> <span class="o">=</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">xi</span> <span class="o">/</span> <span class="mi">8</span>
-
-    <span class="c1"># Compute the magnitudes of currents</span>
-    <span class="n">abs_y0_sq</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span>
-    <span class="n">abs_y1_sq</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span>
-    <span class="n">abs_y2_sq</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span>
-
-    <span class="c1"># Compute intermediate values</span>
-    <span class="n">pp</span> <span class="o">=</span> <span class="n">abs_y0_sq</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">abs_y1_sq</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">abs_y2_sq</span>
-    <span class="n">ss</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">abs_y0_sq</span> <span class="o">+</span> <span class="n">abs_y1_sq</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">abs_y2_sq</span>
-    <span class="n">ii</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">abs_y0_sq</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">abs_y1_sq</span> <span class="o">+</span> <span class="n">abs_y2_sq</span>
-
-    <span class="c1"># Compute derivatives</span>
-    <span class="n">derivs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
-    <span class="n">derivs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">kp</span> <span class="o">*</span> <span class="n">y</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">y</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">dk</span> <span class="o">*</span> <span class="n">t</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span> <span class="o">*</span> <span class="n">kp</span> <span class="o">*</span> <span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">pp</span>
-    <span class="n">derivs</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">ks</span> <span class="o">*</span> <span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">dk</span> <span class="o">*</span> <span class="n">t</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span> <span class="o">*</span> <span class="n">ks</span> <span class="o">*</span> <span class="n">y</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">ss</span>
-    <span class="n">derivs</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">ki</span> <span class="o">*</span> <span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">dk</span> <span class="o">*</span> <span class="n">t</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span> <span class="o">*</span> <span class="n">ki</span> <span class="o">*</span> <span class="n">y</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">ii</span>
-
-    <span class="k">return</span> <span class="n">derivs</span></div>
-
-
-<div class="viewcode-block" id="cme_solve"><a class="viewcode-back" href="../../api-reference/twpasolver.mathutils.html#twpasolver.mathutils.cme_solve">[docs]</a><span class="k">def</span> <span class="nf">cme_solve</span><span class="p">(</span>
-    <span class="n">k_signal</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
-    <span class="n">k_idler</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
-    <span class="n">x_array</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span>
-    <span class="n">y0</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">,</span>
-    <span class="n">k_pump</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-    <span class="n">xi</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-    <span class="n">epsi</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Solve coupled mode equations for multiple frequencies.</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        k_signal (FloatArray): Array of signal wave numbers.</span>
-<span class="sd">        k_idler (FloatArray): Array of idler wave numbers.</span>
-<span class="sd">        x_array (FloatArray): Array of position values for evaluation.</span>
-<span class="sd">        y0 (ComplexArray): Initial conditions for the coupled mode equations.</span>
-<span class="sd">        k_pump (float): Pump wave number.</span>
-<span class="sd">        xi (float): Nonlinear coefficient.</span>
-<span class="sd">        epsi (float): Small perturbation parameter.</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        ComplexArray: Solution of the coupled mode equations for the given frequencies.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">len_k</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">k_signal</span><span class="p">)</span>
-
-    <span class="n">x_span</span> <span class="o">=</span> <span class="p">(</span><span class="n">x_array</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">x_array</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-    <span class="n">I_triplets</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">len_k</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">x_array</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">nb</span><span class="o">.</span><span class="n">prange</span><span class="p">(</span><span class="n">len_k</span><span class="p">):</span>
-        <span class="n">k</span> <span class="o">=</span> <span class="n">k_signal</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-        <span class="n">_</span><span class="p">,</span> <span class="n">I_triplets</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">nbrk_ode</span><span class="p">(</span>
-            <span class="n">CMEode_complete</span><span class="p">,</span>
-            <span class="n">x_span</span><span class="p">,</span>
-            <span class="n">y0</span><span class="p">,</span>
-            <span class="n">args</span><span class="o">=</span><span class="p">(</span>
-                <span class="n">k_pump</span><span class="p">,</span>
-                <span class="n">k</span><span class="p">,</span>
-                <span class="n">k_idler</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
-                <span class="n">xi</span><span class="p">,</span>
-                <span class="n">epsi</span><span class="p">,</span>
-            <span class="p">),</span>
-            <span class="n">atol</span><span class="o">=</span><span class="mf">1e-16</span><span class="p">,</span>
-            <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span>
-            <span class="n">max_num_steps</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-            <span class="n">first_step</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-            <span class="n">t_eval</span><span class="o">=</span><span class="n">x_array</span><span class="p">,</span>
-            <span class="n">rk_method</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-        <span class="p">)</span>
-    <span class="k">return</span> <span class="n">I_triplets</span></div>
 </pre></div>
         </article>
       </div>
@@ -610,7 +545,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

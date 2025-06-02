@@ -169,6 +169,7 @@
 <li class="toctree-l2"><a class="reference internal" href="notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="implementing_models.html">Implementing New Models</a></li>
@@ -189,14 +190,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -247,6 +250,8 @@
 </li>
         <li><a href="api-reference/twpasolver.mathutils.html#twpasolver.mathutils.a2s">a2s() (in module twpasolver.mathutils)</a>
 </li>
+        <li><a href="api-reference/twpasolver.mathutils.html#twpasolver.mathutils.a2z">a2z() (in module twpasolver.mathutils)</a>
+</li>
         <li><a href="api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.abcd_identity">abcd_identity() (in module twpasolver.matrices_arrays)</a>
 </li>
         <li><a href="api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ABCDArray">ABCDArray (class in twpasolver.matrices_arrays)</a>
@@ -255,15 +260,19 @@
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
-        <li><a href="api-reference/twpasolver.typing.html#twpasolver.typing.all_subclasses">all_subclasses() (in module twpasolver.typing)</a>
+        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.add_mode_array">add_mode_array() (twpasolver.analysis.TWPAnalysis method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.bonus_types.html#twpasolver.bonus_types.all_subclasses">all_subclasses() (in module twpasolver.bonus_types)</a>
 </li>
         <li><a href="api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA.alpha">alpha (twpasolver.models.twoportarrays.TWPA property)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.alpha">(twpasolver.modes_rwa.Mode attribute)</a>
 </li>
+        </ul></li>
         <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.analysis_function">analysis_function() (in module twpasolver.analysis)</a>
 </li>
         <li><a href="api-reference/twpasolver.models.modelarray.html#twpasolver.models.modelarray.ModelArray.append">append() (twpasolver.models.modelarray.ModelArray method)</a>
-</li>
-        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.ExecutionRequest.args">args (twpasolver.analysis.ExecutionRequest attribute)</a>
 </li>
         <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.as_dict">as_dict() (twpasolver.twoport.TwoPortCell method)</a>
 </li>
@@ -313,21 +322,35 @@
           <li><a href="api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TwoPortArray.cells">(twpasolver.models.twoportarrays.TwoPortArray attribute)</a>
 </li>
         </ul></li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell.centered">centered (twpasolver.models.twpa_cells.LCLfBaseCell attribute)</a>
 </li>
         <li><a href="api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA.chi">chi (twpasolver.models.twoportarrays.TWPA property)</a>
 </li>
-        <li><a href="api-reference/twpasolver.mathutils.html#twpasolver.mathutils.cme_solve">cme_solve() (in module twpasolver.mathutils)</a>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.cmes.html#twpasolver.cmes.cme_general_solve_freq_array">cme_general_solve_freq_array() (in module twpasolver.cmes)</a>
 </li>
-        <li><a href="api-reference/twpasolver.mathutils.html#twpasolver.mathutils.CMEode_complete">CMEode_complete() (in module twpasolver.mathutils)</a>
+        <li><a href="api-reference/twpasolver.cmes.html#twpasolver.cmes.cme_general_solve_freq_array_full">cme_general_solve_freq_array_full() (in module twpasolver.cmes)</a>
+</li>
+        <li><a href="api-reference/twpasolver.cmes.html#twpasolver.cmes.cme_general_solve_freq_array_ideal">cme_general_solve_freq_array_ideal() (in module twpasolver.cmes)</a>
+</li>
+        <li><a href="api-reference/twpasolver.cmes.html#twpasolver.cmes.cme_general_solve_freq_array_loss">cme_general_solve_freq_array_loss() (in module twpasolver.cmes)</a>
+</li>
+        <li><a href="api-reference/twpasolver.cmes.html#twpasolver.cmes.cme_solve">cme_solve() (in module twpasolver.cmes)</a>
+</li>
+        <li><a href="api-reference/twpasolver.cmes.html#twpasolver.cmes.CMEode_complete">CMEode_complete() (in module twpasolver.cmes)</a>
 </li>
         <li><a href="api-reference/twpasolver.models.compose.html#twpasolver.models.compose.compose">compose() (in module twpasolver.models.compose)</a>
 </li>
         <li><a href="api-reference/twpasolver.mathutils.html#twpasolver.mathutils.compute_phase_matching">compute_phase_matching() (in module twpasolver.mathutils)</a>
 </li>
-        <li><a href="api-reference/twpasolver.logging.html#twpasolver.logging.CustomHandler">CustomHandler (class in twpasolver.logging)</a>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory.create_basic_3wm">create_basic_3wm() (twpasolver.modes_rwa.ModeArrayFactory static method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory.create_custom">create_custom() (twpasolver.modes_rwa.ModeArrayFactory static method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory.create_extended_3wm">create_extended_3wm() (twpasolver.modes_rwa.ModeArrayFactory static method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.logger.html#twpasolver.logger.CustomHandler">CustomHandler (class in twpasolver.logger)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -343,11 +366,19 @@
 </li>
         <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.data_file">data_file (twpasolver.analysis.Analyzer attribute)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api-reference/twpasolver.mathutils.html#twpasolver.mathutils.dBm_to_I">dBm_to_I() (in module twpasolver.mathutils)</a>
 </li>
         <li><a href="api-reference/twpasolver.file_utils.html#twpasolver.file_utils.NpEncoder.default">default() (twpasolver.file_utils.NpEncoder method)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell.delta">delta (twpasolver.models.twpa_cells.LCLfBaseCell attribute)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.delta">(twpasolver.models.twpa_cells.StubBaseCell attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.direction">direction (twpasolver.modes_rwa.Mode attribute)</a>
 </li>
         <li><a href="api-reference/twpasolver.basemodel.html#twpasolver.basemodel.BaseModel.dump_to_file">dump_to_file() (twpasolver.basemodel.BaseModel method)</a>
 
@@ -369,8 +400,6 @@
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA.epsilon">epsilon (twpasolver.models.twoportarrays.TWPA property)</a>
 </li>
-        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.execute">execute() (twpasolver.analysis.Analyzer method)</a>
-</li>
     </ul></td>
   </tr></table>
 </section>
@@ -385,11 +414,15 @@
 </li>
         <li><a href="api-reference/twpasolver.frequency.html#twpasolver.frequency.Frequencies.f_list">f_list (twpasolver.frequency.Frequencies attribute)</a>
 </li>
-        <li><a href="api-reference/twpasolver.logging.html#twpasolver.logging.CustomHandler.format">format() (twpasolver.logging.CustomHandler method)</a>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.RWAAnalyzer.find_rwa_terms">find_rwa_terms() (twpasolver.modes_rwa.RWAAnalyzer method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.logger.html#twpasolver.logger.CustomHandler.format">format() (twpasolver.logger.CustomHandler method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.freqs">freqs (twpasolver.twoport.TwoPortCell property)</a>
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
-        <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.freqs">freqs (twpasolver.twoport.TwoPortCell property)</a>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.frequency">frequency (twpasolver.modes_rwa.Mode attribute)</a>
 </li>
         <li><a href="api-reference/twpasolver.basemodel.html#twpasolver.basemodel.BaseModel.from_file">from_file() (twpasolver.basemodel.BaseModel class method)</a>
 
@@ -398,6 +431,8 @@
 </li>
         </ul></li>
         <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.from_s">from_s() (twpasolver.twoport.TwoPortCell class method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.from_z">from_z() (twpasolver.twoport.TwoPortCell class method)</a>
 </li>
         <li><a href="api-reference/twpasolver.models.transmission_lines.html#twpasolver.models.transmission_lines.LosslessTL.from_z_vp">from_z_vp() (twpasolver.models.transmission_lines.LosslessTL class method)</a>
 </li>
@@ -411,13 +446,37 @@
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.gain">gain() (twpasolver.analysis.TWPAnalysis method)</a>
 </li>
-        <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortModel.get_abcd">get_abcd() (twpasolver.twoport.TwoPortModel method)</a>
+        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.GainModel">GainModel (class in twpasolver.analysis)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.gamma">gamma (twpasolver.modes_rwa.Mode attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.GainModel.GENERAL">GENERAL (twpasolver.analysis.GainModel attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.cmes.html#twpasolver.cmes.general_cme">general_cme() (in module twpasolver.cmes)</a>
+</li>
+        <li><a href="api-reference/twpasolver.cmes.html#twpasolver.cmes.general_cme_ideal">general_cme_ideal() (in module twpasolver.cmes)</a>
+</li>
+        <li><a href="api-reference/twpasolver.cmes.html#twpasolver.cmes.general_cme_loss_only">general_cme_loss_only() (in module twpasolver.cmes)</a>
+</li>
+        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.GainModel.GENERAL_IDEAL">GENERAL_IDEAL (twpasolver.analysis.GainModel attribute)</a>
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.GainModel.GENERAL_LOSS_ONLY">GENERAL_LOSS_ONLY (twpasolver.analysis.GainModel attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortModel.get_abcd">get_abcd() (twpasolver.twoport.TwoPortModel method)</a>
+</li>
         <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortModel.get_cell">get_cell() (twpasolver.twoport.TwoPortModel method)</a>
 </li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.get_mode">get_mode() (twpasolver.modes_rwa.ModeArray method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.get_mode_array">get_mode_array() (twpasolver.analysis.TWPAnalysis method)</a>
+</li>
         <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortModel.get_network">get_network() (twpasolver.twoport.TwoPortModel method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ParameterInterpolator.get_parameters">get_parameters() (twpasolver.modes_rwa.ParameterInterpolator method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.get_rwa_terms">get_rwa_terms() (twpasolver.modes_rwa.ModeArray method)</a>
 </li>
         <li><a href="api-reference/twpasolver.models.rf_functions.html#twpasolver.models.rf_functions.get_stub_cell">get_stub_cell() (in module twpasolver.models.rf_functions)</a>
 </li>
@@ -453,7 +512,7 @@
   <h2>K</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
-        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.ExecutionRequest.kwargs">kwargs (twpasolver.analysis.ExecutionRequest attribute)</a>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.k">k (twpasolver.modes_rwa.Mode attribute)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -482,6 +541,8 @@
         <li><a href="api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.l1">l1 (twpasolver.models.twpa_cells.StubBaseCell attribute)</a>
 </li>
         <li><a href="api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.l2">l2 (twpasolver.models.twpa_cells.StubBaseCell attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode.label">label (twpasolver.modes_rwa.Mode attribute)</a>
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
@@ -517,13 +578,19 @@
 </li>
         <li><a href="api-reference/twpasolver.mathutils.html#twpasolver.mathutils.matpow_2x2">matpow_2x2() (in module twpasolver.mathutils)</a>
 </li>
+        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.GainModel.MINIMAL_3WM">MINIMAL_3WM (twpasolver.analysis.GainModel attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.Mode">Mode (class in twpasolver.modes_rwa)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray">ModeArray (class in twpasolver.modes_rwa)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory">ModeArrayFactory (class in twpasolver.modes_rwa)</a>
+</li>
         <li><a href="api-reference/twpasolver.basemodel.html#twpasolver.basemodel.BaseModel.model_dump">model_dump() (twpasolver.basemodel.BaseModel method)</a>
 </li>
-        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.model_post_init">model_post_init() (twpasolver.analysis.Analyzer method)</a>
+        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.model_post_init">model_post_init() (twpasolver.analysis.TWPAnalysis method)</a>
 
         <ul>
-          <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.model_post_init">(twpasolver.analysis.TWPAnalysis method)</a>
-</li>
           <li><a href="api-reference/twpasolver.frequency.html#twpasolver.frequency.Frequencies.model_post_init">(twpasolver.frequency.Frequencies method)</a>
 </li>
         </ul></li>
@@ -537,11 +604,15 @@
 </li>
           <li><a href="api-reference/twpasolver.basemodel.html#module-twpasolver.basemodel">twpasolver.basemodel</a>
 </li>
+          <li><a href="api-reference/twpasolver.bonus_types.html#module-twpasolver.bonus_types">twpasolver.bonus_types</a>
+</li>
+          <li><a href="api-reference/twpasolver.cmes.html#module-twpasolver.cmes">twpasolver.cmes</a>
+</li>
           <li><a href="api-reference/twpasolver.file_utils.html#module-twpasolver.file_utils">twpasolver.file_utils</a>
 </li>
           <li><a href="api-reference/twpasolver.frequency.html#module-twpasolver.frequency">twpasolver.frequency</a>
 </li>
-          <li><a href="api-reference/twpasolver.logging.html#module-twpasolver.logging">twpasolver.logging</a>
+          <li><a href="api-reference/twpasolver.logger.html#module-twpasolver.logger">twpasolver.logger</a>
 </li>
           <li><a href="api-reference/twpasolver.mathutils.html#module-twpasolver.mathutils">twpasolver.mathutils</a>
 </li>
@@ -563,11 +634,11 @@
 </li>
           <li><a href="api-reference/twpasolver.models.twpa_cells.html#module-twpasolver.models.twpa_cells">twpasolver.models.twpa_cells</a>
 </li>
+          <li><a href="api-reference/twpasolver.modes_rwa.html#module-twpasolver.modes_rwa">twpasolver.modes_rwa</a>
+</li>
           <li><a href="api-reference/twpasolver.plotting.html#module-twpasolver.plotting">twpasolver.plotting</a>
 </li>
           <li><a href="api-reference/twpasolver.twoport.html#module-twpasolver.twoport">twpasolver.twoport</a>
-</li>
-          <li><a href="api-reference/twpasolver.typing.html#module-twpasolver.typing">twpasolver.typing</a>
 </li>
         </ul></li>
     </ul></td>
@@ -580,13 +651,11 @@
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortModel.N">N (twpasolver.twoport.TwoPortModel attribute)</a>
 </li>
-        <li><a href="api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA.N_tot">N_tot (twpasolver.models.twoportarrays.TWPA property)</a>
+        <li><a href="api-reference/twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TwoPortArray.N_tot">N_tot (twpasolver.models.twoportarrays.TwoPortArray property)</a>
 </li>
-        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.ExecutionRequest.name">name (twpasolver.analysis.ExecutionRequest attribute)</a>
+        <li><a href="api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Capacitance.name">name (twpasolver.models.oneport.Capacitance attribute)</a>
 
         <ul>
-          <li><a href="api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Capacitance.name">(twpasolver.models.oneport.Capacitance attribute)</a>
-</li>
           <li><a href="api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Inductance.name">(twpasolver.models.oneport.Inductance attribute)</a>
 </li>
           <li><a href="api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortArray.name">(twpasolver.models.oneport.OnePortArray attribute)</a>
@@ -638,6 +707,8 @@
 </li>
         <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.parameter_sweep">parameter_sweep() (twpasolver.analysis.Analyzer method)</a>
 </li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ParameterInterpolator">ParameterInterpolator (class in twpasolver.modes_rwa)</a>
+</li>
         <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.phase_matching">phase_matching() (twpasolver.analysis.TWPAnalysis method)</a>
 </li>
         <li><a href="api-reference/twpasolver.plotting.html#twpasolver.plotting.plot_gain">plot_gain() (in module twpasolver.plotting)</a>
@@ -646,8 +717,16 @@
           <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_gain">(twpasolver.analysis.TWPAnalysis method)</a>
 </li>
         </ul></li>
+        <li><a href="api-reference/twpasolver.plotting.html#twpasolver.plotting.plot_mode_currents">plot_mode_currents() (in module twpasolver.plotting)</a>
+
+        <ul>
+          <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_mode_currents">(twpasolver.analysis.TWPAnalysis method)</a>
+</li>
+        </ul></li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.plot_mode_relations">plot_mode_relations() (twpasolver.modes_rwa.ModeArray method)</a>
+</li>
         <li><a href="api-reference/twpasolver.plotting.html#twpasolver.plotting.plot_phase_matching">plot_phase_matching() (in module twpasolver.plotting)</a>
 
         <ul>
@@ -660,6 +739,16 @@
           <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.plot_response">(twpasolver.analysis.TWPAnalysis method)</a>
 </li>
         </ul></li>
+        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.prepare_relations_coefficients">prepare_relations_coefficients() (in module twpasolver.analysis)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.print_modes">print_modes() (twpasolver.modes_rwa.ModeArray method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.RWAAnalyzer.print_rwa_terms">print_rwa_terms() (twpasolver.modes_rwa.RWAAnalyzer method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.print_symbolic_expressions">print_symbolic_expressions() (twpasolver.modes_rwa.ModeArray method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.process_frequency_array">process_frequency_array() (twpasolver.modes_rwa.ModeArray method)</a>
+</li>
     </ul></td>
   </tr></table>
 </section>
@@ -672,13 +761,15 @@
 </li>
         <li><a href="api-reference/twpasolver.file_utils.html#twpasolver.file_utils.read_file">read_file() (in module twpasolver.file_utils)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api-reference/twpasolver.file_utils.html#twpasolver.file_utils.read_hdf5">read_hdf5() (in module twpasolver.file_utils)</a>
 </li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api-reference/twpasolver.file_utils.html#twpasolver.file_utils.read_json">read_json() (in module twpasolver.file_utils)</a>
 </li>
-        <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.run">run (twpasolver.analysis.Analyzer attribute)</a>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.RWAAnalyzer.relations">relations (twpasolver.modes_rwa.RWAAnalyzer property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.RWAAnalyzer">RWAAnalyzer (class in twpasolver.modes_rwa)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -774,6 +865,20 @@
 </li>
         </ul></li>
         <li>
+    twpasolver.bonus_types
+
+        <ul>
+          <li><a href="api-reference/twpasolver.bonus_types.html#module-twpasolver.bonus_types">module</a>
+</li>
+        </ul></li>
+        <li>
+    twpasolver.cmes
+
+        <ul>
+          <li><a href="api-reference/twpasolver.cmes.html#module-twpasolver.cmes">module</a>
+</li>
+        </ul></li>
+        <li>
     twpasolver.file_utils
 
         <ul>
@@ -788,10 +893,10 @@
 </li>
         </ul></li>
         <li>
-    twpasolver.logging
+    twpasolver.logger
 
         <ul>
-          <li><a href="api-reference/twpasolver.logging.html#module-twpasolver.logging">module</a>
+          <li><a href="api-reference/twpasolver.logger.html#module-twpasolver.logger">module</a>
 </li>
         </ul></li>
         <li>
@@ -801,6 +906,8 @@
           <li><a href="api-reference/twpasolver.mathutils.html#module-twpasolver.mathutils">module</a>
 </li>
         </ul></li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li>
     twpasolver.matrices_arrays
 
@@ -808,8 +915,6 @@
           <li><a href="api-reference/twpasolver.matrices_arrays.html#module-twpasolver.matrices_arrays">module</a>
 </li>
         </ul></li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li>
     twpasolver.models
 
@@ -867,6 +972,13 @@
 </li>
         </ul></li>
         <li>
+    twpasolver.modes_rwa
+
+        <ul>
+          <li><a href="api-reference/twpasolver.modes_rwa.html#module-twpasolver.modes_rwa">module</a>
+</li>
+        </ul></li>
+        <li>
     twpasolver.plotting
 
         <ul>
@@ -878,13 +990,6 @@
 
         <ul>
           <li><a href="api-reference/twpasolver.twoport.html#module-twpasolver.twoport">module</a>
-</li>
-        </ul></li>
-        <li>
-    twpasolver.typing
-
-        <ul>
-          <li><a href="api-reference/twpasolver.typing.html#module-twpasolver.typing">module</a>
 </li>
         </ul></li>
     </ul></td>
@@ -899,8 +1004,6 @@
 </li>
         <li><a href="api-reference/twpasolver.frequency.html#twpasolver.frequency.Frequencies.unit_multiplier">unit_multiplier (twpasolver.frequency.Frequencies property)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortModel.update">update() (twpasolver.twoport.TwoPortModel method)</a>
 </li>
         <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.Analyzer.update_base_data">update_base_data() (twpasolver.analysis.Analyzer method)</a>
@@ -908,7 +1011,15 @@
         <ul>
           <li><a href="api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis.update_base_data">(twpasolver.analysis.TWPAnalysis method)</a>
 </li>
+          <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.update_base_data">(twpasolver.modes_rwa.ModeArray method)</a>
+</li>
         </ul></li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray.update_frequencies">update_frequencies() (twpasolver.modes_rwa.ModeArray method)</a>
+</li>
+        <li><a href="api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.RWAAnalyzer.update_relations">update_relations() (twpasolver.modes_rwa.RWAAnalyzer method)</a>
+</li>
     </ul></td>
   </tr></table>
 </section>
@@ -917,7 +1028,7 @@
   <h2>V</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
-        <li><a href="api-reference/twpasolver.typing.html#twpasolver.typing.validate_impedance">validate_impedance() (in module twpasolver.typing)</a>
+        <li><a href="api-reference/twpasolver.bonus_types.html#twpasolver.bonus_types.validate_impedance">validate_impedance() (in module twpasolver.bonus_types)</a>
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
@@ -953,6 +1064,8 @@
   <h2>Z</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.z">z (twpasolver.twoport.TwoPortCell property)</a>
+</li>
         <li><a href="api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Capacitance.Z">Z() (twpasolver.models.oneport.Capacitance method)</a>
 
         <ul>
@@ -967,15 +1080,27 @@
           <li><a href="api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Stub.Z">(twpasolver.models.oneport.Stub method)</a>
 </li>
         </ul></li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api-reference/twpasolver.models.transmission_lines.html#twpasolver.models.transmission_lines.LosslessTL.Z0">Z0 (twpasolver.models.transmission_lines.LosslessTL property)</a>
 
         <ul>
           <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortCell.Z0">(twpasolver.twoport.TwoPortCell property)</a>
 </li>
         </ul></li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api-reference/twpasolver.twoport.html#twpasolver.twoport.TwoPortModel.Z0_ref">Z0_ref (twpasolver.twoport.TwoPortModel attribute)</a>
+</li>
+        <li><a href="api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray.Z11">Z11 (twpasolver.matrices_arrays.ZMatrixArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray.Z12">Z12 (twpasolver.matrices_arrays.ZMatrixArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray.Z21">Z21 (twpasolver.matrices_arrays.ZMatrixArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray.Z22">Z22 (twpasolver.matrices_arrays.ZMatrixArray property)</a>
+</li>
+        <li><a href="api-reference/twpasolver.mathutils.html#twpasolver.mathutils.z2a">z2a() (in module twpasolver.mathutils)</a>
+</li>
+        <li><a href="api-reference/twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ZMatrixArray">ZMatrixArray (class in twpasolver.matrices_arrays)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -993,7 +1118,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

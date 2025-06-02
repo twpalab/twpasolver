@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -238,14 +241,14 @@
           <h1>Source code for twpasolver.basemodel</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;Custom overload of pydantic BaseModel.&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">BaseModel</span> <span class="k">as</span> <span class="n">PydanticBaseModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span> <span class="k">as</span> <span class="n">PydanticBaseModel</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.file_utils</span> <span class="kn">import</span> <span class="n">read_file</span><span class="p">,</span> <span class="n">save_to_file</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.file_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_file</span><span class="p">,</span> <span class="n">save_to_file</span>
 
 
-<div class="viewcode-block" id="BaseModel"><a class="viewcode-back" href="../../api-reference/twpasolver.basemodel.html#twpasolver.basemodel.BaseModel">[docs]</a><span class="k">class</span> <span class="nc">BaseModel</span><span class="p">(</span><span class="n">PydanticBaseModel</span><span class="p">):</span>
+<div class="viewcode-block" id="BaseModel"><a class="viewcode-back" href="../../api-reference/twpasolver.basemodel.html#twpasolver.basemodel.BaseModel">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">BaseModel</span><span class="p">(</span><span class="n">PydanticBaseModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Overridden pydantic BaseModel.</span>
 
@@ -253,7 +256,7 @@
 <span class="sd">    and adds functionality for dumping and loading from files.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-<div class="viewcode-block" id="BaseModel.model_dump"><a class="viewcode-back" href="../../api-reference/twpasolver.basemodel.html#twpasolver.basemodel.BaseModel.model_dump">[docs]</a>    <span class="k">def</span> <span class="nf">model_dump</span><span class="p">(</span>
+<div class="viewcode-block" id="BaseModel.model_dump"><a class="viewcode-back" href="../../api-reference/twpasolver.basemodel.html#twpasolver.basemodel.BaseModel.model_dump">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">model_dump</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">exclude_none</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -270,7 +273,7 @@
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(</span><span class="n">exclude_none</span><span class="o">=</span><span class="n">exclude_none</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="BaseModel.from_file"><a class="viewcode-back" href="../../api-reference/twpasolver.basemodel.html#twpasolver.basemodel.BaseModel.from_file">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Load a model instance from a file.</span>
 
@@ -283,7 +286,7 @@
         <span class="n">model_dict</span> <span class="o">=</span> <span class="n">read_file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="s2">&quot;json&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">model_dict</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="BaseModel.dump_to_file"><a class="viewcode-back" href="../../api-reference/twpasolver.basemodel.html#twpasolver.basemodel.BaseModel.dump_to_file">[docs]</a>    <span class="k">def</span> <span class="nf">dump_to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="BaseModel.dump_to_file"><a class="viewcode-back" href="../../api-reference/twpasolver.basemodel.html#twpasolver.basemodel.BaseModel.dump_to_file">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">dump_to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Dump the model instance to a file.</span>
 
@@ -304,7 +307,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

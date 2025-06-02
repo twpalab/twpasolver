@@ -171,6 +171,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
@@ -191,14 +192,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -276,8 +279,8 @@ under different conditions. The models support various operations such as impeda
 frequency response analysis, and composition of complex networks from simpler components.
 See the <a class="reference internal" href="../tutorials.html#tutorials"><span class="std std-ref">Tutorials</span></a> page for more examples.</p>
 <p class="rubric">Example</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">twpasolver.models.oneport</span> <span class="kn">import</span> <span class="n">Resistance</span><span class="p">,</span> <span class="n">Capacitance</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models.twoportarrays</span> <span class="kn">import</span> <span class="n">TwoPortArray</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models.oneport</span><span class="w"> </span><span class="kn">import</span> <span class="n">Resistance</span><span class="p">,</span> <span class="n">Capacitance</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models.twoportarrays</span><span class="w"> </span><span class="kn">import</span> <span class="n">TwoPortArray</span>
 
 <span class="c1"># Define a simple network with a resistor and capacitor in series</span>
 <span class="n">resistor</span> <span class="o">=</span> <span class="n">Resistance</span><span class="p">(</span><span class="n">R</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
@@ -381,6 +384,7 @@ See the <a class="reference internal" href="../tutorials.html#tutorials"><span c
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TwoPortArray.name"><code class="docutils literal notranslate"><span class="pre">TwoPortArray.name</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TwoPortArray.cells"><code class="docutils literal notranslate"><span class="pre">TwoPortArray.cells</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TwoPortArray.single_abcd"><code class="docutils literal notranslate"><span class="pre">TwoPortArray.single_abcd()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TwoPortArray.N_tot"><code class="docutils literal notranslate"><span class="pre">TwoPortArray.N_tot</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA"><code class="docutils literal notranslate"><span class="pre">TWPA</span></code></a><ul>
@@ -393,7 +397,6 @@ See the <a class="reference internal" href="../tutorials.html#tutorials"><span c
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA.chi"><code class="docutils literal notranslate"><span class="pre">TWPA.chi</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA.alpha"><code class="docutils literal notranslate"><span class="pre">TWPA.alpha</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA.Iratio"><code class="docutils literal notranslate"><span class="pre">TWPA.Iratio</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA.N_tot"><code class="docutils literal notranslate"><span class="pre">TWPA.N_tot</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -406,6 +409,7 @@ See the <a class="reference internal" href="../tutorials.html#tutorials"><span c
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.Lf"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.Lf</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.l1"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.l1</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.l2"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.l2</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.delta"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.delta</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.line"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.line</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.single_abcd"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.single_abcd()</span></code></a></li>
 </ul>
@@ -415,6 +419,7 @@ See the <a class="reference internal" href="../tutorials.html#tutorials"><span c
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell.L"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.L</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell.C"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.C</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell.Lf"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.Lf</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell.delta"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.delta</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell.centered"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.centered</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell.single_abcd"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.single_abcd()</span></code></a></li>
 </ul>
@@ -455,7 +460,7 @@ See the <a class="reference internal" href="../tutorials.html#tutorials"><span c
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

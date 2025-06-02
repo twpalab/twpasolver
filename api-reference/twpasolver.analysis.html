@@ -171,6 +171,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
@@ -191,14 +192,16 @@
 </li>
 <li class="toctree-l3 current current-page"><a class="current reference internal" href="#">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -238,7 +241,67 @@
         <article role="main">
           <section id="module-twpasolver.analysis">
 <span id="twpasolver-analysis-module"></span><h1>twpasolver.analysis module<a class="headerlink" href="#module-twpasolver.analysis" title="Permalink to this heading">#</a></h1>
-<p>Analysis classes.</p>
+<p>Analysis class to simulate and plot the nonlinear behavior of TWPAs.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="twpasolver.analysis.GainModel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.analysis.</span></span><span class="sig-name descname"><span class="pre">GainModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/analysis.html#GainModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.GainModel" title="Permalink to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
+<p>Available CMEs models.</p>
+<dl class="simple">
+<dt>Available Models:</dt><dd><p>MINIMAL_3WM: Consider only pump, signal and ider. Faster simulation, but usually not accurate.
+GENERAL_IDEAL: Solve CMEs with arbitrary set of modes, without considering losses nor reflections.
+GENERAL_LOSS_ONLY: Solve CMEs with arbitrary set of modes, considering losses but not reflections.
+GENERAL: Solve CMEs with arbitrary set of modes, including losses and reflections. Most accurate, but slowest.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="twpasolver.analysis.GainModel.MINIMAL_3WM">
+<span class="sig-name descname"><span class="pre">MINIMAL_3WM</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'minimal_3wm'</span></em><a class="headerlink" href="#twpasolver.analysis.GainModel.MINIMAL_3WM" title="Permalink to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="twpasolver.analysis.GainModel.GENERAL_IDEAL">
+<span class="sig-name descname"><span class="pre">GENERAL_IDEAL</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'general_ideal'</span></em><a class="headerlink" href="#twpasolver.analysis.GainModel.GENERAL_IDEAL" title="Permalink to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="twpasolver.analysis.GainModel.GENERAL_LOSS_ONLY">
+<span class="sig-name descname"><span class="pre">GENERAL_LOSS_ONLY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'general_loss_only'</span></em><a class="headerlink" href="#twpasolver.analysis.GainModel.GENERAL_LOSS_ONLY" title="Permalink to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="twpasolver.analysis.GainModel.GENERAL">
+<span class="sig-name descname"><span class="pre">GENERAL</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'general'</span></em><a class="headerlink" href="#twpasolver.analysis.GainModel.GENERAL" title="Permalink to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="twpasolver.analysis.prepare_relations_coefficients">
+<span class="sig-prename descclassname"><span class="pre">twpasolver.analysis.</span></span><span class="sig-name descname"><span class="pre">prepare_relations_coefficients</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">terms_3wm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">terms_4wm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xi</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/analysis.html#prepare_relations_coefficients"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.prepare_relations_coefficients" title="Permalink to this definition">#</a></dt>
+<dd><p>Prepare relation terms and coefficients for 3-wave and 4-wave mixing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>terms_3wm</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><em>list</em></a>) – List of 3-wave mixing terms, each containing mode indices and coefficient</p></li>
+<li><p><strong>terms_4wm</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><em>list</em></a>) – List of 4-wave mixing terms, each containing mode indices and coefficient</p></li>
+<li><p><strong>epsilon</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a>) – Scaling factor for 3-wave mixing coefficients</p></li>
+<li><p><strong>xi</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a>) – Scaling factor for 4-wave mixing coefficients</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Contains:
+- relations_3wm : List of mode indices for 3-wave mixing
+- relations_4wm : List of mode indices for 4-wave mixing
+- coeffs_3wm : numpy array of scaled coefficients for 3-wave mixing
+- coeffs_4wm : numpy array of scaled coefficients for 4-wave mixing</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)">tuple</a></p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py function">
 <dt class="sig sig-object py" id="twpasolver.analysis.analysis_function">
 <span class="sig-prename descclassname"><span class="pre">twpasolver.analysis.</span></span><span class="sig-name descname"><span class="pre">analysis_function</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/analysis.html#analysis_function"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.analysis_function" title="Permalink to this definition">#</a></dt>
@@ -248,66 +311,9 @@ All analysis functions must return a dictionary to be compatible with this wrapp
 </dd></dl>
 
 <dl class="py class pydantic_model">
-<dt class="sig sig-object py" id="twpasolver.analysis.ExecutionRequest">
-<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.analysis.</span></span><span class="sig-name descname"><span class="pre">ExecutionRequest</span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#ExecutionRequest"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.ExecutionRequest" title="Permalink to this definition">#</a></dt>
-<dd><p>Bases: <a class="reference internal" href="twpasolver.basemodel.html#twpasolver.basemodel.BaseModel" title="twpasolver.basemodel.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a></p>
-<p>General stucture of function execution request.</p>
-<p><details  class="autodoc_pydantic_collapsable_json">
-<summary>Show JSON schema</summary><div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">   </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ExecutionRequest&quot;</span><span class="p">,</span>
-<span class="w">   </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;General stucture of function execution request.&quot;</span><span class="p">,</span>
-<span class="w">   </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span><span class="p">,</span>
-<span class="w">   </span><span class="nt">&quot;properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
-<span class="w">      </span><span class="p">},</span>
-<span class="w">      </span><span class="nt">&quot;args&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">         </span><span class="nt">&quot;items&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
-<span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Args&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;array&quot;</span>
-<span class="w">      </span><span class="p">},</span>
-<span class="w">      </span><span class="nt">&quot;kwargs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Kwargs&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span>
-<span class="w">      </span><span class="p">}</span>
-<span class="w">   </span><span class="p">},</span>
-<span class="w">   </span><span class="nt">&quot;required&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">      </span><span class="s2">&quot;name&quot;</span>
-<span class="w">   </span><span class="p">]</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-</details></p><dl class="field-list simple">
-<dt class="field-odd">Fields<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><a class="reference internal" href="#twpasolver.analysis.ExecutionRequest.args" title="twpasolver.analysis.ExecutionRequest.args"><code class="xref py py-obj docutils literal notranslate"><span class="pre">args</span> <span class="pre">(list[typing.Any])</span></code></a></p></li>
-<li><p><a class="reference internal" href="#twpasolver.analysis.ExecutionRequest.kwargs" title="twpasolver.analysis.ExecutionRequest.kwargs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">kwargs</span> <span class="pre">(dict[str,</span> <span class="pre">typing.Any])</span></code></a></p></li>
-<li><p><a class="reference internal" href="#twpasolver.analysis.ExecutionRequest.name" title="twpasolver.analysis.ExecutionRequest.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span> <span class="pre">(str)</span></code></a></p></li>
-</ul>
-</dd>
-</dl>
-<dl class="py attribute pydantic_field">
-<dt class="sig sig-object py" id="twpasolver.analysis.ExecutionRequest.name">
-<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#twpasolver.analysis.ExecutionRequest.name" title="Permalink to this definition">#</a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute pydantic_field">
-<dt class="sig sig-object py" id="twpasolver.analysis.ExecutionRequest.args">
-<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">args</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Optional]</span></em><a class="headerlink" href="#twpasolver.analysis.ExecutionRequest.args" title="Permalink to this definition">#</a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute pydantic_field">
-<dt class="sig sig-object py" id="twpasolver.analysis.ExecutionRequest.kwargs">
-<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">kwargs</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Optional]</span></em><a class="headerlink" href="#twpasolver.analysis.ExecutionRequest.kwargs" title="Permalink to this definition">#</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="py class pydantic_model">
 <dt class="sig sig-object py" id="twpasolver.analysis.Analyzer">
 <em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.analysis.</span></span><span class="sig-name descname"><span class="pre">Analyzer</span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer" title="Permalink to this definition">#</a></dt>
-<dd><p>Bases: <a class="reference internal" href="twpasolver.basemodel.html#twpasolver.basemodel.BaseModel" title="twpasolver.basemodel.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<dd><p>Bases: <a class="reference internal" href="twpasolver.basemodel.html#twpasolver.basemodel.BaseModel" title="twpasolver.basemodel.BaseModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseModel</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
 <p>Base class for structured analysis.</p>
 <p><details  class="autodoc_pydantic_collapsable_json">
 <summary>Show JSON schema</summary><div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
@@ -319,40 +325,9 @@ All analysis functions must return a dictionary to be compatible with this wrapp
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Data File&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">      </span><span class="p">},</span>
-<span class="w">      </span><span class="nt">&quot;run&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">         </span><span class="nt">&quot;items&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;$ref&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/ExecutionRequest&quot;</span>
-<span class="w">         </span><span class="p">},</span>
-<span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Run&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;array&quot;</span>
-<span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">         </span><span class="nt">&quot;additionalProperties&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Data&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span>
-<span class="w">      </span><span class="p">}</span>
-<span class="w">   </span><span class="p">},</span>
-<span class="w">   </span><span class="nt">&quot;$defs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;ExecutionRequest&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;General stucture of function execution request.&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
-<span class="w">            </span><span class="p">},</span>
-<span class="w">            </span><span class="nt">&quot;args&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;items&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
-<span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Args&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;array&quot;</span>
-<span class="w">            </span><span class="p">},</span>
-<span class="w">            </span><span class="nt">&quot;kwargs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Kwargs&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span>
-<span class="w">            </span><span class="p">}</span>
-<span class="w">         </span><span class="p">},</span>
-<span class="w">         </span><span class="nt">&quot;required&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">            </span><span class="s2">&quot;name&quot;</span>
-<span class="w">         </span><span class="p">],</span>
-<span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ExecutionRequest&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span>
 <span class="w">      </span><span class="p">}</span>
 <span class="w">   </span><span class="p">}</span>
@@ -364,65 +339,47 @@ All analysis functions must return a dictionary to be compatible with this wrapp
 <dd class="field-odd"><ul class="simple">
 <li><p><a class="reference internal" href="#twpasolver.analysis.Analyzer.data" title="twpasolver.analysis.Analyzer.data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data</span> <span class="pre">(dict[str,</span> <span class="pre">typing.Any])</span></code></a></p></li>
 <li><p><a class="reference internal" href="#twpasolver.analysis.Analyzer.data_file" title="twpasolver.analysis.Analyzer.data_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data_file</span> <span class="pre">(str)</span></code></a></p></li>
-<li><p><a class="reference internal" href="#twpasolver.analysis.Analyzer.run" title="twpasolver.analysis.Analyzer.run"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run</span> <span class="pre">(list[twpasolver.analysis.ExecutionRequest])</span></code></a></p></li>
 </ul>
 </dd>
 </dl>
 <dl class="py attribute pydantic_field">
 <dt class="sig sig-object py" id="twpasolver.analysis.Analyzer.data_file">
-<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data_file</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></em><em class="property"> <span class="pre">[Optional]</span></em><a class="headerlink" href="#twpasolver.analysis.Analyzer.data_file" title="Permalink to this definition">#</a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute pydantic_field">
-<dt class="sig sig-object py" id="twpasolver.analysis.Analyzer.run">
-<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">run</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#twpasolver.analysis.ExecutionRequest" title="twpasolver.analysis.ExecutionRequest"><span class="pre">twpasolver.analysis.ExecutionRequest</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Optional]</span></em><a class="headerlink" href="#twpasolver.analysis.Analyzer.run" title="Permalink to this definition">#</a></dt>
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data_file</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></em><em class="property"> <span class="pre">[Optional]</span></em><a class="headerlink" href="#twpasolver.analysis.Analyzer.data_file" title="Permalink to this definition">#</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute pydantic_field">
 <dt class="sig sig-object py" id="twpasolver.analysis.Analyzer.data">
-<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Optional]</span></em><a class="headerlink" href="#twpasolver.analysis.Analyzer.data" title="Permalink to this definition">#</a></dt>
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Optional]</span></em><a class="headerlink" href="#twpasolver.analysis.Analyzer.data" title="Permalink to this definition">#</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="twpasolver.analysis.Analyzer.model_post_init">
-<span class="sig-name descname"><span class="pre">model_post_init</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">_Analyzer__context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><span class="pre">Any</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer.model_post_init"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer.model_post_init" title="Permalink to this definition">#</a></dt>
-<dd><p>Run analysis if list of ExecutionRequest is not empty.</p>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.Analyzer.update_base_data">
-<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">update_base_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer.update_base_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer.update_base_data" title="Permalink to this definition">#</a></dt>
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">update_base_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer.update_base_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer.update_base_data" title="Permalink to this definition">#</a></dt>
 <dd><p>Check and update base data of the class if necessary.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.Analyzer.save_data">
-<span class="sig-name descname"><span class="pre">save_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">writer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'hdf5'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer.save_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer.save_data" title="Permalink to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">save_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">writer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'hdf5'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer.save_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer.save_data" title="Permalink to this definition">#</a></dt>
 <dd><p>Save data to file.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.Analyzer.load_data">
-<span class="sig-name descname"><span class="pre">load_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">writer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hdf5'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer.load_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer.load_data" title="Permalink to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">load_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">writer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'hdf5'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer.load_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer.load_data" title="Permalink to this definition">#</a></dt>
 <dd><p>Load data from file.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="twpasolver.analysis.Analyzer.execute">
-<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer.execute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer.execute" title="Permalink to this definition">#</a></dt>
-<dd><p>Run analysis.</p>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.Analyzer.parameter_sweep">
-<span class="sig-name descname"><span class="pre">parameter_sweep</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">values</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><span class="pre">list</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer.parameter_sweep"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer.parameter_sweep" title="Permalink to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">parameter_sweep</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">values</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><span class="pre">list</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#Analyzer.parameter_sweep"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.Analyzer.parameter_sweep" title="Permalink to this definition">#</a></dt>
 <dd><p>Run an analysis function multiple times for different values of a parameter.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>function</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – Name of the analysis function to be executed multiple times.</p></li>
-<li><p><strong>target</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – Name of the argument of the analysis function changed in the sweep.</p></li>
-<li><p><strong>values</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><em>list</em></a>) – list of values for the sweep.</p></li>
+<li><p><strong>function</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – Name of the analysis function to be executed multiple times.</p></li>
+<li><p><strong>target</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – Name of the argument of the analysis function changed in the sweep.</p></li>
+<li><p><strong>values</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><em>list</em></a>) – list of values for the sweep.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -437,7 +394,7 @@ with all items organized in lists with an additional dimension.</p></li>
 </p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)">dict</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)">dict</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -448,18 +405,18 @@ with all items organized in lists with an additional dimension.</p></li>
 <dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis">
 <em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.analysis.</span></span><span class="sig-name descname"><span class="pre">TWPAnalysis</span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis" title="Permalink to this definition">#</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#twpasolver.analysis.Analyzer" title="twpasolver.analysis.Analyzer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Analyzer</span></code></a>, <a class="reference internal" href="twpasolver.frequency.html#twpasolver.frequency.Frequencies" title="twpasolver.frequency.Frequencies"><code class="xref py py-class docutils literal notranslate"><span class="pre">Frequencies</span></code></a></p>
-<p>Runner for standard analysis routines of 3WM twpa models.</p>
+<p>Runner for standard analysis routines of TWPA models with enhanced ModeArray support.</p>
 <p><details  class="autodoc_pydantic_collapsable_json">
 <summary>Show JSON schema</summary><div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
 <span class="w">   </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TWPAnalysis&quot;</span><span class="p">,</span>
-<span class="w">   </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Runner for standard analysis routines of 3WM twpa models.&quot;</span><span class="p">,</span>
+<span class="w">   </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Runner for standard analysis routines of TWPA models with enhanced ModeArray support.&quot;</span><span class="p">,</span>
 <span class="w">   </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span><span class="p">,</span>
 <span class="w">   </span><span class="nt">&quot;properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">      </span><span class="nt">&quot;f_list&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="nt">&quot;anyOf&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">            </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;items&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">                  </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">                  </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">                  </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">               </span><span class="p">},</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;array&quot;</span>
@@ -479,15 +436,15 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">               </span><span class="nt">&quot;minItems&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;prefixItems&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">                  </span><span class="p">{</span>
-<span class="w">                     </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">                     </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">                     </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">                  </span><span class="p">},</span>
 <span class="w">                  </span><span class="p">{</span>
-<span class="w">                     </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">                     </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">                     </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">                  </span><span class="p">},</span>
 <span class="w">                  </span><span class="p">{</span>
-<span class="w">                     </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">                     </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">                     </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">                  </span><span class="p">}</span>
 <span class="w">               </span><span class="p">],</span>
@@ -517,14 +474,8 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Data File&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">      </span><span class="p">},</span>
-<span class="w">      </span><span class="nt">&quot;run&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">         </span><span class="nt">&quot;items&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;$ref&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/ExecutionRequest&quot;</span>
-<span class="w">         </span><span class="p">},</span>
-<span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Run&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;array&quot;</span>
-<span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">         </span><span class="nt">&quot;additionalProperties&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Data&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span>
 <span class="w">      </span><span class="p">},</span>
@@ -558,14 +509,11 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Capacitance&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Capacitance&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                  </span><span class="s2">&quot;Capacitance&quot;</span>
-<span class="w">               </span><span class="p">],</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;C&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">}</span>
@@ -574,29 +522,6 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">            </span><span class="s2">&quot;C&quot;</span>
 <span class="w">         </span><span class="p">],</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Capacitance&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span>
-<span class="w">      </span><span class="p">},</span>
-<span class="w">      </span><span class="nt">&quot;ExecutionRequest&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;General stucture of function execution request.&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
-<span class="w">            </span><span class="p">},</span>
-<span class="w">            </span><span class="nt">&quot;args&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;items&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
-<span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Args&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;array&quot;</span>
-<span class="w">            </span><span class="p">},</span>
-<span class="w">            </span><span class="nt">&quot;kwargs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Kwargs&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span>
-<span class="w">            </span><span class="p">}</span>
-<span class="w">         </span><span class="p">},</span>
-<span class="w">         </span><span class="nt">&quot;required&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">            </span><span class="s2">&quot;name&quot;</span>
-<span class="w">         </span><span class="p">],</span>
-<span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ExecutionRequest&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;Inductance&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -624,14 +549,11 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Inductance&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Inductance&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                  </span><span class="s2">&quot;Inductance&quot;</span>
-<span class="w">               </span><span class="p">],</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;L&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">}</span>
@@ -661,28 +583,32 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LCLfBaseCell&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LCLfBaseCell&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                  </span><span class="s2">&quot;LCLfBaseCell&quot;</span>
-<span class="w">               </span><span class="p">],</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;L&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Inductance of the straight line.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;C&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Capacitance of the stub finger.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;Lf&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Inductance of the stub finger.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Lf&quot;</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;delta&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Loss Tangent&quot;</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Delta&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;centered&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -718,27 +644,24 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LosslessTL&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LosslessTL&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                  </span><span class="s2">&quot;LosslessTL&quot;</span>
-<span class="w">               </span><span class="p">],</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;l&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Length of the line.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;L&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Characteristic inductance of the line.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;C&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Characteristic capacitance of the line.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">}</span>
@@ -810,9 +733,6 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;OnePortArray&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;OnePortArray&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                  </span><span class="s2">&quot;OnePortArray&quot;</span>
-<span class="w">               </span><span class="p">],</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">            </span><span class="p">},</span>
@@ -851,14 +771,11 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Resistance&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Resistance&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                  </span><span class="s2">&quot;Resistance&quot;</span>
-<span class="w">               </span><span class="p">],</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;R&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;R&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">}</span>
@@ -894,24 +811,21 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Stub&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Stub&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                  </span><span class="s2">&quot;Stub&quot;</span>
-<span class="w">               </span><span class="p">],</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;L&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;C&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;length&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Length&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
@@ -946,42 +860,46 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;integer&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;StubBaseCell&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;StubBaseCell&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                  </span><span class="s2">&quot;StubBaseCell&quot;</span>
-<span class="w">               </span><span class="p">],</span>
+<span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;StubBaseCell2&quot;</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;StubBaseCell2&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;L&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Inductance of the straight line.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;C&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Capacitance of the line.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;Lf&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Inductance of the stub finger.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Lf&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;l1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Length of the stub finger.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L1&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;l2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Length of the straight line.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L2&quot;</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
+<span class="w">            </span><span class="p">},</span>
+<span class="w">            </span><span class="nt">&quot;delta&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Loss Tangent&quot;</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Delta&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;line&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -1029,7 +947,7 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">                        </span><span class="nt">&quot;OnePortArray&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/OnePortArray&quot;</span><span class="p">,</span>
 <span class="w">                        </span><span class="nt">&quot;Resistance&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/Resistance&quot;</span><span class="p">,</span>
 <span class="w">                        </span><span class="nt">&quot;Stub&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/Stub&quot;</span><span class="p">,</span>
-<span class="w">                        </span><span class="nt">&quot;StubBaseCell&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/StubBaseCell&quot;</span><span class="p">,</span>
+<span class="w">                        </span><span class="nt">&quot;StubBaseCell2&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/StubBaseCell&quot;</span><span class="p">,</span>
 <span class="w">                        </span><span class="nt">&quot;TWPA&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/TWPA&quot;</span><span class="p">,</span>
 <span class="w">                        </span><span class="nt">&quot;TwoPortArray&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/TwoPortArray&quot;</span>
 <span class="w">                     </span><span class="p">},</span>
@@ -1074,30 +992,27 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TWPA&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TWPA&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                  </span><span class="s2">&quot;TWPA&quot;</span>
-<span class="w">               </span><span class="p">],</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;Istar&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0065</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Nonlinearity scale current parameter.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Istar&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;Idc&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.001</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Bias dc current.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Idc&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">},</span>
 <span class="w">            </span><span class="nt">&quot;Ip0&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0002</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Rf pump amplitude.&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">               </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Ip0&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">            </span><span class="p">}</span>
@@ -1133,7 +1048,7 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">                        </span><span class="nt">&quot;OnePortArray&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/OnePortArray&quot;</span><span class="p">,</span>
 <span class="w">                        </span><span class="nt">&quot;Resistance&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/Resistance&quot;</span><span class="p">,</span>
 <span class="w">                        </span><span class="nt">&quot;Stub&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/Stub&quot;</span><span class="p">,</span>
-<span class="w">                        </span><span class="nt">&quot;StubBaseCell&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/StubBaseCell&quot;</span><span class="p">,</span>
+<span class="w">                        </span><span class="nt">&quot;StubBaseCell2&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/StubBaseCell&quot;</span><span class="p">,</span>
 <span class="w">                        </span><span class="nt">&quot;TWPA&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/TWPA&quot;</span><span class="p">,</span>
 <span class="w">                        </span><span class="nt">&quot;TwoPortArray&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#/$defs/TwoPortArray&quot;</span>
 <span class="w">                     </span><span class="p">},</span>
@@ -1178,9 +1093,6 @@ with all items organized in lists with an additional dimension.</p></li>
 <span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">               </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TwoPortArray&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TwoPortArray&quot;</span><span class="p">,</span>
-<span class="w">               </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                  </span><span class="s2">&quot;TwoPortArray&quot;</span>
-<span class="w">               </span><span class="p">],</span>
 <span class="w">               </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">               </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">            </span><span class="p">}</span>
@@ -1227,92 +1139,109 @@ with all items organized in lists with an additional dimension.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.update_base_data">
-<span class="sig-name descname"><span class="pre">update_base_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.update_base_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.update_base_data" title="Permalink to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">update_base_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.update_base_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.update_base_data" title="Permalink to this definition">#</a></dt>
 <dd><p>Update data extracted from the twpa model.</p>
 <p>This function is triggered every time an analysis function is executed after changing a parameter of the model.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.phase_matching">
-<span class="sig-name descname"><span class="pre">phase_matching</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">thin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">20</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.phase_matching"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.phase_matching" title="Permalink to this definition">#</a></dt>
-<dd><p>Build phase matching profile.</p>
-<p>The phase matching condition is computed considering all signal frequencies
-lower than the first stopband and all pump frequencies from the end of the first stopband.</p>
+<dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.get_mode_array">
+<span class="sig-name descname"><span class="pre">get_mode_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'basic_3wm'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray" title="twpasolver.modes_rwa.ModeArray"><span class="pre">ModeArray</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.get_mode_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.get_mode_array" title="Permalink to this definition">#</a></dt>
+<dd><p>Get a mode array by configuration name.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>thin</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>) – The step size to thin out the frequency and wavenumber arrays.</p>
+<dd class="field-odd"><p><strong>config</strong> – Name of the mode array configuration</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>A dictionary containing:</dt><dd><ul class="simple">
-<li><p>”delta” (array): Phase matching condition values.</p></li>
-<li><dl class="simple">
-<dt>”triplets” (dict): A dictionary containing triplets satisfying phase matching:</dt><dd><ul>
-<li><p>”f” (array): Frequency triplets.</p></li>
-<li><p>”k” (array): Wavenumber triplets.</p></li>
-</ul>
-</dd>
-</dl>
-</li>
-<li><p>”pump_freqs” (array): All pump frequencies considered.</p></li>
-<li><p>”signal_freqs” (array): All signal frequencies considered.</p></li>
-</ul>
-</dd>
-</dl>
-</p>
+<dd class="field-even"><p>The requested mode array configuration</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)">dict</a></p>
+<dd class="field-odd"><p><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray" title="twpasolver.modes_rwa.ModeArray">ModeArray</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.add_mode_array">
+<span class="sig-name descname"><span class="pre">add_mode_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode_array</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray" title="twpasolver.modes_rwa.ModeArray"><span class="pre">ModeArray</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.add_mode_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.add_mode_array" title="Permalink to this definition">#</a></dt>
+<dd><p>Add a custom mode array to the analyzer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> – Name to assign to the mode array</p></li>
+<li><p><strong>mode_array</strong> – The mode array to add</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.phase_matching">
+<span class="sig-name descname"><span class="pre">phase_matching</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">process</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.13)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'PA'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'FCU'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'FCD'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'PA'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">signal_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'s'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'p'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idler_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'i'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode_array_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'basic_3wm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump_Ip0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">signal_arange</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump_arange</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">20</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.phase_matching"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.phase_matching" title="Permalink to this definition">#</a></dt>
+<dd><p>Build phase matching profile for specified modes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>process</strong> – Type of process (“PA”, “FCU”, “FCD”)</p></li>
+<li><p><strong>signal_mode</strong> – Label of the signal mode</p></li>
+<li><p><strong>pump_mode</strong> – Label of the pump mode</p></li>
+<li><p><strong>idler_mode</strong> – Label of the idler mode</p></li>
+<li><p><strong>mode_array_config</strong> – Name of the mode array configuration to use</p></li>
+<li><p><strong>pump_Ip0</strong> – Optional pump current</p></li>
+<li><p><strong>signal_arange</strong> – Signal frequency range as (start, stop, step)</p></li>
+<li><p><strong>pump_arange</strong> – Pump frequency range as (start, stop, step)</p></li>
+<li><p><strong>thin</strong> – The step size to thin out the frequency and wavenumber arrays</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A dictionary containing phase matching analysis results</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)">dict</a></p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.gain">
-<span class="sig-name descname"><span class="pre">gain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">signal_freqs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><span class="pre">Any</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Is0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ip0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.gain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.gain" title="Permalink to this definition">#</a></dt>
-<dd><p>Compute expected gain with 3WM as a function of frequency and cell number in the TWPA.</p>
+<span class="sig-name descname"><span class="pre">gain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">signal_freqs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><span class="pre">Any</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Is0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ip0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#twpasolver.analysis.GainModel" title="twpasolver.analysis.GainModel"><span class="pre">GainModel</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">GainModel.MINIMAL_3WM</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode_array_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'basic_3wm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">signal_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'s'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'p'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idler_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'i'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_amplitudes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.gain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.gain" title="Permalink to this definition">#</a></dt>
+<dd><p>Compute expected gain with selected gain model.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>signal_freqs</strong> (<em>FloatArray</em>) – Array of signal frequencies to consider.</p></li>
-<li><p><strong>pump</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><em>float</em></a><em>]</em>) – The pump frequency. If None, uses the optimal pump frequency from data.</p></li>
-<li><p><strong>Is0</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><em>float</em></a>) – Initial signal current (in A).</p></li>
-<li><p><strong>Ip0</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><em>float</em></a><em>]</em>) – Initial pump current (in A). If None, uses the current TWPA’s Ip0.</p></li>
-<li><p><strong>thin</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>) – The step size to thin out the position array.
-Otherwise, the currents are computed at every cell in the TWPA</p></li>
+<li><p><strong>signal_freqs</strong> – Array of signal frequencies to consider</p></li>
+<li><p><strong>pump</strong> – The pump frequency (if None, uses the optimal pump frequency from data)</p></li>
+<li><p><strong>Is0</strong> – Initial signal current (in A) for standard 3WM model</p></li>
+<li><p><strong>Ip0</strong> – Initial pump current (in A) (if None, uses the current TWPA’s Ip0)</p></li>
+<li><p><strong>model</strong> – Gain model to use (minimal_3wm, general, general without reflections, or general with loss only)</p></li>
+<li><p><strong>mode_array_config</strong> – Name of the mode array configuration to use</p></li>
+<li><p><strong>signal_mode</strong> – Label of the signal mode</p></li>
+<li><p><strong>pump_mode</strong> – Label of the pump mode</p></li>
+<li><p><strong>idler_mode</strong> – Label of the idler mode (if None, will be determined from mode array relations)</p></li>
+<li><p><strong>initial_amplitudes</strong> – Initial amplitudes for all modes. Can be:
+- 1D array: Same initial conditions for all frequencies
+- 2D array: Different initial conditions for each frequency [n_freq, n_modes]
+- None: Use default values (specified Ip0 and Is0, 1e-14 for all other modes)</p></li>
+<li><p><strong>thin</strong> – The step size to thin out the position array</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>A dictionary containing:</dt><dd><ul class="simple">
-<li><p>”pump_freq” (float): The pump frequency used in the calculation.</p></li>
-<li><p>”signal_freqs” (array): The array of signal frequencies.</p></li>
-<li><p>”x” (array): The thinned cell position array along the TWPA.</p></li>
-<li><dl class="simple">
-<dt>”I_triplets” (array): Array of pump, signal and idler current</dt><dd><p>triplets at each computed cell.</p>
-</dd>
-</dl>
-</li>
-<li><p>”gain_db” (array): The final signal gain in dB.</p></li>
-</ul>
-</dd>
-</dl>
-</p>
+<dd class="field-even"><p>A dictionary containing gain calculation results</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)">dict</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)">dict</a></p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.bandwidth">
-<span class="sig-name descname"><span class="pre">bandwidth</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gain_reduction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">gain_kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.bandwidth"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.bandwidth" title="Permalink to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">bandwidth</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gain_reduction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">gain_kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.bandwidth"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.bandwidth" title="Permalink to this definition">#</a></dt>
 <dd><p>Compute informations about the compund gain bandwidth.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>gain_reduction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><em>float</em></a>) – Difference from maximum gain used as threshold to determine the bandwidth edges.</p></li>
+<li><p><strong>gain_reduction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a>) – Difference from maximum gain used as threshold to determine the bandwidth edges.</p></li>
 <li><p><strong>**gain_kwargs</strong> – Additional arguments to pass to the gain function.</p></li>
 </ul>
 </dd>
@@ -1332,7 +1261,7 @@ Otherwise, the currents are computed at every cell in the TWPA</p></li>
 </p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)">dict</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)">dict</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1350,6 +1279,12 @@ Otherwise, the currents are computed at every cell in the TWPA</p></li>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.plot_mode_currents">
+<span class="sig-name descname"><span class="pre">plot_mode_currents</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Axes</span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.plot_mode_currents"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.plot_mode_currents" title="Permalink to this definition">#</a></dt>
+<dd><p>Plot mean currents of modes as a function of position along the TWPA line.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.plot_phase_matching">
 <span class="sig-name descname"><span class="pre">plot_phase_matching</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Axes</span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.plot_phase_matching"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.plot_phase_matching" title="Permalink to this definition">#</a></dt>
 <dd><p>Plot phase matching profile of twpa.</p>
@@ -1357,9 +1292,17 @@ Otherwise, the currents are computed at every cell in the TWPA</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.model_post_init">
-<span class="sig-name descname"><span class="pre">model_post_init</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.model_post_init" title="Permalink to this definition">#</a></dt>
-<dd><p>We need to both initialize private attributes and call the user-defined model_post_init
-method.</p>
+<span class="sig-name descname"><span class="pre">model_post_init</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.model_post_init" title="Permalink to this definition">#</a></dt>
+<dd><p>This function is meant to behave like a BaseModel method to initialise private attributes.</p>
+<p>It takes context as an argument since that’s what pydantic-core passes when calling it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – The BaseModel instance.</p></li>
+<li><p><strong>context</strong> – The context.</p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
@@ -1395,7 +1338,7 @@ method.</p>
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             
@@ -1429,22 +1372,21 @@ method.</p>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">twpasolver.analysis module</a><ul>
-<li><a class="reference internal" href="#twpasolver.analysis.analysis_function"><code class="docutils literal notranslate"><span class="pre">analysis_function()</span></code></a></li>
-<li><a class="reference internal" href="#twpasolver.analysis.ExecutionRequest"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest</span></code></a><ul>
-<li><a class="reference internal" href="#twpasolver.analysis.ExecutionRequest.name"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest.name</span></code></a></li>
-<li><a class="reference internal" href="#twpasolver.analysis.ExecutionRequest.args"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest.args</span></code></a></li>
-<li><a class="reference internal" href="#twpasolver.analysis.ExecutionRequest.kwargs"><code class="docutils literal notranslate"><span class="pre">ExecutionRequest.kwargs</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.analysis.GainModel"><code class="docutils literal notranslate"><span class="pre">GainModel</span></code></a><ul>
+<li><a class="reference internal" href="#twpasolver.analysis.GainModel.MINIMAL_3WM"><code class="docutils literal notranslate"><span class="pre">GainModel.MINIMAL_3WM</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.analysis.GainModel.GENERAL_IDEAL"><code class="docutils literal notranslate"><span class="pre">GainModel.GENERAL_IDEAL</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.analysis.GainModel.GENERAL_LOSS_ONLY"><code class="docutils literal notranslate"><span class="pre">GainModel.GENERAL_LOSS_ONLY</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.analysis.GainModel.GENERAL"><code class="docutils literal notranslate"><span class="pre">GainModel.GENERAL</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#twpasolver.analysis.prepare_relations_coefficients"><code class="docutils literal notranslate"><span class="pre">prepare_relations_coefficients()</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.analysis.analysis_function"><code class="docutils literal notranslate"><span class="pre">analysis_function()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.Analyzer"><code class="docutils literal notranslate"><span class="pre">Analyzer</span></code></a><ul>
 <li><a class="reference internal" href="#twpasolver.analysis.Analyzer.data_file"><code class="docutils literal notranslate"><span class="pre">Analyzer.data_file</span></code></a></li>
-<li><a class="reference internal" href="#twpasolver.analysis.Analyzer.run"><code class="docutils literal notranslate"><span class="pre">Analyzer.run</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.Analyzer.data"><code class="docutils literal notranslate"><span class="pre">Analyzer.data</span></code></a></li>
-<li><a class="reference internal" href="#twpasolver.analysis.Analyzer.model_post_init"><code class="docutils literal notranslate"><span class="pre">Analyzer.model_post_init()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.Analyzer.update_base_data"><code class="docutils literal notranslate"><span class="pre">Analyzer.update_base_data()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.Analyzer.save_data"><code class="docutils literal notranslate"><span class="pre">Analyzer.save_data()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.Analyzer.load_data"><code class="docutils literal notranslate"><span class="pre">Analyzer.load_data()</span></code></a></li>
-<li><a class="reference internal" href="#twpasolver.analysis.Analyzer.execute"><code class="docutils literal notranslate"><span class="pre">Analyzer.execute()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.Analyzer.parameter_sweep"><code class="docutils literal notranslate"><span class="pre">Analyzer.parameter_sweep()</span></code></a></li>
 </ul>
 </li>
@@ -1452,11 +1394,14 @@ method.</p>
 <li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.twpa"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.twpa</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.load_model_from_file"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.load_model_from_file</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.update_base_data"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.update_base_data()</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.get_mode_array"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.get_mode_array()</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.add_mode_array"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.add_mode_array()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.phase_matching"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.phase_matching()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.gain"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.gain()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.bandwidth"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.bandwidth()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.plot_response"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_response()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.plot_gain"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_gain()</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.plot_mode_currents"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_mode_currents()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.plot_phase_matching"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.plot_phase_matching()</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.TWPAnalysis.model_post_init"><code class="docutils literal notranslate"><span class="pre">TWPAnalysis.model_post_init()</span></code></a></li>
 </ul>

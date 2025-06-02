@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -244,27 +247,27 @@
 
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Union</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">NonNegativeFloat</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">NonNegativeFloat</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.matrices_arrays</span> <span class="kn">import</span> <span class="n">ABCDArray</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models.modelarray</span> <span class="kn">import</span> <span class="n">ModelArray</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models.rf_functions</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.matrices_arrays</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABCDArray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models.modelarray</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelArray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models.rf_functions</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">capacitance</span><span class="p">,</span>
     <span class="n">inductance</span><span class="p">,</span>
     <span class="n">parallel_admittance_abcd</span><span class="p">,</span>
     <span class="n">series_impedance_abcd</span><span class="p">,</span>
     <span class="n">stub</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">twpasolver.twoport</span> <span class="kn">import</span> <span class="n">TwoPortModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.twoport</span><span class="w"> </span><span class="kn">import</span> <span class="n">TwoPortModel</span>
 
 
-<div class="viewcode-block" id="OnePortModel"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortModel">[docs]</a><span class="k">class</span> <span class="nc">OnePortModel</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<div class="viewcode-block" id="OnePortModel"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortModel">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">OnePortModel</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for components entirely described by a 1D impedance array.&quot;&quot;&quot;</span>
 
     <span class="n">twoport_parallel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
@@ -273,7 +276,7 @@
     <span class="p">)</span>
 
 <div class="viewcode-block" id="OnePortModel.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortModel.Z">[docs]</a>    <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get impedance of component as function of frequency.</span>
 
@@ -284,7 +287,7 @@
 <span class="sd">            np.ndarray: Impedance of the component.</span>
 <span class="sd">        &quot;&quot;&quot;</span></div>
 
-<div class="viewcode-block" id="OnePortModel.Y"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortModel.Y">[docs]</a>    <span class="k">def</span> <span class="nf">Y</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<div class="viewcode-block" id="OnePortModel.Y"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortModel.Y">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">Y</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get admittance of component as function of frequency.</span>
 
@@ -296,7 +299,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="mi">1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="OnePortModel.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortModel.single_abcd">[docs]</a>    <span class="k">def</span> <span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
+<div class="viewcode-block" id="OnePortModel.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortModel.single_abcd">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get ABCD parameters of series impedance or parallel admittance.</span>
 
@@ -311,7 +314,7 @@
         <span class="k">return</span> <span class="n">ABCDArray</span><span class="p">(</span><span class="n">series_impedance_abcd</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="n">freqs</span><span class="p">)))</span></div></div>
 
 
-<div class="viewcode-block" id="OnePortArray"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortArray">[docs]</a><span class="k">class</span> <span class="nc">OnePortArray</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">,</span> <span class="n">ModelArray</span><span class="p">):</span>
+<div class="viewcode-block" id="OnePortArray"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortArray">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">OnePortArray</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">,</span> <span class="n">ModelArray</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Container for direct compositions of OnePortModels.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;OnePortArray&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;OnePortArray&quot;</span><span class="p">)</span>
@@ -323,7 +326,7 @@
         <span class="n">description</span><span class="o">=</span><span class="s2">&quot;List of OnePortModel representing the basic cells. Nested cells are allowed.&quot;</span><span class="p">,</span>
     <span class="p">)</span>
 
-<div class="viewcode-block" id="OnePortArray.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortArray.Z">[docs]</a>    <span class="k">def</span> <span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<div class="viewcode-block" id="OnePortArray.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.OnePortArray.Z">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get impedance of the composed elements.</span>
 
@@ -338,13 +341,13 @@
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">Z</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="Resistance"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Resistance">[docs]</a><span class="k">class</span> <span class="nc">Resistance</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">):</span>
+<div class="viewcode-block" id="Resistance"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Resistance">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">Resistance</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Model of a resistor.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;Resistance&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Resistance&quot;</span>
     <span class="n">R</span><span class="p">:</span> <span class="n">NonNegativeFloat</span>
 
-<div class="viewcode-block" id="Resistance.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Resistance.Z">[docs]</a>    <span class="k">def</span> <span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<div class="viewcode-block" id="Resistance.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Resistance.Z">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get impedance of resistor.</span>
 
@@ -357,13 +360,13 @@
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">R</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="Capacitance"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Capacitance">[docs]</a><span class="k">class</span> <span class="nc">Capacitance</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">):</span>
+<div class="viewcode-block" id="Capacitance"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Capacitance">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">Capacitance</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Model of a capacitor.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;Capacitance&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Capacitance&quot;</span>
     <span class="n">C</span><span class="p">:</span> <span class="n">NonNegativeFloat</span>
 
-<div class="viewcode-block" id="Capacitance.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Capacitance.Z">[docs]</a>    <span class="k">def</span> <span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<div class="viewcode-block" id="Capacitance.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Capacitance.Z">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get impedance of capacitor.</span>
 
@@ -376,13 +379,13 @@
         <span class="k">return</span> <span class="n">capacitance</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="Inductance"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Inductance">[docs]</a><span class="k">class</span> <span class="nc">Inductance</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">):</span>
+<div class="viewcode-block" id="Inductance"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Inductance">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">Inductance</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Model of an inductor.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;Inductance&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Inductance&quot;</span>
     <span class="n">L</span><span class="p">:</span> <span class="n">NonNegativeFloat</span>
 
-<div class="viewcode-block" id="Inductance.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Inductance.Z">[docs]</a>    <span class="k">def</span> <span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<div class="viewcode-block" id="Inductance.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Inductance.Z">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get impedance of inductor.</span>
 
@@ -395,7 +398,7 @@
         <span class="k">return</span> <span class="n">inductance</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="Stub"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Stub">[docs]</a><span class="k">class</span> <span class="nc">Stub</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">):</span>
+<div class="viewcode-block" id="Stub"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Stub">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">Stub</span><span class="p">(</span><span class="n">OnePortModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Model of a stub.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;Stub&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Stub&quot;</span>
@@ -404,7 +407,7 @@
     <span class="n">length</span><span class="p">:</span> <span class="n">NonNegativeFloat</span>
     <span class="nb">open</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 
-<div class="viewcode-block" id="Stub.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Stub.Z">[docs]</a>    <span class="k">def</span> <span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<div class="viewcode-block" id="Stub.Z"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.oneport.html#twpasolver.models.oneport.Stub.Z">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">Z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get impedance of stub.</span>
 
@@ -433,7 +436,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

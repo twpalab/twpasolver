@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="prev" title="twpasolver.twoport module" href="twpasolver.twoport.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="twpasolver.mathutils module" href="twpasolver.mathutils.html" /><link rel="prev" title="twpasolver.frequency module" href="twpasolver.frequency.html" />
 
     <link rel="shortcut icon" href="../_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
-        <title>twpasolver.typing module - twpasolver · 0.0.1</title>
+        <title>twpasolver.logger module - twpasolver · 0.0.1</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?digest=369552022d0b975c8e74270ce6eabe0fb7978f24" />
     <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
@@ -171,6 +171,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
@@ -191,14 +192,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -236,35 +239,20 @@
           </label>
         </div>
         <article role="main">
-          <section id="module-twpasolver.typing">
-<span id="twpasolver-typing-module"></span><h1>twpasolver.typing module<a class="headerlink" href="#module-twpasolver.typing" title="Permalink to this heading">#</a></h1>
-<p>Type annotations module.</p>
-<dl class="py function">
-<dt class="sig sig-object py" id="twpasolver.typing.all_subclasses">
-<span class="sig-prename descclassname"><span class="pre">twpasolver.typing.</span></span><span class="sig-name descname"><span class="pre">all_subclasses</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cls</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)"><span class="pre">list</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/typing.html#all_subclasses"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.typing.all_subclasses" title="Permalink to this definition">#</a></dt>
-<dd><p>Recursively get all subclasses of a given class.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>cls</strong> – The class for which to find all subclasses.</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A list of all subclasses of the given class.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)">list</a></p>
-</dd>
-</dl>
+          <section id="module-twpasolver.logger">
+<span id="twpasolver-logger-module"></span><h1>twpasolver.logger module<a class="headerlink" href="#module-twpasolver.logger" title="Permalink to this heading">#</a></h1>
+<p>Loggers configuration.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="twpasolver.logger.CustomHandler">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.logger.</span></span><span class="sig-name descname"><span class="pre">CustomHandler</span></span><a class="reference internal" href="../_modules/twpasolver/logger.html#CustomHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.logger.CustomHandler" title="Permalink to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/logging.handlers.html#logging.StreamHandler" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">StreamHandler</span></code></a></p>
+<p>Custom handler for logging algorithm. Credits to Qibocal.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="twpasolver.logger.CustomHandler.format">
+<span class="sig-name descname"><span class="pre">format</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">record</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/logger.html#CustomHandler.format"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.logger.CustomHandler.format" title="Permalink to this definition">#</a></dt>
+<dd><p>Format the record with specific format.</p>
 </dd></dl>
 
-<dl class="py function">
-<dt class="sig sig-object py" id="twpasolver.typing.validate_impedance">
-<span class="sig-prename descclassname"><span class="pre">twpasolver.typing.</span></span><span class="sig-name descname"><span class="pre">validate_impedance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Z</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.12)"><span class="pre">complex</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.12)"><span class="pre">complex</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><span class="pre">float</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/typing.html#validate_impedance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.typing.validate_impedance" title="Permalink to this definition">#</a></dt>
-<dd><p>Validate impedance value.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>Z</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.12)"><em>complex</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><em>float</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – Input impedance value.</p>
-</dd>
-</dl>
 </dd></dl>
 
 </section>
@@ -274,15 +262,23 @@
       <footer>
         
         <div class="related-pages">
-          
-          <a class="prev-page" href="twpasolver.twoport.html">
+          <a class="next-page" href="twpasolver.mathutils.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">twpasolver.mathutils module</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="twpasolver.frequency.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">twpasolver.twoport module</div>
+                <div class="title">twpasolver.frequency module</div>
                 
               </div>
             </a>
@@ -290,7 +286,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             
@@ -323,9 +319,11 @@
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">twpasolver.typing module</a><ul>
-<li><a class="reference internal" href="#twpasolver.typing.all_subclasses"><code class="docutils literal notranslate"><span class="pre">all_subclasses()</span></code></a></li>
-<li><a class="reference internal" href="#twpasolver.typing.validate_impedance"><code class="docutils literal notranslate"><span class="pre">validate_impedance()</span></code></a></li>
+<li><a class="reference internal" href="#">twpasolver.logger module</a><ul>
+<li><a class="reference internal" href="#twpasolver.logger.CustomHandler"><code class="docutils literal notranslate"><span class="pre">CustomHandler</span></code></a><ul>
+<li><a class="reference internal" href="#twpasolver.logger.CustomHandler.format"><code class="docutils literal notranslate"><span class="pre">CustomHandler.format()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

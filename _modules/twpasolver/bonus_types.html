@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
 
     <link rel="shortcut icon" href="../../_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
-        <title>twpasolver.typing - twpasolver · 0.0.1</title>
+        <title>twpasolver.bonus_types - twpasolver · 0.0.1</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?digest=369552022d0b975c8e74270ce6eabe0fb7978f24" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css" />
@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -235,20 +238,21 @@
           </label>
         </div>
         <article role="main">
-          <h1>Source code for twpasolver.typing</h1><div class="highlight"><pre>
+          <h1>Source code for twpasolver.bonus_types</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;Type annotations module.&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">TypeAlias</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">TypeAlias</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">GetJsonSchemaHandler</span><span class="p">,</span> <span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">NonNegativeInt</span>
-<span class="kn">from</span> <span class="nn">pydantic.functional_validators</span> <span class="kn">import</span> <span class="n">BeforeValidator</span>
-<span class="kn">from</span> <span class="nn">pydantic.json_schema</span> <span class="kn">import</span> <span class="n">JsonSchemaValue</span>
-<span class="kn">from</span> <span class="nn">pydantic_core</span> <span class="kn">import</span> <span class="n">core_schema</span>
-<span class="kn">from</span> <span class="nn">typing_extensions</span> <span class="kn">import</span> <span class="n">Annotated</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numba</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nb</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">GetJsonSchemaHandler</span><span class="p">,</span> <span class="n">NonNegativeFloat</span><span class="p">,</span> <span class="n">NonNegativeInt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic.functional_validators</span><span class="w"> </span><span class="kn">import</span> <span class="n">BeforeValidator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic.json_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">JsonSchemaValue</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic_core</span><span class="w"> </span><span class="kn">import</span> <span class="n">core_schema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
 
 
-<div class="viewcode-block" id="all_subclasses"><a class="viewcode-back" href="../../api-reference/twpasolver.typing.html#twpasolver.typing.all_subclasses">[docs]</a><span class="k">def</span> <span class="nf">all_subclasses</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<div class="viewcode-block" id="all_subclasses"><a class="viewcode-back" href="../../api-reference/twpasolver.bonus_types.html#twpasolver.bonus_types.all_subclasses">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">all_subclasses</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Recursively get all subclasses of a given class.</span>
 
@@ -263,7 +267,7 @@
     <span class="p">]</span></div>
 
 
-<div class="viewcode-block" id="validate_impedance"><a class="viewcode-back" href="../../api-reference/twpasolver.typing.html#twpasolver.typing.validate_impedance">[docs]</a><span class="k">def</span> <span class="nf">validate_impedance</span><span class="p">(</span><span class="n">Z</span><span class="p">:</span> <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span><span class="p">:</span>
+<div class="viewcode-block" id="validate_impedance"><a class="viewcode-back" href="../../api-reference/twpasolver.bonus_types.html#twpasolver.bonus_types.validate_impedance">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">validate_impedance</span><span class="p">(</span><span class="n">Z</span><span class="p">:</span> <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Validate impedance value.</span>
 
@@ -273,7 +277,7 @@
     <span class="k">try</span><span class="p">:</span>
         <span class="n">Z</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot convert </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">Z</span><span class="si">}</span><span class="s2"> to complex number.&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot convert </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">Z</span><span class="si">}</span><span class="s2"> to complex number.&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
     <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Real part of impedance </span><span class="si">{Z}</span><span class="s2"> must be non-negative.&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">imag</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -281,9 +285,9 @@
     <span class="k">return</span> <span class="n">Z</span></div>
 
 
-<span class="k">class</span> <span class="nc">_Impedance2PydanticAnnotation</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">_Impedance2PydanticAnnotation</span><span class="p">:</span>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">__get_pydantic_core_schema__</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">__get_pydantic_core_schema__</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">_source_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">_handler</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="n">core_schema</span><span class="o">.</span><span class="n">CoreSchema</span><span class="p">],</span>
@@ -307,7 +311,7 @@
         <span class="p">)</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">__get_pydantic_json_schema__</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">__get_pydantic_json_schema__</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="n">_core_schema</span><span class="p">:</span> <span class="n">core_schema</span><span class="o">.</span><span class="n">CoreSchema</span><span class="p">,</span> <span class="n">handler</span><span class="p">:</span> <span class="n">GetJsonSchemaHandler</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JsonSchemaValue</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">core_schema</span><span class="o">.</span><span class="n">float_schema</span><span class="p">())</span>
@@ -322,6 +326,11 @@
 
 <span class="n">ComplexArray</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">]]</span>
 <span class="n">FloatArray</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]]</span>
+
+<span class="n">nb_complex3d</span> <span class="o">=</span> <span class="n">nb</span><span class="o">.</span><span class="n">complex128</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:]</span>
+<span class="n">nb_complex1d</span> <span class="o">=</span> <span class="n">nb</span><span class="o">.</span><span class="n">complex128</span><span class="p">[:]</span>
+<span class="n">nb_float1d</span> <span class="o">=</span> <span class="n">nb</span><span class="o">.</span><span class="n">float64</span><span class="p">[:]</span>
+<span class="n">nb_int2d</span> <span class="o">=</span> <span class="n">nb</span><span class="o">.</span><span class="n">int64</span><span class="p">[:,</span> <span class="p">:]</span>
 </pre></div>
         </article>
       </div>
@@ -334,7 +343,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

@@ -3,7 +3,7 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="twpasolver.plotting module" href="twpasolver.plotting.html" /><link rel="prev" title="twpasolver.mathutils module" href="twpasolver.mathutils.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="twpasolver.modes_rwa module" href="twpasolver.modes_rwa.html" /><link rel="prev" title="twpasolver.mathutils module" href="twpasolver.mathutils.html" />
 
     <link rel="shortcut icon" href="../_static/favicon.ico"/><!-- Generated with Sphinx 6.2.1 and Furo 2023.09.10 -->
         <title>twpasolver.matrices_arrays module - twpasolver · 0.0.1</title>
@@ -171,6 +171,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
@@ -191,14 +192,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3 current current-page"><a class="current reference internal" href="#">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -242,7 +245,7 @@
 <dl class="py class">
 <dt class="sig sig-object py" id="twpasolver.matrices_arrays.TwoByTwoArray">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.matrices_arrays.</span></span><span class="sig-name descname"><span class="pre">TwoByTwoArray</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/matrices_arrays.html#TwoByTwoArray"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.matrices_arrays.TwoByTwoArray" title="Permalink to this definition">#</a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>A class representing an array of 2x2 matrices.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="twpasolver.matrices_arrays.TwoByTwoArray.shape">
@@ -320,13 +323,44 @@
 
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="twpasolver.matrices_arrays.ZMatrixArray">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.matrices_arrays.</span></span><span class="sig-name descname"><span class="pre">ZMatrixArray</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/matrices_arrays.html#ZMatrixArray"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.matrices_arrays.ZMatrixArray" title="Permalink to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#twpasolver.matrices_arrays.TwoByTwoArray" title="twpasolver.matrices_arrays.TwoByTwoArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">TwoByTwoArray</span></code></a></p>
+<p>A class representing an array of two-ports Z parameters matrices.</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="twpasolver.matrices_arrays.ZMatrixArray.Z11">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Z11</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#twpasolver.matrices_arrays.ZMatrixArray.Z11" title="Permalink to this definition">#</a></dt>
+<dd><p>Z11 parameter (element (0,0)) of the 2x2 matrices.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="twpasolver.matrices_arrays.ZMatrixArray.Z12">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Z12</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#twpasolver.matrices_arrays.ZMatrixArray.Z12" title="Permalink to this definition">#</a></dt>
+<dd><p>Z12 parameter (element (0,1)) of the 2x2 matrices.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="twpasolver.matrices_arrays.ZMatrixArray.Z21">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Z21</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#twpasolver.matrices_arrays.ZMatrixArray.Z21" title="Permalink to this definition">#</a></dt>
+<dd><p>Z21 parameter (element (1,0)) of the 2x2 matrices.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="twpasolver.matrices_arrays.ZMatrixArray.Z22">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Z22</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></em><a class="headerlink" href="#twpasolver.matrices_arrays.ZMatrixArray.Z22" title="Permalink to this definition">#</a></dt>
+<dd><p>Z22 parameter (element (1,1)) of the 2x2 matrices.</p>
+</dd></dl>
+
+</dd></dl>
+
 <dl class="py function">
 <dt class="sig sig-object py" id="twpasolver.matrices_arrays.abcd_identity">
-<span class="sig-prename descclassname"><span class="pre">twpasolver.matrices_arrays.</span></span><span class="sig-name descname"><span class="pre">abcd_identity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N_abcd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#twpasolver.matrices_arrays.ABCDArray" title="twpasolver.matrices_arrays.ABCDArray"><span class="pre">ABCDArray</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/matrices_arrays.html#abcd_identity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.matrices_arrays.abcd_identity" title="Permalink to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">twpasolver.matrices_arrays.</span></span><span class="sig-name descname"><span class="pre">abcd_identity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N_abcd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#twpasolver.matrices_arrays.ABCDArray" title="twpasolver.matrices_arrays.ABCDArray"><span class="pre">ABCDArray</span></a></span></span><a class="reference internal" href="../_modules/twpasolver/matrices_arrays.html#abcd_identity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.matrices_arrays.abcd_identity" title="Permalink to this definition">#</a></dt>
 <dd><p>Get abcd array of identity matrices.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>N_abcd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>) – Number of matrices in array.</p>
+<dd class="field-odd"><p><strong>N_abcd</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a>) – Number of matrices in array.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>Array of identity matrices.</p>
@@ -344,12 +378,12 @@
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="twpasolver.plotting.html">
+          <a class="next-page" href="twpasolver.modes_rwa.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">twpasolver.plotting module</div>
+                <div class="title">twpasolver.modes_rwa module</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -368,7 +402,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             
@@ -419,6 +453,13 @@
 <li><a class="reference internal" href="#twpasolver.matrices_arrays.SMatrixArray.S12"><code class="docutils literal notranslate"><span class="pre">SMatrixArray.S12</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.matrices_arrays.SMatrixArray.S21"><code class="docutils literal notranslate"><span class="pre">SMatrixArray.S21</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.matrices_arrays.SMatrixArray.S22"><code class="docutils literal notranslate"><span class="pre">SMatrixArray.S22</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#twpasolver.matrices_arrays.ZMatrixArray"><code class="docutils literal notranslate"><span class="pre">ZMatrixArray</span></code></a><ul>
+<li><a class="reference internal" href="#twpasolver.matrices_arrays.ZMatrixArray.Z11"><code class="docutils literal notranslate"><span class="pre">ZMatrixArray.Z11</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.matrices_arrays.ZMatrixArray.Z12"><code class="docutils literal notranslate"><span class="pre">ZMatrixArray.Z12</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.matrices_arrays.ZMatrixArray.Z21"><code class="docutils literal notranslate"><span class="pre">ZMatrixArray.Z21</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.matrices_arrays.ZMatrixArray.Z22"><code class="docutils literal notranslate"><span class="pre">ZMatrixArray.Z22</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#twpasolver.matrices_arrays.abcd_identity"><code class="docutils literal notranslate"><span class="pre">abcd_identity()</span></code></a></li>

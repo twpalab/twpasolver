@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -238,66 +241,81 @@
           <h1>Source code for twpasolver.models.twpa_cells</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;Models for TWPAS.&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Literal</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">NonNegativeFloat</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">NonNegativeFloat</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.matrices_arrays</span> <span class="kn">import</span> <span class="n">ABCDArray</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models.oneport</span> <span class="kn">import</span> <span class="n">Inductance</span>
-<span class="kn">from</span> <span class="nn">twpasolver.models.rf_functions</span> <span class="kn">import</span> <span class="n">LCLf_abcd</span><span class="p">,</span> <span class="n">get_stub_cell</span><span class="p">,</span> <span class="n">lossless_line_abcd</span>
-<span class="kn">from</span> <span class="nn">twpasolver.twoport</span> <span class="kn">import</span> <span class="n">TwoPortModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.matrices_arrays</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABCDArray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models.oneport</span><span class="w"> </span><span class="kn">import</span> <span class="n">Inductance</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.models.rf_functions</span><span class="w"> </span><span class="kn">import</span> <span class="n">LCLf_abcd</span><span class="p">,</span> <span class="n">get_stub_cell</span><span class="p">,</span> <span class="n">lossless_line_abcd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.twoport</span><span class="w"> </span><span class="kn">import</span> <span class="n">TwoPortModel</span>
 
 <span class="n">required</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="StubBaseCell"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell">[docs]</a><span class="k">class</span> <span class="nc">StubBaseCell</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
+<div class="viewcode-block" id="StubBaseCell"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">StubBaseCell</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Base cell of twpa stub filter model.&quot;&quot;&quot;</span>
 
-    <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;StubBaseCell&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;StubBaseCell&quot;</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;StubBaseCell2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;StubBaseCell2&quot;</span>
     <span class="n">L</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Inductance of the straight line.&quot;</span><span class="p">)</span>
     <span class="n">C</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Capacitance of the line.&quot;</span><span class="p">)</span>
     <span class="n">Lf</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Inductance of the stub finger.&quot;</span><span class="p">)</span>
     <span class="n">l1</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Length of the stub finger.&quot;</span><span class="p">)</span>
     <span class="n">l2</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Length of the straight line.&quot;</span><span class="p">)</span>
+    <span class="n">delta</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Loss Tangent&quot;</span><span class="p">)</span>
     <span class="n">line</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
         <span class="kc">False</span><span class="p">,</span>
         <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Model line as distributed element instead of lumped inductance.&quot;</span><span class="p">,</span>
     <span class="p">)</span>
 
-<div class="viewcode-block" id="StubBaseCell.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.single_abcd">[docs]</a>    <span class="k">def</span> <span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
+<div class="viewcode-block" id="StubBaseCell.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.StubBaseCell.single_abcd">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute abcd matrix.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">line</span><span class="p">:</span>
             <span class="n">parallel_stubs</span> <span class="o">=</span> <span class="n">ABCDArray</span><span class="p">(</span>
-                <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">get_stub_cell</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Lf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="o">-</span><span class="mi">1</span>
+                <span class="o">*</span> <span class="n">get_stub_cell</span><span class="p">(</span>
+                    <span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">Lf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l1</span><span class="p">,</span> <span class="mi">0</span>
+                <span class="p">)</span>
             <span class="p">)</span>
             <span class="n">half_line</span> <span class="o">=</span> <span class="n">ABCDArray</span><span class="p">(</span>
-                <span class="n">lossless_line_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l2</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+                <span class="n">lossless_line_abcd</span><span class="p">(</span>
+                    <span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l2</span> <span class="o">/</span> <span class="mi">2</span>
+                <span class="p">)</span>
             <span class="p">)</span>
             <span class="k">return</span> <span class="n">half_line</span> <span class="o">@</span> <span class="n">parallel_stubs</span> <span class="o">@</span> <span class="n">half_line</span>
 
-        <span class="k">return</span> <span class="n">ABCDArray</span><span class="p">(</span><span class="n">get_stub_cell</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l2</span><span class="p">))</span></div></div>
+        <span class="k">return</span> <span class="n">ABCDArray</span><span class="p">(</span>
+            <span class="n">get_stub_cell</span><span class="p">(</span>
+                <span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">l2</span>
+            <span class="p">)</span>
+        <span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="LCLfBaseCell"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell">[docs]</a><span class="k">class</span> <span class="nc">LCLfBaseCell</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
+<div class="viewcode-block" id="LCLfBaseCell"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">LCLfBaseCell</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Base cell of twpa LC model.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;LCLfBaseCell&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;LCLfBaseCell&quot;</span>
     <span class="n">L</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Inductance of the straight line.&quot;</span><span class="p">)</span>
     <span class="n">C</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Capacitance of the stub finger.&quot;</span><span class="p">)</span>
     <span class="n">Lf</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">required</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Inductance of the stub finger.&quot;</span><span class="p">)</span>
+    <span class="n">delta</span><span class="p">:</span> <span class="n">NonNegativeFloat</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Loss Tangent&quot;</span><span class="p">)</span>
     <span class="n">centered</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 
-<div class="viewcode-block" id="LCLfBaseCell.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell.single_abcd">[docs]</a>    <span class="k">def</span> <span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
+<div class="viewcode-block" id="LCLfBaseCell.single_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.twpa_cells.html#twpasolver.models.twpa_cells.LCLfBaseCell.single_abcd">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">single_abcd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freqs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ABCDArray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute abcd matrix.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">centered</span><span class="p">:</span>
-            <span class="n">fingers</span> <span class="o">=</span> <span class="n">ABCDArray</span><span class="p">(</span><span class="n">LCLf_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Lf</span><span class="p">))</span>
+            <span class="n">fingers</span> <span class="o">=</span> <span class="n">ABCDArray</span><span class="p">(</span>
+                <span class="n">LCLf_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Lf</span><span class="p">)</span>
+            <span class="p">)</span>
             <span class="n">half_inductance</span> <span class="o">=</span> <span class="n">Inductance</span><span class="p">(</span><span class="n">L</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">get_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">half_inductance</span> <span class="o">@</span> <span class="n">fingers</span> <span class="o">@</span> <span class="n">half_inductance</span>
-        <span class="k">return</span> <span class="n">ABCDArray</span><span class="p">(</span><span class="n">LCLf_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Lf</span><span class="p">))</span></div></div>
+        <span class="k">return</span> <span class="n">ABCDArray</span><span class="p">(</span>
+            <span class="n">LCLf_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">C</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">delta</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Lf</span><span class="p">)</span>
+        <span class="p">)</span></div></div>
 </pre></div>
         </article>
       </div>
@@ -310,7 +328,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

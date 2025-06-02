@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -245,16 +248,16 @@
 
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">json</span>
-<span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span>
 
-<span class="kn">import</span> <span class="nn">h5py</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">h5py</span> <span class="kn">import</span> <span class="n">Group</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">h5py</span><span class="w"> </span><span class="kn">import</span> <span class="n">Group</span>
 
 
-<div class="viewcode-block" id="read_file"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.read_file">[docs]</a><span class="k">def</span> <span class="nf">read_file</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">writer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<div class="viewcode-block" id="read_file"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.read_file">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">read_file</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">writer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Read data from a file and return it as a dictionary.</span>
 
@@ -271,7 +274,7 @@
     <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;hdf5&quot;</span><span class="p">:</span> <span class="n">read_hdf5</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">:</span> <span class="n">read_json</span><span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">writer</span><span class="p">,</span> <span class="n">read_hdf5</span><span class="p">)(</span><span class="n">savename</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="save_to_file"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.save_to_file">[docs]</a><span class="k">def</span> <span class="nf">save_to_file</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">writer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="save_to_file"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.save_to_file">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">save_to_file</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">writer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Save data to a file in the specified format.</span>
 
@@ -285,7 +288,7 @@
     <span class="p">{</span><span class="s2">&quot;hdf5&quot;</span><span class="p">:</span> <span class="n">save_to_hdf5</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">:</span> <span class="n">save_to_json</span><span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">writer</span><span class="p">,</span> <span class="n">save_to_hdf5</span><span class="p">)(</span><span class="n">savename</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="add_extension"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.add_extension">[docs]</a><span class="k">def</span> <span class="nf">add_extension</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">extension</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<div class="viewcode-block" id="add_extension"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.add_extension">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">add_extension</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">extension</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Add the specified extension to the filename if not already present.</span>
 
@@ -301,7 +304,7 @@
     <span class="k">return</span> <span class="n">filename</span></div>
 
 
-<div class="viewcode-block" id="ensure_directory_exists"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.ensure_directory_exists">[docs]</a><span class="k">def</span> <span class="nf">ensure_directory_exists</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="ensure_directory_exists"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.ensure_directory_exists">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">ensure_directory_exists</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Ensure that the directory for the given filename exists; create it if necessary.</span>
 
@@ -314,7 +317,7 @@
             <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="read_hdf5"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.read_hdf5">[docs]</a><span class="k">def</span> <span class="nf">read_hdf5</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<div class="viewcode-block" id="read_hdf5"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.read_hdf5">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">read_hdf5</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Read data from an HDF5 file and return it as a dictionary.</span>
 
@@ -328,7 +331,7 @@
         <span class="k">return</span> <span class="n">_recursively_load_dict_contents_from_group</span><span class="p">(</span><span class="n">f</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="read_json"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.read_json">[docs]</a><span class="k">def</span> <span class="nf">read_json</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<div class="viewcode-block" id="read_json"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.read_json">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">read_json</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Read data from a JSON file and return it as a dictionary.</span>
 
@@ -342,7 +345,7 @@
         <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="save_to_hdf5"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.save_to_hdf5">[docs]</a><span class="k">def</span> <span class="nf">save_to_hdf5</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="save_to_hdf5"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.save_to_hdf5">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">save_to_hdf5</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Save data to an HDF5 file.</span>
 
@@ -357,7 +360,7 @@
         <span class="n">_recursively_save_dict_contents_to_group</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="save_to_json"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.save_to_json">[docs]</a><span class="k">def</span> <span class="nf">save_to_json</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="save_to_json"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.save_to_json">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">save_to_json</span><span class="p">(</span><span class="n">savename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Save data to a JSON file.</span>
 
@@ -369,7 +372,7 @@
         <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">fp</span><span class="p">,</span> <span class="bp">cls</span><span class="o">=</span><span class="n">NpEncoder</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span></div>
 
 
-<span class="k">def</span> <span class="nf">_recursively_save_dict_contents_to_group</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Group</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_recursively_save_dict_contents_to_group</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Group</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Recursively save dictionary contents to an HDF5 group.</span>
 
@@ -395,7 +398,7 @@
             <span class="n">f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">item</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_recursively_load_dict_contents_from_group</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_recursively_load_dict_contents_from_group</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Recursively load dictionary contents from an HDF5 group.</span>
 
@@ -416,10 +419,10 @@
     <span class="k">return</span> <span class="n">ans</span>
 
 
-<div class="viewcode-block" id="NpEncoder"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.NpEncoder">[docs]</a><span class="k">class</span> <span class="nc">NpEncoder</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="p">):</span>
+<div class="viewcode-block" id="NpEncoder"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.NpEncoder">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">NpEncoder</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;JSON encoder for handling NumPy types.&quot;&quot;&quot;</span>
 
-<div class="viewcode-block" id="NpEncoder.default"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.NpEncoder.default">[docs]</a>    <span class="k">def</span> <span class="nf">default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span><span class="p">:</span>
+<div class="viewcode-block" id="NpEncoder.default"><a class="viewcode-back" href="../../api-reference/twpasolver.file_utils.html#twpasolver.file_utils.NpEncoder.default">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return default encoding for NumPy types.</span>
 
@@ -452,7 +455,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

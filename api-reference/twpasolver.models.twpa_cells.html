@@ -171,6 +171,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../implementing_models.html">Implementing New Models</a></li>
@@ -191,14 +192,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -264,42 +267,46 @@
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;integer&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">         </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;StubBaseCell&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;StubBaseCell&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">            </span><span class="s2">&quot;StubBaseCell&quot;</span>
-<span class="w">         </span><span class="p">],</span>
+<span class="w">         </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;StubBaseCell2&quot;</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;StubBaseCell2&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;L&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Inductance of the straight line.&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;C&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Capacitance of the line.&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;Lf&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Inductance of the stub finger.&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Lf&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;l1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Length of the stub finger.&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L1&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;l2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Length of the straight line.&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L2&quot;</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="nt">&quot;delta&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">         </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Loss Tangent&quot;</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Delta&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;line&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -325,16 +332,17 @@
 <li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.C" title="twpasolver.models.twpa_cells.StubBaseCell.C"><code class="xref py py-obj docutils literal notranslate"><span class="pre">C</span> <span class="pre">(float)</span></code></a></p></li>
 <li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.L" title="twpasolver.models.twpa_cells.StubBaseCell.L"><code class="xref py py-obj docutils literal notranslate"><span class="pre">L</span> <span class="pre">(float)</span></code></a></p></li>
 <li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.Lf" title="twpasolver.models.twpa_cells.StubBaseCell.Lf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Lf</span> <span class="pre">(float)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.delta" title="twpasolver.models.twpa_cells.StubBaseCell.delta"><code class="xref py py-obj docutils literal notranslate"><span class="pre">delta</span> <span class="pre">(float)</span></code></a></p></li>
 <li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.l1" title="twpasolver.models.twpa_cells.StubBaseCell.l1"><code class="xref py py-obj docutils literal notranslate"><span class="pre">l1</span> <span class="pre">(float)</span></code></a></p></li>
 <li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.l2" title="twpasolver.models.twpa_cells.StubBaseCell.l2"><code class="xref py py-obj docutils literal notranslate"><span class="pre">l2</span> <span class="pre">(float)</span></code></a></p></li>
 <li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.line" title="twpasolver.models.twpa_cells.StubBaseCell.line"><code class="xref py py-obj docutils literal notranslate"><span class="pre">line</span> <span class="pre">(bool)</span></code></a></p></li>
-<li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.name" title="twpasolver.models.twpa_cells.StubBaseCell.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span> <span class="pre">(Literal['StubBaseCell'])</span></code></a></p></li>
+<li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.name" title="twpasolver.models.twpa_cells.StubBaseCell.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span> <span class="pre">(Literal['StubBaseCell2'])</span></code></a></p></li>
 </ul>
 </dd>
 </dl>
 <dl class="py attribute pydantic_field">
 <dt class="sig sig-object py" id="twpasolver.models.twpa_cells.StubBaseCell.name">
-<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'StubBaseCell'</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'StubBaseCell'</span></em><a class="headerlink" href="#twpasolver.models.twpa_cells.StubBaseCell.name" title="Permalink to this definition">#</a></dt>
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'StubBaseCell2'</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'StubBaseCell2'</span></em><a class="headerlink" href="#twpasolver.models.twpa_cells.StubBaseCell.name" title="Permalink to this definition">#</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute pydantic_field">
@@ -403,8 +411,21 @@
 </dd></dl>
 
 <dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="twpasolver.models.twpa_cells.StubBaseCell.delta">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">delta</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">NonNegativeFloat</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#twpasolver.models.twpa_cells.StubBaseCell.delta" title="Permalink to this definition">#</a></dt>
+<dd><p>Loss Tangent</p>
+<dl class="field-list simple">
+<dt class="field-odd">Constraints<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ge</strong> = 0</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
 <dt class="sig sig-object py" id="twpasolver.models.twpa_cells.StubBaseCell.line">
-<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">line</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#twpasolver.models.twpa_cells.StubBaseCell.line" title="Permalink to this definition">#</a></dt>
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">line</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#twpasolver.models.twpa_cells.StubBaseCell.line" title="Permalink to this definition">#</a></dt>
 <dd><p>Model line as distributed element instead of lumped inductance.</p>
 </dd></dl>
 
@@ -443,28 +464,32 @@
 <span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="nt">&quot;const&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LCLfBaseCell&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LCLfBaseCell&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;enum&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">            </span><span class="s2">&quot;LCLfBaseCell&quot;</span>
-<span class="w">         </span><span class="p">],</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Name&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;L&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Inductance of the straight line.&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;L&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;C&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Capacitance of the stub finger.&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;Lf&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Inductance of the stub finger.&quot;</span><span class="p">,</span>
-<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Lf&quot;</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="nt">&quot;delta&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">         </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Loss Tangent&quot;</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;minimum&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Delta&quot;</span><span class="p">,</span>
 <span class="w">         </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;number&quot;</span>
 <span class="w">      </span><span class="p">},</span>
 <span class="w">      </span><span class="nt">&quot;centered&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -488,6 +513,7 @@
 <li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.L" title="twpasolver.models.twpa_cells.LCLfBaseCell.L"><code class="xref py py-obj docutils literal notranslate"><span class="pre">L</span> <span class="pre">(float)</span></code></a></p></li>
 <li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.Lf" title="twpasolver.models.twpa_cells.LCLfBaseCell.Lf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Lf</span> <span class="pre">(float)</span></code></a></p></li>
 <li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.centered" title="twpasolver.models.twpa_cells.LCLfBaseCell.centered"><code class="xref py py-obj docutils literal notranslate"><span class="pre">centered</span> <span class="pre">(bool)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.delta" title="twpasolver.models.twpa_cells.LCLfBaseCell.delta"><code class="xref py py-obj docutils literal notranslate"><span class="pre">delta</span> <span class="pre">(float)</span></code></a></p></li>
 <li><p><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.name" title="twpasolver.models.twpa_cells.LCLfBaseCell.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span> <span class="pre">(Literal['LCLfBaseCell'])</span></code></a></p></li>
 </ul>
 </dd>
@@ -537,8 +563,21 @@
 </dd></dl>
 
 <dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="twpasolver.models.twpa_cells.LCLfBaseCell.delta">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">delta</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">NonNegativeFloat</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#twpasolver.models.twpa_cells.LCLfBaseCell.delta" title="Permalink to this definition">#</a></dt>
+<dd><p>Loss Tangent</p>
+<dl class="field-list simple">
+<dt class="field-odd">Constraints<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ge</strong> = 0</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
 <dt class="sig sig-object py" id="twpasolver.models.twpa_cells.LCLfBaseCell.centered">
-<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">centered</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#twpasolver.models.twpa_cells.LCLfBaseCell.centered" title="Permalink to this definition">#</a></dt>
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">centered</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#twpasolver.models.twpa_cells.LCLfBaseCell.centered" title="Permalink to this definition">#</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -580,7 +619,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             
@@ -621,6 +660,7 @@
 <li><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.Lf"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.Lf</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.l1"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.l1</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.l2"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.l2</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.delta"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.delta</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.line"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.line</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.models.twpa_cells.StubBaseCell.single_abcd"><code class="docutils literal notranslate"><span class="pre">StubBaseCell.single_abcd()</span></code></a></li>
 </ul>
@@ -630,6 +670,7 @@
 <li><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.L"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.L</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.C"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.C</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.Lf"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.Lf</span></code></a></li>
+<li><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.delta"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.delta</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.centered"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.centered</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.models.twpa_cells.LCLfBaseCell.single_abcd"><code class="docutils literal notranslate"><span class="pre">LCLfBaseCell.single_abcd()</span></code></a></li>
 </ul>

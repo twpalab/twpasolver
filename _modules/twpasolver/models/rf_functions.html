@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -238,14 +241,14 @@
           <h1>Source code for twpasolver.models.rf_functions</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;Compiled functions for components impedance and abcd matrices.&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">numba</span> <span class="kn">import</span> <span class="n">njit</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">numba</span><span class="w"> </span><span class="kn">import</span> <span class="n">njit</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.typing</span> <span class="kn">import</span> <span class="n">ComplexArray</span><span class="p">,</span> <span class="n">FloatArray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.bonus_types</span><span class="w"> </span><span class="kn">import</span> <span class="n">ComplexArray</span><span class="p">,</span> <span class="n">FloatArray</span>
 
 
 <div class="viewcode-block" id="inductance"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.rf_functions.html#twpasolver.models.rf_functions.inductance">[docs]</a><span class="nd">@njit</span>
-<span class="k">def</span> <span class="nf">inductance</span><span class="p">(</span><span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">L</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inductance</span><span class="p">(</span><span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">L</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate the impedance of an inductance as a function of frequency.</span>
 
@@ -261,7 +264,7 @@
 
 
 <div class="viewcode-block" id="capacitance"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.rf_functions.html#twpasolver.models.rf_functions.capacitance">[docs]</a><span class="nd">@njit</span>
-<span class="k">def</span> <span class="nf">capacitance</span><span class="p">(</span><span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">C</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">capacitance</span><span class="p">(</span><span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">C</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate the impedance of a capacitor as a function of frequency.</span>
 
@@ -272,13 +275,13 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        np.ndarray: Impedance of the capacitor.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">assert</span> <span class="n">C</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">C</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">0</span>
     <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="n">j</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">freqs</span> <span class="o">*</span> <span class="n">C</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="stub"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.rf_functions.html#twpasolver.models.rf_functions.stub">[docs]</a><span class="nd">@njit</span>
-<span class="k">def</span> <span class="nf">stub</span><span class="p">(</span>
-    <span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">L</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">C</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">length</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">open</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">stub</span><span class="p">(</span>
+    <span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">L</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">C</span><span class="p">:</span> <span class="nb">complex</span><span class="p">,</span> <span class="n">length</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">open</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate the impedance of a stub as a function of frequency.</span>
@@ -301,7 +304,7 @@
 
 
 <div class="viewcode-block" id="parallel_admittance_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.rf_functions.html#twpasolver.models.rf_functions.parallel_admittance_abcd">[docs]</a><span class="nd">@njit</span>
-<span class="k">def</span> <span class="nf">parallel_admittance_abcd</span><span class="p">(</span><span class="n">Y</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">parallel_admittance_abcd</span><span class="p">(</span><span class="n">Y</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate the ABCD matrix of a parallel admittance.</span>
 
@@ -319,7 +322,7 @@
 
 
 <div class="viewcode-block" id="series_impedance_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.rf_functions.html#twpasolver.models.rf_functions.series_impedance_abcd">[docs]</a><span class="nd">@njit</span>
-<span class="k">def</span> <span class="nf">series_impedance_abcd</span><span class="p">(</span><span class="n">Z</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">series_impedance_abcd</span><span class="p">(</span><span class="n">Z</span><span class="p">:</span> <span class="n">ComplexArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate the ABCD matrix of a series impedance.</span>
 
@@ -337,7 +340,7 @@
 
 
 <div class="viewcode-block" id="lossless_line_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.rf_functions.html#twpasolver.models.rf_functions.lossless_line_abcd">[docs]</a><span class="nd">@njit</span>
-<span class="k">def</span> <span class="nf">lossless_line_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">C</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">L</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">l</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">lossless_line_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">C</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">L</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">l</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate the ABCD matrix of a lossless transmission line.</span>
 
@@ -350,7 +353,7 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        np.ndarray: ABCD matrix of the lossless transmission line.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">assert</span> <span class="n">C</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">C</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">0</span>
     <span class="k">assert</span> <span class="n">L</span> <span class="o">&gt;=</span> <span class="mi">0</span>
     <span class="n">Z0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">L</span> <span class="o">/</span> <span class="n">C</span><span class="p">)</span>
     <span class="n">n_mat</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
@@ -365,7 +368,7 @@
 
 
 <div class="viewcode-block" id="LCLf_abcd"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.rf_functions.html#twpasolver.models.rf_functions.LCLf_abcd">[docs]</a><span class="nd">@njit</span>
-<span class="k">def</span> <span class="nf">LCLf_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">C</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">L</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">Lf</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">LCLf_abcd</span><span class="p">(</span><span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">C</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">L</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">Lf</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate the ABCD matrix of an LCLf cell model.</span>
 
@@ -378,7 +381,7 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        np.ndarray: ABCD matrix of the LCLf cell model.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">assert</span> <span class="n">C</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">C</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">0</span>
     <span class="k">assert</span> <span class="n">L</span> <span class="o">&gt;=</span> <span class="mi">0</span>
     <span class="k">assert</span> <span class="n">Lf</span> <span class="o">&gt;=</span> <span class="mi">0</span>
     <span class="n">n_mat</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">freqs</span><span class="p">)</span>
@@ -394,8 +397,8 @@
 
 
 <div class="viewcode-block" id="get_stub_cell"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.rf_functions.html#twpasolver.models.rf_functions.get_stub_cell">[docs]</a><span class="nd">@njit</span>
-<span class="k">def</span> <span class="nf">get_stub_cell</span><span class="p">(</span>
-    <span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">C</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">L</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">l1</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">l2</span><span class="p">:</span> <span class="nb">float</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_stub_cell</span><span class="p">(</span>
+    <span class="n">freqs</span><span class="p">:</span> <span class="n">FloatArray</span><span class="p">,</span> <span class="n">C</span><span class="p">:</span> <span class="nb">complex</span><span class="p">,</span> <span class="n">L</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">l1</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">l2</span><span class="p">:</span> <span class="nb">float</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComplexArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculate the ABCD matrix of a stub cell model.</span>
@@ -410,7 +413,7 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        np.ndarray: ABCD matrix of the stub cell model.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">assert</span> <span class="n">C</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+    <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">C</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">0</span>
     <span class="k">assert</span> <span class="n">L</span> <span class="o">&gt;=</span> <span class="mi">0</span>
     <span class="n">Z0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">L</span> <span class="o">/</span> <span class="n">C</span><span class="p">)</span>
     <span class="n">v</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">L</span> <span class="o">*</span> <span class="n">C</span><span class="p">)</span> <span class="o">*</span> <span class="n">l1</span>
@@ -439,7 +442,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

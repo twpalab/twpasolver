@@ -12,3 +12,4 @@ These tutorials showcase the basic functionalities of the package, providing ste
    notebooks/01_models
    notebooks/02_twpas
    notebooks/03_analysis
+   notebooks/04_generalized_cmes

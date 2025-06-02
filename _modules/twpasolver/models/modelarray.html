@@ -170,6 +170,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/01_models.html">Network models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/02_twpas.html">Constructing twpas</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../notebooks/03_analysis.html">3WM gain and TWPAnalysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/04_generalized_cmes.html">Advanced Coupled Mode Equations models</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../../implementing_models.html">Implementing New Models</a></li>
@@ -190,14 +191,16 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.analysis.html">twpasolver.analysis module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.basemodel.html">twpasolver.basemodel module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.bonus_types.html">twpasolver.bonus_types module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.cmes.html">twpasolver.cmes module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.file_utils.html">twpasolver.file_utils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.frequency.html">twpasolver.frequency module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.logging.html">twpasolver.logging module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.logger.html">twpasolver.logger module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.mathutils.html">twpasolver.mathutils module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.matrices_arrays.html">twpasolver.matrices_arrays module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.plotting.html">twpasolver.plotting module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.twoport.html">twpasolver.twoport module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../../api-reference/twpasolver.typing.html">twpasolver.typing module</a></li>
 </ul>
 </li>
 </ul>
@@ -243,16 +246,16 @@
 <span class="sd">organization and manipulation of multiple two-port network models, including nested lists.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
 
-<span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">field_validator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">field_validator</span>
 
-<span class="kn">from</span> <span class="nn">twpasolver.twoport</span> <span class="kn">import</span> <span class="n">TwoPortModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.twoport</span><span class="w"> </span><span class="kn">import</span> <span class="n">TwoPortModel</span>
 
 
-<div class="viewcode-block" id="ModelArray"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.modelarray.html#twpasolver.models.modelarray.ModelArray">[docs]</a><span class="k">class</span> <span class="nc">ModelArray</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
+<div class="viewcode-block" id="ModelArray"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.modelarray.html#twpasolver.models.modelarray.ModelArray">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">ModelArray</span><span class="p">(</span><span class="n">TwoPortModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Generic container for arrays of TwoPortModels.&quot;&quot;&quot;</span>
 
     <span class="n">cells</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
@@ -262,7 +265,7 @@
 
 <div class="viewcode-block" id="ModelArray.validate_nested_cells"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.modelarray.html#twpasolver.models.modelarray.ModelArray.validate_nested_cells">[docs]</a>    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;cells&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">,</span> <span class="n">check_fields</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">validate_nested_cells</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">cells</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TwoPortModel</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">TwoPortModel</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_nested_cells</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">cells</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TwoPortModel</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">TwoPortModel</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Recursively create ModelArrays inside nested lists.</span>
 
@@ -277,7 +280,7 @@
                 <span class="n">cells</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">cells</span><span class="o">=</span><span class="n">c</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">cells</span></div>
 
-    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">:</span> <span class="nb">slice</span> <span class="o">|</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ModelArray</span> <span class="o">|</span> <span class="n">TwoPortModel</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">:</span> <span class="nb">slice</span> <span class="o">|</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ModelArray</span> <span class="o">|</span> <span class="n">TwoPortModel</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get model(s) at indices or slice.</span>
 
@@ -291,7 +294,7 @@
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">(</span><span class="n">cells</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">[</span><span class="n">indices</span><span class="p">])</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
 
-<div class="viewcode-block" id="ModelArray.append"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.modelarray.html#twpasolver.models.modelarray.ModelArray.append">[docs]</a>    <span class="k">def</span> <span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">TwoPortModel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="ModelArray.append"><a class="viewcode-back" href="../../../api-reference/twpasolver.models.modelarray.html#twpasolver.models.modelarray.ModelArray.append">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">TwoPortModel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Append new model to internal cell array.</span>
 
@@ -311,7 +314,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, twpalab
+                Copyright &#169; 2025, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             
