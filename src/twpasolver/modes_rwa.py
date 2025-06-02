@@ -1,13 +1,15 @@
-"""Simplified Mode array implementation."""
+"""Classes to represent frequency modes, their properties and the relations between them."""
 
 import itertools as it
-from collections import Counter
+from collections import Counter, defaultdict, deque
 from copy import deepcopy
 from dataclasses import dataclass
 from math import factorial
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 from scipy.interpolate import interp1d
 from sympy import symbols
@@ -17,9 +19,9 @@ from twpasolver.logger import log
 
 class ParameterInterpolator:
     """
-    Interpolates kappa and gamma values based on frequency.
+    Interpolates kappa, gamma, and alpha values based on frequency.
 
-    Handles both real and complex values.
+    Always returns real kappa and alpha, complex gamma.
     """
 
     def __init__(
@@ -27,55 +29,44 @@ class ParameterInterpolator:
         frequencies: np.ndarray,
         kappas: np.ndarray,
         gammas: np.ndarray,
+        alphas: np.ndarray,
         kind: str = "cubic",
     ):
         """
-        Initialize interpolators for kappa and gamma.
+        Initialize interpolators for kappa, gamma, and alpha.
 
         Args:
             frequencies: Array of frequency points
-            kappas: Array of coupling coefficients
-            gammas: Array of reflection coefficients
+            kappas: Array of coupling coefficients (real)
+            gammas: Array of reflection coefficients (complex)
+            alphas: Array of attenuation coefficients (real)
             kind: Interpolation method ('linear', 'cubic', etc.)
         """
         # Validate input arrays
-        if not (len(frequencies) == len(kappas) == len(gammas)):
-            raise ValueError("All input arrays must have the same length")
+        if not (len(frequencies) == len(kappas) == len(gammas) == len(alphas)):
+            raise ValueError(
+                "Frequencies, kappas, gammas, and alphas must have the same length"
+            )
         if len(frequencies) < 2:
             raise ValueError("Need at least 2 points for interpolation")
+
         self.orig_freqs = frequencies
         self.orig_kappas = kappas
         self.orig_gammas = gammas
+        self.orig_alphas = alphas
         self.freq_min = np.min(frequencies)
         self.freq_max = np.max(frequencies)
 
-        # For kappa interpolation
-        if np.iscomplexobj(kappas):
-            self.kappa_real = interp1d(
-                frequencies,
-                np.real(kappas),
-                kind=kind,
-                bounds_error=False,
-                fill_value=(kappas[0].real, kappas[-1].real),
-            )
-            self.kappa_imag = interp1d(
-                frequencies,
-                np.imag(kappas),
-                kind=kind,
-                bounds_error=False,
-                fill_value=(kappas[0].imag, kappas[-1].imag),
-            )
-        else:
-            self.kappa_real = interp1d(
-                frequencies,
-                kappas,
-                kind=kind,
-                bounds_error=False,
-                fill_value=(kappas[0], kappas[-1]),
-            )
-            self.kappa_imag = None
+        # For kappa interpolation (real only)
+        self.kappa_interp = interp1d(
+            frequencies,
+            np.real(kappas),
+            kind=kind,
+            bounds_error=False,
+            fill_value=(np.real(kappas[0]), np.real(kappas[-1])),
+        )
 
-        # For gamma interpolation
+        # For gamma interpolation (complex)
         if np.iscomplexobj(gammas):
             self.gamma_real = interp1d(
                 frequencies,
@@ -101,17 +92,29 @@ class ParameterInterpolator:
             )
             self.gamma_imag = None
 
+        # For alpha interpolation (real only)
+        self.alpha_interp = interp1d(
+            frequencies,
+            np.real(alphas),
+            kind=kind,
+            bounds_error=False,
+            fill_value=(np.real(alphas[0]), np.real(alphas[-1])),
+        )
+
     def get_parameters(
         self, frequency: Union[float, np.ndarray]
-    ) -> Tuple[Union[complex, np.ndarray], Union[complex, np.ndarray]]:
+    ) -> Tuple[
+        Union[float, np.ndarray], Union[complex, np.ndarray], Union[float, np.ndarray]
+    ]:
         """
-        Get interpolated kappa and gamma for a given frequency or array of frequencies.
+        Get interpolated kappa, gamma, and alpha for a given frequency or array of frequencies.
 
         Args:
             frequency: Frequency point(s) for interpolation, can be a single value or array
 
         Returns:
-            Tuple of (kappa, gamma) at the requested frequency/frequencies
+            Tuple of (kappa, gamma, alpha) at the requested frequency/frequencies
+            kappa and alpha are real, gamma is complex
         """
         # Check if we're processing a single value or array
         is_array = isinstance(frequency, np.ndarray)
@@ -130,15 +133,10 @@ class ParameterInterpolator:
                     f"[{self.freq_min}, {self.freq_max}]. Using endpoint values."
                 )
 
-        # Interpolate kappa
-        if self.kappa_imag is not None:
-            kappa_real = self.kappa_real(frequency)
-            kappa_imag = self.kappa_imag(frequency)
-            kappa = kappa_real + 1j * kappa_imag
-        else:
-            kappa = self.kappa_real(frequency)
+        # Interpolate kappa (real only)
+        kappa = self.kappa_interp(frequency)
 
-        # Interpolate gamma
+        # Interpolate gamma (complex)
         if self.gamma_imag is not None:
             gamma_real = self.gamma_real(frequency)
             gamma_imag = self.gamma_imag(frequency)
@@ -146,20 +144,24 @@ class ParameterInterpolator:
         else:
             gamma = self.gamma_real(frequency)
 
-        return kappa, gamma
+        # Interpolate alpha (real only)
+        alpha = self.alpha_interp(frequency)
+
+        return kappa, gamma, alpha
 
 
 @dataclass
 class Mode:
     """
-    Represents a single optical mode with its physical properties.
+    Represents a single mode with its physical properties.
 
-    Attributes:
+    Args:
         label: Mode identifier (e.g., 'p' for pump)
-        frequency: Angular frequency (ω)
+        frequency: Mode frequency
         direction: 1 for forward, -1 for backward
         gamma: Reflection coefficient
         k: Wavenumber (calculated from frequency)
+        alpha: Attenuation constant
     """
 
     label: str
@@ -167,6 +169,7 @@ class Mode:
     frequency: Optional[float] = None
     k: Optional[float] = None
     gamma: Optional[Union[float, complex]] = 0.0
+    alpha: Optional[float] = 0.0
 
     def __post_init__(self):
         """Initialize derived quantities and validate inputs."""
@@ -174,7 +177,7 @@ class Mode:
         if abs(self.direction) != 1:
             raise ValueError("Direction must be either 1 (forward) or -1 (backward)")
         if self.k is not None:
-            self.k *= self.direction
+            self.k = self.k * self.direction
 
     def __eq__(self, other):
         """Compare modes based on their physical properties."""
@@ -185,6 +188,7 @@ class Mode:
             and self.direction == other.direction
             and self.gamma == other.gamma
             and self.k == other.k
+            and self.alpha == other.alpha
         )
 
     def __hash__(self):
@@ -200,7 +204,7 @@ class Mode:
         """Get representation of class."""
         return (
             f'Mode("{self.label}", freq={self.frequency}, '
-            f"dir={self.direction}, gamma={self.gamma}, k={self.k})"
+            f"dir={self.direction}, gamma={self.gamma}, k={self.k}, alpha={self.alpha})"
         )
 
 
@@ -221,13 +225,12 @@ class RWAAnalyzer:
         self.modes_symbolic = [symbols(m) for m in modes]
         self.modes_extended = self.modes_symbolic + [-m for m in self.modes_symbolic]
         self.mode_to_idx = {mode: idx for idx, mode in enumerate(modes)}
-        # self.idx_to_mode = {idm: mode for idx, mode in enumerate(modes)}
         self._relations = relations
         self.relations_idx = self._convert_relations_to_indices()
         self.modes_subs = self._compute_substitutions()
 
         # Cache for RWA terms
-        self._rwa_terms_cache = {}
+        self._rwa_terms_cache: Dict[int, List[Tuple[Any, ...]]] = {}
 
     @property
     def relations(self):
@@ -311,13 +314,13 @@ class RWAAnalyzer:
 
     def _calculate_coefficient(self, terms: List[str]) -> float:
         """Calculate coefficient based on term repetitions."""
-        coeff = 1
+        coeff = 1.0
         if len(set(terms)) != len(terms):
             for repetitions in Counter(terms).values():
                 coeff = coeff / factorial(repetitions)
         return coeff
 
-    def find_rwa_terms(self, power: int = 3) -> List[Tuple]:
+    def find_rwa_terms(self, power: int = 3) -> List[Tuple[Any, ...]]:
         """
         Find all valid RWA terms of given power.
 
@@ -352,7 +355,7 @@ class RWAAnalyzer:
 
         return result
 
-    def print_rwa_terms(self, terms: List[Tuple]) -> None:
+    def print_rwa_terms(self, terms: List[Tuple[Any, ...]]) -> None:
         """Pretty print the RWA terms with their coefficients."""
         for term in terms:
             mode_name = term[2]
@@ -363,41 +366,156 @@ class RWAAnalyzer:
 
 
 class ModeArray:
-    """Manages a collection of modes, their relations, and parameter interpolation."""
+    """Class representing a list of modes and frequency relations between them."""
 
     def __init__(
         self,
         modes: List[Mode],
         relations: List[List[str]],
-        freq_data: np.ndarray,
-        kappa_data: np.ndarray,
-        gamma_data: np.ndarray,
+        interpolator: ParameterInterpolator,
     ):
         """
-        Initialize mode array with modes, relations and interpolation data.
+        Initialize mode array with modes, relations and interpolator.
 
         Args:
             modes: List of Mode objects
             relations: List of [result, expression] pairs for mode relationships
-            freq_data: Array of frequency points for interpolation
-            kappa_data: Array of kappa values corresponding to frequencies
-            gamma_data: Array of gamma values corresponding to frequencies
+            interpolator: ParameterInterpolator instance for getting mode parameters
         """
         self.modes = {mode.label: mode for mode in modes}
         self.relations = relations
+        self.interpolator = interpolator
 
-        # Initialize RWA analyzer for mode relations
         self.analyzer = RWAAnalyzer(list(self.modes.keys()), relations)
 
-        # Initialize parameter interpolator
-        self.interpolator = ParameterInterpolator(freq_data, kappa_data, gamma_data)
+        # Build symbolic expressions for efficient frequency propagation
+        self._build_symbolic_expressions()
 
         # Cache for computed mixing coefficients
-        self._rwa_terms_3wm = None
-        self._rwa_terms_4wm = None
+        self._rwa_terms_3wm: Optional[List[Tuple[Any, ...]]] = None
+        self._rwa_terms_4wm: Optional[List[Tuple[Any, ...]]] = None
 
         # Validate initial state
         self._validate_modes()
+
+    def _parse_expression_for_propagation(self, expr: str) -> List[Tuple[str, int]]:
+        """Parse expression into list of (mode, coefficient) pairs for frequency propagation."""
+        expr = expr.replace(" ", "")
+        if not expr.startswith(("+", "-")):
+            expr = "+" + expr
+
+        terms = []
+        current_term = ""
+        sign = 1
+
+        for char in expr:
+            if char in ["+", "-"]:
+                if current_term:
+                    terms.append((current_term, sign))
+                current_term = ""
+                sign = 1 if char == "+" else -1
+            else:
+                current_term += char
+
+        if current_term:
+            terms.append((current_term, sign))
+
+        return terms
+
+    def _build_dependency_graph(self):
+        """Build dependency graph for relation analysis."""
+        self.dependency_graph = defaultdict(set)
+        self.reverse_deps = defaultdict(set)
+
+        for result, expr in self.relations:
+            terms = self._parse_expression_for_propagation(expr)
+            for mode, _ in terms:
+                self.dependency_graph[mode].add(result)
+                self.reverse_deps[result].add(mode)
+
+    def _topological_sort(self) -> List[str]:
+        """Perform topological sort of dependencies."""
+        in_degree = defaultdict(int)
+
+        # Calculate in-degrees
+        for mode in self.modes.keys():
+            in_degree[mode] = len(self.reverse_deps[mode])
+
+        # Start with modes that have no dependencies
+        queue = deque([mode for mode in self.modes.keys() if in_degree[mode] == 0])
+        result = []
+
+        while queue:
+            current = queue.popleft()
+            result.append(current)
+
+            # Update in-degrees of dependent modes
+            for dependent in self.dependency_graph[current]:
+                in_degree[dependent] -= 1
+                if in_degree[dependent] == 0:
+                    queue.append(dependent)
+
+        return result
+
+    def _build_symbolic_expressions(self):
+        """
+        Build symbolic expressions for each mode in terms of independent modes.
+
+        This enables O(n) frequency propagation instead of iterative solving.
+        """
+        # Build dependency graph
+        self._build_dependency_graph()
+
+        # Find independent modes (those not defined by relations)
+        self.independent_modes = set(self.modes.keys())
+        for result, _ in self.relations:
+            self.independent_modes.discard(result)
+
+        # Initialize symbolic expressions
+        self.symbolic_expressions = {}
+
+        # Independent modes have simple expressions
+        for mode in self.independent_modes:
+            self.symbolic_expressions[mode] = {mode: 1.0}
+
+        # Build expressions for dependent modes using topological order
+        topo_order = self._topological_sort()
+
+        for mode in topo_order:
+            if mode in self.symbolic_expressions:
+                continue  # Already processed (independent mode)
+
+            # Find the relation that defines this mode
+            for result, expr in self.relations:
+                if result == mode:
+                    terms = self._parse_expression_for_propagation(expr)
+                    self.symbolic_expressions[mode] = {}
+
+                    for dep_mode, coeff in terms:
+                        if dep_mode in self.symbolic_expressions:
+                            # Add contribution from dependency
+                            for base_mode, base_coeff in self.symbolic_expressions[
+                                dep_mode
+                            ].items():
+                                if base_mode in self.symbolic_expressions[mode]:
+                                    self.symbolic_expressions[mode][base_mode] += (
+                                        coeff * base_coeff
+                                    )
+                                else:
+                                    self.symbolic_expressions[mode][base_mode] = (
+                                        coeff * base_coeff
+                                    )
+                        else:
+                            # This should not happen with proper topological sort
+                            log.warning(
+                                f"Dependency {dep_mode} not found when processing {mode}"
+                            )
+                    break
+
+        log.info(
+            f"Built symbolic expressions for {len(self.symbolic_expressions)} modes"
+        )
+        log.info(f"Independent modes: {self.independent_modes}")
 
     def _validate_modes(self):
         """Ensure all modes referenced in relations exist."""
@@ -415,11 +533,11 @@ class ModeArray:
                 if mode not in self.modes:
                     raise ValueError(f"Mode {mode} in relations not found")
 
-    def _propagate_frequencies(
+    def _propagate_frequencies_symbolic(
         self, updated_freqs: Dict[str, float]
-    ) -> Dict[str, float]:
+    ) -> Dict[str, Optional[float]]:
         """
-        Propagate frequency updates through relations.
+        Symbolic frequency propagation - O(n) complexity.
 
         Args:
             updated_freqs: Dictionary of mode labels to their new frequencies
@@ -427,38 +545,35 @@ class ModeArray:
         Returns:
             Dictionary of all mode labels to their computed frequencies
         """
-        # Start with existing frequencies
-        frequencies = {label: mode.frequency for label, mode in self.modes.items()}
+        # Start with current frequencies
+        frequencies: Dict[str, Optional[float]] = {
+            label: mode.frequency for label, mode in self.modes.items()
+        }
         frequencies.update(updated_freqs)
 
-        # Propagate through relations until no changes
-        changed = True
-        while changed:
-            changed = False
-            for rel_idx, term_indices, term_signs in self.analyzer.relations_idx:
-                result_mode = list(self.modes.keys())[rel_idx]
+        # Evaluate each mode using its symbolic expression
+        for mode, expression in self.symbolic_expressions.items():
+            if mode in updated_freqs:
+                continue  # Already set by user
 
-                # Skip if we don't have all required frequencies
-                term_modes = [list(self.modes.keys())[abs(idx)] for idx in term_indices]
-                if not all(frequencies.get(mode) is not None for mode in term_modes):
-                    continue
+            # Check if all base modes are available
+            all_available = True
+            new_freq = 0.0
 
-                # Calculate new frequency from relation
-                new_freq = sum(
-                    term_signs[i] * frequencies[list(self.modes.keys())[abs(idx)]]
-                    for i, idx in enumerate(term_indices)
-                )
+            for base_mode, coeff in expression.items():
+                if frequencies.get(base_mode) is None:
+                    all_available = False
+                    break
+                new_freq += coeff * frequencies[base_mode]
 
-                # Update if different
-                if frequencies.get(result_mode) != new_freq:
-                    frequencies[result_mode] = new_freq
-                    changed = True
+            if all_available:
+                frequencies[mode] = new_freq
 
         return frequencies
 
     def update_frequencies(self, new_frequencies: Dict[str, float]) -> None:
         """
-        Update mode frequencies and interpolate corresponding parameters.
+        Update mode frequencies using optimized symbolic propagation.
 
         Args:
             new_frequencies: Dictionary mapping mode labels to new frequencies
@@ -468,24 +583,45 @@ class ModeArray:
         if unknown_modes:
             raise ValueError(f"Unknown modes in frequency update: {unknown_modes}")
 
-        # Propagate frequencies through relations
-        all_frequencies = self._propagate_frequencies(new_frequencies)
+        # Use symbolic propagation (much faster than iterative)
+        all_frequencies = self._propagate_frequencies_symbolic(new_frequencies)
 
         # Update modes with new frequencies and interpolated parameters
         for label, freq in all_frequencies.items():
             if freq is not None:
                 mode = self.modes[label]
                 mode.frequency = freq
-                # Get interpolated parameters
-                kappa, gamma = self.interpolator.get_parameters(abs(freq))
-                mode.gamma = gamma
-                mode.k = kappa * mode.direction
+                # Get interpolated parameters (always returns kappa, gamma, alpha)
+                kappa, gamma, alpha = self.interpolator.get_parameters(abs(freq))
+                mode.alpha = alpha  # type: ignore
+                mode.gamma = gamma  # type: ignore
+                mode.k = kappa * mode.direction  # type: ignore
+
+    def update_base_data(self, interpolator: ParameterInterpolator) -> None:
+        """
+        Update the base data interpolator and refresh all mode parameters.
+
+        Args:
+            interpolator: New ParameterInterpolator instance
+        """
+        self.interpolator = interpolator
+
+        # Refresh all mode parameters with current frequencies
+        current_freqs = {
+            label: mode.frequency
+            for label, mode in self.modes.items()
+            if mode.frequency is not None
+        }
+        if current_freqs:
+            self.update_frequencies(current_freqs)
 
     def process_frequency_array(
         self, mode_label: str, frequencies: np.ndarray
     ) -> Dict[str, Dict[str, np.ndarray]]:
         """
         Process an array of frequencies for a single mode, propagating to all related modes.
+
+        Uses symbolic expressions for optimal performance.
 
         Args:
             mode_label: Label of the mode to update with array of frequencies
@@ -499,29 +635,38 @@ class ModeArray:
             raise ValueError(f"Unknown mode: {mode_label}")
 
         # Initialize result containers
-        all_frequencies = {}
-        mode_params = {}
+        mode_params: Dict[str, Dict[str, np.ndarray]] = {}
 
-        # Process each frequency point
-        for i, freq in enumerate(frequencies):
-            # Update with this single frequency
-            freq_results = self._propagate_frequencies({mode_label: freq})
+        # For each mode, compute its frequency array using symbolic expressions
+        for mode, expression in self.symbolic_expressions.items():
+            if mode_label not in expression:
+                indep_mode = self.modes[mode]
+                mode_params[mode] = {
+                    "freqs": np.full(len(frequencies), indep_mode.frequency),
+                    "k": np.full(len(frequencies), indep_mode.k),
+                    "gamma": np.full(len(frequencies), indep_mode.gamma),
+                    "alpha": np.full(len(frequencies), indep_mode.alpha),
+                }
+                continue
 
-            # Store results for each mode
-            for label, value in freq_results.items():
-                if label not in all_frequencies:
-                    # Initialize array for this mode
-                    all_frequencies[label] = np.zeros(len(frequencies))
-                all_frequencies[label][i] = value
+            # Compute frequency array for this mode
+            mode_freqs = frequencies * expression[mode_label]
 
-        # Get all parameters for the computed frequencies
-        for label, freqs in all_frequencies.items():
+            # Add contributions from other independent modes if they have values
+            for base_mode, coeff in expression.items():
+                if (
+                    base_mode != mode_label
+                    and self.modes[base_mode].frequency is not None
+                ):
+                    mode_freqs += coeff * self.modes[base_mode].frequency
+
             # Get direction for this mode
-            mode = self.modes[label]
-            direction = mode.direction
+            direction = self.modes[mode].direction
 
-            # Get parameters for all frequencies of this mode
-            kappas, gammas = self.interpolator.get_parameters(np.abs(freqs))
+            # Get parameters for all frequencies of this mode (always returns kappa, gamma, alpha)
+            kappas, gammas, alphas = self.interpolator.get_parameters(
+                np.abs(mode_freqs)
+            )
 
             # Apply direction to kappas
             if isinstance(kappas, np.ndarray):
@@ -530,15 +675,249 @@ class ModeArray:
                 kappas = np.array([kappas * direction])
 
             # Store parameters
-            mode_params[label] = {"freqs": freqs, "k": kappas, "gamma": gammas}
+            mode_params[mode] = {
+                "freqs": mode_freqs,
+                "k": kappas,
+                "gamma": gammas,  # type: ignore
+                "alpha": alphas,  # type: ignore
+            }
 
         return mode_params
+
+    def plot_mode_relations(
+        self,
+        figsize: Tuple[float, float] = (12, 8),
+        node_size: int = 3000,
+        font_size: int = 12,
+        show_frequencies: bool = False,
+        show_directions: bool = True,
+        layout: str = "hierarchical",
+    ) -> None:
+        """
+        Plot the relationships between modes as a directed graph.
+
+        Args:
+            figsize: Figure size (width, height)
+            node_size: Size of mode nodes
+            font_size: Font size for labels
+            show_frequencies: Whether to show current frequencies on nodes
+            show_directions: Whether to show mode propagation directions
+            layout: Graph layout algorithm ('spring', 'circular', 'hierarchical')
+        """
+        # Create directed graph
+        G = nx.DiGraph()
+
+        # Add nodes for all modes
+        for mode_label, mode in self.modes.items():
+            node_attrs = {
+                "frequency": mode.frequency,
+                "direction": mode.direction,
+                "is_independent": mode_label in self.independent_modes,
+            }
+            G.add_node(mode_label, **node_attrs)
+
+        # Add edges based on relations
+        edge_labels: dict[Tuple[str, str], str] = {}
+        for result, expr in self.relations:
+            terms = self._parse_expression_for_propagation(expr)
+            for dep_mode, coeff in terms:
+                if coeff > 0:
+                    edge_color = "blue"
+                    edge_style = "-"
+                else:
+                    edge_color = "red"
+                    edge_style = "--"
+
+                G.add_edge(
+                    dep_mode,
+                    result,
+                    weight=abs(coeff),
+                    color=edge_color,
+                    style=edge_style,
+                )
+
+                # Create edge label
+                coeff_str = f"+{coeff}" if coeff > 0 else str(coeff)
+                if (dep_mode, result) in edge_labels:
+                    edge_labels[(dep_mode, result)] += f", {coeff_str}"
+                else:
+                    edge_labels[(dep_mode, result)] = coeff_str
+
+        # Create figure
+        fig, (ax1, ax2) = plt.subplots(
+            1, 2, figsize=figsize, gridspec_kw={"width_ratios": [3, 1]}
+        )
+
+        # Choose layout
+        if layout == "hierarchical":
+            pos = self._hierarchical_layout(G)
+        elif layout == "circular":
+            pos = nx.circular_layout(G)
+        else:  # spring layout
+            pos = nx.spring_layout(G, k=2, iterations=50)
+
+        # Node colors based on type
+        node_colors = []
+        for node in G.nodes():
+            if G.nodes[node]["is_independent"]:
+                node_colors.append("lightgreen")  # Independent modes
+            else:
+                node_colors.append("lightblue")  # Dependent modes
+
+        # Draw nodes
+        nx.draw_networkx_nodes(
+            G, pos, node_color=node_colors, node_size=node_size, ax=ax1
+        )
+
+        # Draw edges with different styles
+        edge_colors = [G.edges[edge]["color"] for edge in G.edges()]
+        edge_styles = [G.edges[edge]["style"] for edge in G.edges()]
+
+        # Draw positive and negative edges separately for different styles
+        pos_edges = [(u, v) for u, v, d in G.edges(data=True) if d["color"] == "blue"]
+        neg_edges = [(u, v) for u, v, d in G.edges(data=True) if d["color"] == "red"]
+
+        if pos_edges:
+            nx.draw_networkx_edges(
+                G,
+                pos,
+                edgelist=pos_edges,
+                edge_color="blue",
+                style="-",
+                arrows=True,
+                arrowsize=20,
+                ax=ax1,
+            )
+        if neg_edges:
+            nx.draw_networkx_edges(
+                G,
+                pos,
+                edgelist=neg_edges,
+                edge_color="red",
+                style="--",
+                arrows=True,
+                arrowsize=20,
+                ax=ax1,
+            )
+
+        # Node labels
+        if show_frequencies and show_directions:
+            labels = {}
+            for mode_label, mode in self.modes.items():
+                direction_str = "→" if mode.direction == 1 else "←"
+                freq_str = f"{mode.frequency:.1f}" if mode.frequency else "None"
+                labels[mode_label] = f"{mode_label}\n{direction_str}\n({freq_str})"
+        elif show_frequencies:
+            labels = {}
+            for mode_label, mode in self.modes.items():
+                freq_str = f"{mode.frequency:.1f}" if mode.frequency else "None"
+                labels[mode_label] = f"{mode_label}\n({freq_str})"
+        elif show_directions:
+            labels = {}
+            for mode_label, mode in self.modes.items():
+                direction_str = "→" if mode.direction == 1 else "←"
+                labels[mode_label] = f"{mode_label}\n{direction_str}"
+        else:
+            labels = {mode: mode for mode in G.nodes()}
+
+        nx.draw_networkx_labels(G, pos, labels, font_size=font_size, ax=ax1)
+
+        # Edge labels (coefficients)
+        nx.draw_networkx_edge_labels(
+            G, pos, edge_labels, font_size=font_size - 2, ax=ax1
+        )
+
+        ax1.set_title("Mode Relationships", fontsize=font_size + 2, fontweight="bold")
+        ax1.axis("off")
+
+        # Legend
+        legend_elements = [
+            mpatches.Patch(color="lightgreen", label="Independent modes"),
+            mpatches.Patch(color="lightblue", label="Dependent modes"),
+            plt.Line2D([0], [0], color="blue", lw=2, label="Positive contribution"),
+            plt.Line2D(
+                [0],
+                [0],
+                color="red",
+                lw=2,
+                linestyle="--",
+                label="Negative contribution",
+            ),
+        ]
+        ax1.legend(handles=legend_elements, loc="upper right")
+
+        # Relations text in second subplot
+        ax2.axis("off")
+        ax2.set_title("Relations", fontsize=font_size + 1, fontweight="bold")
+
+        relations_text = "Symbolic Expressions:\n\n"
+        for mode, expression in self.symbolic_expressions.items():
+            expr_parts = []
+            for base_mode, coeff in expression.items():
+                if coeff == 1:
+                    expr_parts.append(base_mode)
+                elif coeff == -1:
+                    expr_parts.append(f"-{base_mode}")
+                else:
+                    expr_parts.append(f"{coeff}*{base_mode}")
+
+            expr_str = " + ".join(expr_parts).replace(" + -", " - ")
+            relations_text += f"{mode} = {expr_str}\n"
+
+        relations_text += f"\nIndependent: {', '.join(sorted(self.independent_modes))}"
+
+        ax2.text(
+            0.05,
+            0.95,
+            relations_text,
+            transform=ax2.transAxes,
+            fontsize=font_size - 1,
+            verticalalignment="top",
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
+        )
+
+        plt.tight_layout()
+        plt.show()
+
+    def _hierarchical_layout(self, G: nx.DiGraph) -> Dict[str, Tuple[float, float]]:
+        """Create hierarchical layout with independent modes at bottom."""
+        levels = {}
+
+        # Independent modes at level 0
+        for mode in self.independent_modes:
+            levels[mode] = 0
+
+        # Assign levels based on dependencies
+        max_level = 0
+        for mode in nx.topological_sort(G):
+            if mode not in levels:
+                # Find maximum level of predecessors
+                pred_levels = [levels.get(pred, 0) for pred in G.predecessors(mode)]
+                levels[mode] = max(pred_levels, default=0) + 1
+                max_level = max(max_level, levels[mode])
+
+        # Create positions
+        level_counts: dict[int, int] = defaultdict(int)
+        level_positions: dict[int, int] = defaultdict(int)
+
+        # Count nodes per level
+        for level in levels.values():
+            level_counts[level] += 1
+
+        pos: dict[str, tuple[float, float]] = {}
+        for mode, level in levels.items():
+            x = level_positions[level] - (level_counts[level] - 1) / 2
+            y = max_level - level  # Flip so independent modes are at bottom
+            pos[mode] = (x, y)
+            level_positions[level] += 1
+
+        return pos
 
     def get_mode(self, label: str) -> Mode:
         """Get mode by label."""
         return self.modes[label]
 
-    def get_rwa_terms(self, power: int = 3) -> List[Tuple]:
+    def get_rwa_terms(self, power: int = 3) -> List[Tuple[Any, ...]]:
         """
         Get RWA terms for the specified mixing order with caching.
 
@@ -563,76 +942,32 @@ class ModeArray:
     def print_modes(self):
         """Print current state of all modes."""
         for label, mode in self.modes.items():
-            print(f"{label}:")
+            independence = " (independent)" if label in self.independent_modes else ""
+            print(f"{label}{independence}:")
             print(f"  Frequency: {mode.frequency}")
             print(f"  Direction: {mode.direction}")
             print(f"  k: {mode.k}")
             print(f"  gamma: {mode.gamma}")
+            print(f"  alpha: {mode.alpha}")
             print()
 
-    def plot_k_comparison(
-        self, freq_range: Optional[Tuple[float, float]] = None, num_points: int = 1000
-    ):
-        """
-        Plot k values for all modes and reference data.
+    def print_symbolic_expressions(self):
+        """Print the symbolic expressions for all modes."""
+        print("Symbolic Expressions:")
+        print("=" * 50)
+        for mode, expression in self.symbolic_expressions.items():
+            expr_parts = []
+            for base_mode, coeff in expression.items():
+                if coeff == 1:
+                    expr_parts.append(base_mode)
+                elif coeff == -1:
+                    expr_parts.append(f"-{base_mode}")
+                else:
+                    expr_parts.append(f"{coeff}*{base_mode}")
 
-        Args:
-            freq_range: Optional tuple of (min_freq, max_freq) to plot
-                       If None, uses the full data range
-            num_points: Number of points for plotting the data curves
-        """
-        if freq_range is None:
-            freq_min = min(self.interpolator.orig_freqs)
-            freq_max = max(self.interpolator.orig_freqs)
-        else:
-            freq_min, freq_max = freq_range
-
-        # Create figure and axis
-        plt.figure(figsize=(9, 5))
-        ax = plt.gca()
-
-        # Plot reference k data
-        freq_points = np.linspace(freq_min, freq_max, num_points)
-        k_data = np.interp(
-            freq_points, self.interpolator.orig_freqs, self.interpolator.orig_kappas
-        )
-        ax.plot(freq_points, k_data, "k--", label="Reference k(ω)", alpha=0.5)
-
-        # Plot current mode k values
-        colors = plt.cm.tab10(np.linspace(0, 1, len(self.modes)))
-        for (label, mode), color in zip(self.modes.items(), colors):
-            if mode.frequency is not None:
-                # Plot point for current k value
-                marker = "o" if mode.direction == 1 else "s"
-                ax.scatter(
-                    abs(mode.frequency),
-                    mode.k,
-                    color=color,
-                    marker=marker,
-                    s=100,
-                    label=f"{label}",
-                )
-
-        # Add labels and title
-        ax.set_xlabel("Frequency (ω)")
-        ax.set_ylabel("Wavenumber (k)")
-        ax.set_title("Mode k-vectors and Reference Dispersion")
-        ax.grid(True, alpha=0.3)
-        ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-
-        # Add text box with current relations
-        relation_text = "\n".join([f"{rel[0]} = {rel[1]}" for rel in self.relations])
-        plt.text(
-            1.05,
-            0.3,
-            f"Relations:\n{relation_text}",
-            transform=ax.transAxes,
-            verticalalignment="center",
-            bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
-        )
-
-        plt.tight_layout()
-        plt.show()
+            expr_str = " + ".join(expr_parts).replace(" + -", " - ")
+            independence = " (independent)" if mode in self.independent_modes else ""
+            print(f"{mode}{independence} = {expr_str}")
 
 
 class ModeArrayFactory:
@@ -640,23 +975,28 @@ class ModeArrayFactory:
 
     @staticmethod
     def create_basic_3wm(
-        freqs: np.ndarray,
-        kappas: np.ndarray,
-        gammas: np.ndarray,
+        base_data: Dict[str, Any],
         forward_modes: bool = True,
     ) -> ModeArray:
         """
         Create a basic 3WM ModeArray with pump, signal, and idler modes.
 
         Args:
-            freqs: Array of frequency points for interpolation
-            kappas: Array of kappa values corresponding to frequencies
-            gammas: Array of gamma values corresponding to frequencies
+            base_data: Dictionary containing 'freqs', 'k', 'gammas', and 'alpha' arrays
             forward_modes: Whether to create forward (True) or backward (False) propagating modes
 
         Returns:
             ModeArray: Configured for basic 3WM operation
         """
+        # Extract required arrays from base_data
+        freqs = base_data["freqs"]
+        kappas = base_data["k"]
+        gammas = base_data["gammas"]
+        alphas = base_data["alpha"]
+
+        # Create interpolator
+        interpolator = ParameterInterpolator(freqs, kappas, gammas, alphas)
+
         direction = 1 if forward_modes else -1
         modes = [
             Mode(label="p", direction=direction),
@@ -666,31 +1006,39 @@ class ModeArrayFactory:
 
         relations = [["i", "p-s"]]  # Idler is pump minus signal
 
-        return ModeArray(modes, relations, freqs, kappas, gammas)
+        return ModeArray(modes, relations, interpolator)
 
     @staticmethod
     def create_extended_3wm(
-        freqs: np.ndarray,
-        kappas: np.ndarray,
-        gammas: np.ndarray,
+        base_data: Dict[str, Any],
         n_pump_harmonics: int = 1,
         n_frequency_conversion: int = 1,
         n_signal_harmonics: int = 1,
+        n_sidebands: int = 1,
         forward_modes: bool = True,
     ) -> ModeArray:
         """
         Create an extended 3WM ModeArray with pump harmonics and conversion terms.
 
         Args:
-            freqs: Array of frequency points for interpolation
-            kappas: Array of kappa values corresponding to frequencies
-            gammas: Array of gamma values corresponding to frequencies
+            base_data: Dictionary containing 'freqs', 'k', 'gammas', and 'alpha' arrays
             n_pump_harmonics: Number of pump harmonics to include
+            n_frequency_conversion: Number of frequency conversion terms
+            n_signal_harmonics: Number of signal and idler harmonics
             forward_modes: Whether to create forward (True) or backward (False) propagating modes
 
         Returns:
             ModeArray: Configured for extended 3WM operation with harmonics
         """
+        # Extract required arrays from base_data
+        freqs = base_data["freqs"]
+        kappas = base_data["k"]
+        gammas = base_data["gammas"]
+        alphas = base_data["alpha"]
+
+        # Create interpolator
+        interpolator = ParameterInterpolator(freqs, kappas, gammas, alphas)
+
         direction = 1 if forward_modes else -1
 
         # Create basic modes
@@ -702,12 +1050,6 @@ class ModeArrayFactory:
 
         # Basic relation
         relations = [["i", "p-s"]]  # Idler is pump minus signal
-
-        for n in range(2, n_signal_harmonics + 2):
-            modes.append(Mode(label=f"s{n}", direction=direction))
-            relations.append([f"s{n}", "s+" * (n - 1) + "s"])
-            modes.append(Mode(label=f"i{n}", direction=direction))
-            relations.append([f"i{n}", "i+" * (n - 1) + "i"])
 
         for n in range(1, n_frequency_conversion + 1):
             if n == 1:
@@ -725,13 +1067,23 @@ class ModeArrayFactory:
             modes.append(Mode(label=f"p{n}", direction=direction))
             relations.append([f"p{n}", "p+" * (n - 1) + "p"])
 
-        return ModeArray(modes, relations, freqs, kappas, gammas)
+        for n in range(2, n_signal_harmonics + 2):
+            modes.append(Mode(label=f"s{n}", direction=direction))
+            relations.append([f"s{n}", "s+" * (n - 1) + "s"])
+            modes.append(Mode(label=f"i{n}", direction=direction))
+            relations.append([f"i{n}", "i+" * (n - 1) + "i"])
+
+        # for n in range(2, n_sidebands + 2):
+        #     modes.append(Mode(label=f"s{n}p", direction=direction))
+        #     modes.append(Mode(label=f"i{n}p", direction=direction))
+        #     relations.append([f"s{n}p", "s+s-p"])
+        #     relations.append([f"i{n}p", "i+i-p"])
+
+        return ModeArray(modes, relations, interpolator)
 
     @staticmethod
     def create_custom(
-        freqs: np.ndarray,
-        kappas: np.ndarray,
-        gammas: np.ndarray,
+        base_data: Dict[str, Any],
         mode_labels: List[str],
         mode_directions: List[int],
         relations: List[List[str]],
@@ -740,9 +1092,7 @@ class ModeArrayFactory:
         Create a custom ModeArray with user-defined modes and relations.
 
         Args:
-            freqs: Array of frequency points for interpolation
-            kappas: Array of kappa values corresponding to frequencies
-            gammas: Array of gamma values corresponding to frequencies
+            base_data: Dictionary containing 'freqs', 'k', 'gammas', and 'alpha' arrays
             mode_labels: List of mode labels
             mode_directions: List of mode directions (1 for forward, -1 for backward)
             relations: List of relations between modes
@@ -755,9 +1105,18 @@ class ModeArrayFactory:
                 "mode_labels and mode_directions must have the same length"
             )
 
+        # Extract required arrays from base_data
+        freqs = base_data["freqs"]
+        kappas = base_data["k"]
+        gammas = base_data["gammas"]
+        alphas = base_data["alpha"]
+
+        # Create interpolator
+        interpolator = ParameterInterpolator(freqs, kappas, gammas, alphas)
+
         modes = [
             Mode(label=label, direction=direction)
             for label, direction in zip(mode_labels, mode_directions)
         ]
 
-        return ModeArray(modes, relations, freqs, kappas, gammas)
+        return ModeArray(modes, relations, interpolator)

@@ -253,6 +253,70 @@ class SMatrixArray(TwoByTwoArray):
         self._set_parameter(1, 1, value)
 
 
+class ZMatrixArray(TwoByTwoArray):
+    """A class representing an array of two-ports Z parameters matrices."""
+
+    @property
+    def Z11(self) -> np.ndarray:
+        """Z11 parameter (element (0,0)) of the 2x2 matrices."""
+        return self._get_parameter(0, 0)
+
+    @Z11.setter
+    def Z11(self, value: np.ndarray):
+        """
+        Zetter for the Z11 parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the Z11 parameter.
+        """
+        self._set_parameter(0, 0, value)
+
+    @property
+    def Z12(self) -> np.ndarray:
+        """Z12 parameter (element (0,1)) of the 2x2 matrices."""
+        return self._get_parameter(0, 1)
+
+    @Z12.setter
+    def Z12(self, value: np.ndarray):
+        """
+        Zetter for the Z12 parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the Z12 parameter.
+        """
+        self._set_parameter(0, 1, value)
+
+    @property
+    def Z21(self) -> np.ndarray:
+        """Z21 parameter (element (1,0)) of the 2x2 matrices."""
+        return self._get_parameter(1, 0)
+
+    @Z21.setter
+    def Z21(self, value: np.ndarray):
+        """
+        Zetter for the Z21 parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the Z21 parameter.
+        """
+        self._set_parameter(1, 0, value)
+
+    @property
+    def Z22(self) -> np.ndarray:
+        """Z22 parameter (element (1,1)) of the 2x2 matrices."""
+        return self._get_parameter(1, 1)
+
+    @Z22.setter
+    def Z22(self, value: np.ndarray):
+        """
+        Zetter for the Z22 parameter.
+
+        Args:
+            value (numpy.ndarray): Values to set for the Z22 parameter.
+        """
+        self._set_parameter(1, 1, value)
+
+
 def abcd_identity(N_abcd: int) -> ABCDArray:
     """
     Get abcd array of identity matrices.

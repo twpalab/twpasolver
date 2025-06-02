@@ -137,6 +137,58 @@ def s2a(spar: ComplexArray, Z0: complex | float) -> ComplexArray:
 
 
 @nb.njit(cache=True)
+def a2z(abcd: ComplexArray) -> ComplexArray:
+    """
+    Convert arrays of ABCD matrices to arrays of Z-parameters.
+
+    Args:
+        abcd (ComplexArray): Array of 2x2 ABCD matrices.
+
+    Returns:
+        ComplexArray: Array of 2x2 Z-parameter matrices.
+    """
+    assert abcd.shape[1] == 2 and abcd.shape[2] == 2
+    n_mat = abcd.shape[0]
+    z_mat = np.empty((n_mat, 2, 2), dtype=np.complex128)
+    for i in range(n_mat):
+        A = abcd[i, 0, 0]
+        B = abcd[i, 0, 1]
+        C = abcd[i, 1, 0]
+        D = abcd[i, 1, 1]
+        z_mat[i, 0, 0] = A / C
+        z_mat[i, 0, 1] = (A * D - B * C) / C
+        z_mat[i, 1, 0] = 1 / C
+        z_mat[i, 1, 1] = D / C
+    return z_mat
+
+
+@nb.njit(cache=True)
+def z2a(z_mat: ComplexArray) -> ComplexArray:
+    """
+    Convert arrays of Z-parameters to arrays of ABCD matrices.
+
+    Args:
+        z_mat (ComplexArray): Array of 2x2 Z-parameter matrices.
+
+    Returns:
+        ComplexArray: Array of 2x2 ABCD matrices.
+    """
+    assert z_mat.shape[1] == 2 and z_mat.shape[2] == 2
+    n_mat = z_mat.shape[0]
+    abcd = np.empty((n_mat, 2, 2), dtype=np.complex128)
+    for i in range(n_mat):
+        Z11 = z_mat[i, 0, 0]
+        Z12 = z_mat[i, 0, 1]
+        Z21 = z_mat[i, 1, 0]
+        Z22 = z_mat[i, 1, 1]
+        abcd[i, 0, 0] = Z11 / Z21
+        abcd[i, 0, 1] = (Z11 * Z22 - Z12 * Z21) / Z21
+        abcd[i, 1, 0] = 1 / Z21
+        abcd[i, 1, 1] = Z22 / Z21
+    return abcd
+
+
+@nb.njit(cache=True)
 def to_dB(values: FloatArray | ComplexArray) -> FloatArray:
     """
     Convert arrays of values to dB.
@@ -200,6 +252,7 @@ def compute_phase_matching(
         k_signal_array (FloatArray): Array of signal wave numbers.
         k_pump_array (FloatArray): Array of pump wave numbers.
         chi (float): Nonlinear coefficient.
+        gamma_pump_array (ComplexArray): Array of pump reflection coefficients.
 
     Returns:
         Tuple[FloatArray, FloatArray, FloatArray]: Phase matching profile, frequency triplets, and wave number triplets.

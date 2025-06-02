@@ -34,13 +34,13 @@ def capacitance(freqs: FloatArray, C: float) -> ComplexArray:
     Returns:
         np.ndarray: Impedance of the capacitor.
     """
-    assert C >= 0
+    assert np.real(C) >= 0
     return -1j / (2 * np.pi * freqs * C)
 
 
 @njit
 def stub(
-    freqs: FloatArray, L: float, C: float, length: float, open: bool = True
+    freqs: FloatArray, L: float, C: complex, length: float, open: bool = True
 ) -> ComplexArray:
     """
     Calculate the impedance of a stub as a function of frequency.
@@ -112,7 +112,7 @@ def lossless_line_abcd(freqs: FloatArray, C: float, L: float, l: float) -> Compl
     Returns:
         np.ndarray: ABCD matrix of the lossless transmission line.
     """
-    assert C >= 0
+    assert np.real(C) >= 0
     assert L >= 0
     Z0 = np.sqrt(L / C)
     n_mat = len(freqs)
@@ -140,7 +140,7 @@ def LCLf_abcd(freqs: FloatArray, C: float, L: float, Lf: float) -> ComplexArray:
     Returns:
         np.ndarray: ABCD matrix of the LCLf cell model.
     """
-    assert C >= 0
+    assert np.real(C) >= 0
     assert L >= 0
     assert Lf >= 0
     n_mat = len(freqs)
@@ -157,7 +157,7 @@ def LCLf_abcd(freqs: FloatArray, C: float, L: float, Lf: float) -> ComplexArray:
 
 @njit
 def get_stub_cell(
-    freqs: FloatArray, C: float, L: float, l1: float, l2: float
+    freqs: FloatArray, C: complex, L: float, l1: float, l2: float
 ) -> ComplexArray:
     """
     Calculate the ABCD matrix of a stub cell model.
@@ -172,7 +172,7 @@ def get_stub_cell(
     Returns:
         np.ndarray: ABCD matrix of the stub cell model.
     """
-    assert C >= 0
+    assert np.real(C) >= 0
     assert L >= 0
     Z0 = np.sqrt(L / C)
     v = np.sqrt(L * C) * l1

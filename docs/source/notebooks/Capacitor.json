@@ -1,0 +1,7 @@
+{
+    "Z0_ref": 50.0,
+    "N": 1,
+    "twoport_parallel": false,
+    "name": "Capacitance",
+    "C": 1e-12
+}

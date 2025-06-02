@@ -19,12 +19,13 @@ required = partial(Field, ...)
 class StubBaseCell(TwoPortModel):
     """Base cell of twpa stub filter model."""
 
-    name: Literal["StubBaseCell"] = "StubBaseCell"
+    name: Literal["StubBaseCell2"] = "StubBaseCell2"
     L: NonNegativeFloat = required(description="Inductance of the straight line.")
     C: NonNegativeFloat = required(description="Capacitance of the line.")
     Lf: NonNegativeFloat = required(description="Inductance of the stub finger.")
     l1: NonNegativeFloat = required(description="Length of the stub finger.")
     l2: NonNegativeFloat = required(description="Length of the straight line.")
+    delta: NonNegativeFloat = Field(0, description="Loss Tangent")
     line: bool = Field(
         False,
         description="Model line as distributed element instead of lumped inductance.",
@@ -34,14 +35,23 @@ class StubBaseCell(TwoPortModel):
         """Compute abcd matrix."""
         if self.line:
             parallel_stubs = ABCDArray(
-                -1 * get_stub_cell(freqs, self.C, self.Lf, self.l1, 0)
+                -1
+                * get_stub_cell(
+                    freqs, self.C * (1 - 1j * self.delta), self.Lf, self.l1, 0
+                )
             )
             half_line = ABCDArray(
-                lossless_line_abcd(freqs, self.C, self.L, self.l2 / 2)
+                lossless_line_abcd(
+                    freqs, self.C * (1 - 1j * self.delta), self.L, self.l2 / 2
+                )
             )
             return half_line @ parallel_stubs @ half_line
 
-        return ABCDArray(get_stub_cell(freqs, self.C, self.L, self.l1, self.l2))
+        return ABCDArray(
+            get_stub_cell(
+                freqs, self.C * (1 - 1j * self.delta), self.L, self.l1, self.l2
+            )
+        )
 
 
 class LCLfBaseCell(TwoPortModel):
@@ -51,12 +61,17 @@ class LCLfBaseCell(TwoPortModel):
     L: NonNegativeFloat = required(description="Inductance of the straight line.")
     C: NonNegativeFloat = required(description="Capacitance of the stub finger.")
     Lf: NonNegativeFloat = required(description="Inductance of the stub finger.")
+    delta: NonNegativeFloat = Field(0, description="Loss Tangent")
     centered: bool = False
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Compute abcd matrix."""
         if self.centered:
-            fingers = ABCDArray(LCLf_abcd(freqs, self.C, 0, self.Lf))
+            fingers = ABCDArray(
+                LCLf_abcd(freqs, self.C * (1 - 1j * self.delta), 0, self.Lf)
+            )
             half_inductance = Inductance(L=self.L / 2).get_abcd(freqs)
             return half_inductance @ fingers @ half_inductance
-        return ABCDArray(LCLf_abcd(freqs, self.C, self.L, self.Lf))
+        return ABCDArray(
+            LCLf_abcd(freqs, self.C * (1 - 1j * self.delta), self.L, self.Lf)
+        )

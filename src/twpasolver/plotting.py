@@ -38,10 +38,10 @@ def plot_mode_currents(
     """
     # Extract data from gain result
     x = gain_result["x"]
-    model = gain_result.get("model", "standard_3wm")
+    model = gain_result.get("model", "minimal_3wm")
 
     # Determine the dimensionality and mode names based on the model
-    if model == "standard_3wm":
+    if model == "minimal_3wm":
         # Standard 3WM model with pump, signal, idler
         I_triplets = gain_result["I_triplets"]
         n_freqs = I_triplets.shape[0]
@@ -128,7 +128,7 @@ def plot_mode_currents(
     if ylim:
         ax.set_ylim(ylim)
 
-    ax.legend(loc="best")
+    ax.legend(bbox_to_anchor=(1.2, 1))
     ax.grid(True, alpha=0.3)
 
     return ax
