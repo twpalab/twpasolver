@@ -1,28 +1,14 @@
 import numpy as np
 import pytest
 
-from twpasolver.analysis import (
-    Analyzer,
-    ExecutionRequest,
-    TWPAnalysis,
-    analysis_function,
-)
+from twpasolver.analysis import Analyzer, TWPAnalysis, analysis_function
 from twpasolver.file_utils import read_file
 
 
 @pytest.fixture
-def execution_request_data():
-    return {
-        "name": "test_function",
-        "kwargs": {"x": 2},
-    }
-
-
-@pytest.fixture
-def analyzer_data(tmpdir, execution_request_data):
+def analyzer_data(tmpdir):
     return {
         "data_file": str(tmpdir.join("test_data.hdf5")),
-        "run": [ExecutionRequest(**execution_request_data)],
     }
 
 
@@ -43,12 +29,6 @@ def analyzer_instance(analyzer_data):
 @pytest.fixture
 def twpanalysis_instance(twpa_model):
     return TWPAnalysis(twpa=twpa_model, freqs_arange=(0, 9, 1e-3))
-
-
-def test_execution_request(execution_request_data):
-    request = ExecutionRequest(**execution_request_data)
-    assert request.name == "test_function"
-    assert request.kwargs == {"x": 2}
 
 
 def test_analysis_function(analyzer_instance):
@@ -74,14 +54,6 @@ def test_analyzer_dump_and_load_file(analyzer_data, tmpdir):
     analyzer.dump_to_file(dump_file)
     analyzer_from_file = SimpleAnalyzer.from_file(dump_file)
     assert analyzer == analyzer_from_file
-
-
-def test_analyzer_execute(analyzer_data):
-    executed_class = SimpleAnalyzer(**analyzer_data)
-    assert executed_class.data == {"test_function": {"fn_x": 2}}
-    analyzer_data["run"] = []
-    not_executed_class = SimpleAnalyzer(**analyzer_data)
-    assert not_executed_class.data == {}
 
 
 def test_analyzer_parameter_sweep(analyzer_instance):

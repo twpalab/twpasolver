@@ -2,6 +2,7 @@
 
 from typing import Any, Callable, TypeAlias
 
+import numba as nb
 import numpy as np
 from pydantic import GetJsonSchemaHandler, NonNegativeFloat, NonNegativeInt
 from pydantic.functional_validators import BeforeValidator
@@ -84,3 +85,8 @@ FrequencyLinspace = tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeInt]
 
 ComplexArray: TypeAlias = np.ndarray[Any, np.dtype[np.complex128]]
 FloatArray: TypeAlias = np.ndarray[Any, np.dtype[np.float64]]
+
+nb_complex3d = nb.complex128[:, :, :]
+nb_complex1d = nb.complex128[:]
+nb_float1d = nb.float64[:]
+nb_int2d = nb.int64[:, :]

@@ -11,7 +11,7 @@ import numpy as np
 from pydantic import Field, PrivateAttr
 
 from twpasolver.basemodel import BaseModel
-from twpasolver.typing import FrequencyArange, FrequencyList
+from twpasolver.bonus_types import FrequencyArange, FrequencyList
 
 
 class Frequencies(BaseModel):
@@ -25,7 +25,7 @@ class Frequencies(BaseModel):
         description="Tuple passed to numpy.arange to construct frequency span.",
     )
     unit: Literal["Hz", "kHz", "MHz", "GHz", "THz"] = Field(default="GHz", repr=False)
-    _unit_multipliers: dict[str, int] = PrivateAttr(
+    _unit_multipliers: dict[str, float] = PrivateAttr(
         {"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9, "THz": 1e12}
     )
 
