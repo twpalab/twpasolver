@@ -57,5 +57,5 @@ ipykernel = ">=6.15.2"
 ipython = ">=8.4.0"
 
 [[tool.mypy.overrides]]
-module=["numba.*", "h5py.*", "skrf", "scipy.*", "matplotlib.*", "CyRK.*", "networkx.*"]
+module=["numba.*", "h5py.*", "skrf", "scipy.*", "matplotlib.*", "CyRK.*", "networkx.*", "sympy.*"]
 ignore_missing_imports = true
