@@ -251,12 +251,23 @@
         <article role="main">
           <section id="Advanced-Coupled-Mode-Equations-models">
 <h1>Advanced Coupled Mode Equations models<a class="headerlink" href="#Advanced-Coupled-Mode-Equations-models" title="Permalink to this heading">#</a></h1>
-<p>This tutorial demonstrates how to use the more advanced CMEs models to simulate the nonlinear response of a TWPA.</p>
+<p>This tutorial demonstrates how to use the advanced CMEs models to simulate the nonlinear response of a TWPA. We’ll explore extended mode systems that go beyond the basic pump-signal-idler configuration to include pump harmonics, frequency conversion processes, and higher-order effects.</p>
+<section id="Overview">
+<h2>Overview<a class="headerlink" href="#Overview" title="Permalink to this heading">#</a></h2>
+<p>While the basic 3-wave mixing (3WM) model provides a good starting point for TWPA analysis, real devices exhibit more complex behavior due to:</p>
+<ul class="simple">
+<li><p><strong>Pump harmonics</strong>: 2nd, 3rd, and higher harmonics of the pump frequency</p></li>
+<li><p><strong>Frequency conversion</strong>: Processes like pump + signal, pump + idler</p></li>
+<li><p><strong>Signal/idler harmonics</strong>: Higher harmonics of signal and idler modes</p></li>
+<li><p><strong>Device imperfections</strong>: Losses and reflections throughout the transmission line</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> library handles these effects automatically through its <code class="docutils literal notranslate"><span class="pre">ModeArray</span></code> system and advanced CME solvers.</p>
+</section>
 <section id="Initialize-TWPAnalysis">
 <h2>Initialize TWPAnalysis<a class="headerlink" href="#Initialize-TWPAnalysis" title="Permalink to this heading">#</a></h2>
-<p>First, let’s load a KITWPA model and plot its reponse. Since we are going to consider higher order processes, we will initialize TWPAnalysis with a larger frequency span</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<p>First, let’s load a KITWPA model and plot its response. Since we are going to consider higher order processes, we will initialize TWPAnalysis with a larger frequency span to capture pump harmonics.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
@@ -275,36 +286,49 @@
 
 <span class="n">twpa_file</span> <span class="o">=</span> <span class="s2">&quot;model_cpw_dartwars_13nm_Lk8_5.json&quot;</span>
 <span class="n">a</span> <span class="o">=</span> <span class="n">TWPAnalysis</span><span class="p">(</span><span class="n">twpa</span><span class="o">=</span><span class="n">twpa_file</span><span class="p">,</span> <span class="n">f_arange</span><span class="o">=</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mf">0.5e-3</span><span class="p">))</span>
-<span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">a</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">cells</span><span class="p">:</span>
-    <span class="n">c</span><span class="o">.</span><span class="n">delta</span> <span class="o">=</span> <span class="mf">0e-4</span>
-<span class="n">a</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">Z0_ref</span> <span class="o">=</span> <span class="mi">50</span>
 <span class="n">a</span><span class="o">.</span><span class="n">update_base_data</span><span class="p">()</span>
-<span class="n">optimal_pump</span> <span class="o">=</span> <span class="mf">7.4735</span>
+
+<span class="n">optimal_pump</span> <span class="o">=</span> <span class="mf">7.4755</span>
 <span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;optimal_pump_freq&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">optimal_pump</span>
 <span class="n">ax</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">plot_response</span><span class="p">(</span><span class="n">pump_freq</span><span class="o">=</span><span class="n">optimal_pump</span><span class="p">)</span>
-
-<span class="c1"># plot first and second pump harmonic</span>
-<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">optimal_pump</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
-<span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">optimal_pump</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
-<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="n">optimal_pump</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
-<span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="n">optimal_pump</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
-<span class="n">a</span><span class="o">.</span><span class="n">twpa</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()</span>
-<span class="n">a</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;optimal_pump_freq&quot;</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+    <span class="n">ax</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">optimal_pump</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="n">optimal_pump</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+(-20.0, 1.0)
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_04_generalized_cmes_1_1.png" src="../_images/notebooks_04_generalized_cmes_1_1.png" />
+</div>
+</div>
+<p>Notice how we’ve extended the frequency range to 30 GHz to capture the 2nd and 3rd pump harmonics (marked with red dashed lines). The TWPA’s dispersive response means these harmonics will have different propagation constants and can participate in additional mixing processes.</p>
 <section id="ModeArrays-and-ModeArrayFactory">
 <h3>ModeArrays and ModeArrayFactory<a class="headerlink" href="#ModeArrays-and-ModeArrayFactory" title="Permalink to this heading">#</a></h3>
-<p>Properly describing the nonlinear response of TWPAs requires going beyond the basic CMEs system that considers only pump, signal and idler. <code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> is able to automatically build and solve CMEs systems including an arbitrary number of physical modes connected by relations between their frequencies. A collection of related modes is represented in a <code class="docutils literal notranslate"><span class="pre">ModeArray</span></code> object, which has the following notable features:</p>
+<p>Properly describing the nonlinear response of TWPAs requires going beyond the basic CMEs system that considers only pump, signal and idler. <code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> uses <code class="docutils literal notranslate"><span class="pre">ModeArray</span></code> objects to automatically build and solve CMEs systems including an arbitrary number of physical modes connected by frequency relationships.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">ModeArray</span></code> has several key features:</p>
 <ul class="simple">
-<li><p>Organize the mode relations in a dependency graph, identifying the independent modes</p></li>
-<li><p>Automatically extrapolate and propagate the physical propertie of the modes (frequency, wavenumber…) according to the relations</p></li>
-<li><p>Automatically select the 3WM and 4WM terms that satisfy the Rotating Wave Approximation (RWA) when solving the CMEs</p></li>
+<li><p><strong>Dependency graph management</strong>: Organizes mode relations and identifies independent modes</p></li>
+<li><p><strong>Automatic parameter interpolation</strong>: Extrapolates physical properties (frequency, wavenumber, losses) according to the relations</p></li>
+<li><p><strong>RWA term selection</strong>: Automatically selects the 3WM and 4WM terms that satisfy the Rotating Wave Approximation when solving the CMEs</p></li>
+<li><p><strong>Symbolic frequency propagation</strong>: Updates all related mode frequencies in O(n) time using pre-computed expressions</p></li>
 </ul>
-<p>The <code class="docutils literal notranslate"><span class="pre">ModeArray</span></code> factory helps to set up custom mode arrays or create standard extended mode collections useful to improve the accuracy of your simulations.</p>
-<p>Here is to setup a ModeArray with custom defined modes and relations</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<p>The <code class="docutils literal notranslate"><span class="pre">ModeArrayFactory</span></code> helps set up custom mode arrays or create standard extended mode collections.</p>
+<p>Here’s how to set up a ModeArray with custom defined modes and relations:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">twpasolver.modes_rwa</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModeArrayFactory</span>
@@ -321,9 +345,24 @@
 </pre></div>
 </div>
 </div>
-<p>For obtaining more realistic simulations, you should consider pump harmonics, frequency conversion processes and signal/idler harmonics. The <code class="docutils literal notranslate"><span class="pre">create_extended_3wm</span></code> method helps you to do so. Let’s also add this more complete set of mode to the analysis class</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_04_generalized_cmes_3_0.png" src="../_images/notebooks_04_generalized_cmes_3_0.png" />
+</div>
+</div>
+<p>The graph shows the mode relationships where:</p>
+<ul class="simple">
+<li><p><strong>Green nodes</strong>: Independent modes (pump <code class="docutils literal notranslate"><span class="pre">p</span></code> and signal <code class="docutils literal notranslate"><span class="pre">s</span></code>)</p></li>
+<li><p><strong>Blue nodes</strong>: Dependent modes (idler <code class="docutils literal notranslate"><span class="pre">i</span></code> and 2nd pump harmonic <code class="docutils literal notranslate"><span class="pre">p2</span></code>)</p></li>
+<li><p><strong>Blue arrows</strong>: Positive frequency contributions</p></li>
+<li><p><strong>Red dashed arrows</strong>: Negative frequency contributions</p></li>
+</ul>
+<p>The symbolic expressions on the right show how each mode’s frequency depends on the independent modes.</p>
+<p>For more realistic simulations, you should consider pump harmonics, frequency conversion processes and signal/idler harmonics. The <code class="docutils literal notranslate"><span class="pre">create_extended_3wm</span></code> method creates a comprehensive set of modes automatically:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mode_array</span> <span class="o">=</span> <span class="n">ModeArrayFactory</span><span class="o">.</span><span class="n">create_extended_3wm</span><span class="p">(</span>
@@ -334,12 +373,34 @@
 </pre></div>
 </div>
 </div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_04_generalized_cmes_5_0.png" src="../_images/notebooks_04_generalized_cmes_5_0.png" />
+</div>
+</div>
+<p>This extended mode array includes:</p>
+<ul class="simple">
+<li><p><strong>Pump harmonics</strong>: <code class="docutils literal notranslate"><span class="pre">p</span></code>, <code class="docutils literal notranslate"><span class="pre">p2</span></code>, <code class="docutils literal notranslate"><span class="pre">p3</span></code> (fundamental, 2nd and 3rd harmonic)</p></li>
+<li><p><strong>Basic 3WM</strong>: <code class="docutils literal notranslate"><span class="pre">s</span></code>, <code class="docutils literal notranslate"><span class="pre">i</span></code> (signal and idler)</p></li>
+<li><p><strong>Frequency conversion</strong>: <code class="docutils literal notranslate"><span class="pre">ps</span></code> (p+s), <code class="docutils literal notranslate"><span class="pre">pi</span></code> (p+i), and higher order processes generated by the pump harmonics</p></li>
+<li><p><strong>Signal harmonics</strong>: <code class="docutils literal notranslate"><span class="pre">s2</span></code>, <code class="docutils literal notranslate"><span class="pre">i2</span></code> (first harmonics of signal and idler)</p></li>
+</ul>
+<p>The hierarchical layout shows the dependency relationships, with independent modes at the top and increasingly complex derived modes below them.</p>
 </section>
 <section id="Gain-comparison-with-different-models">
 <h3>Gain comparison with different models<a class="headerlink" href="#Gain-comparison-with-different-models" title="Permalink to this heading">#</a></h3>
-<p>You can use the attributes of the <code class="docutils literal notranslate"><span class="pre">gain</span></code> analysis function to specify which CME model and array of modes you want to include in the simulation. Once compied, even simulations with quite a large number of modes compared to the basic CMEs system should still be quite fast</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<p>You can use the <code class="docutils literal notranslate"><span class="pre">model</span></code> parameter of the <code class="docutils literal notranslate"><span class="pre">gain</span></code> analysis function to specify which CME model to use. The library provides four models with increasing complexity:</p>
+<ul class="simple">
+<li><p><strong>minimal_3wm</strong>: Basic pump-signal-idler model (fastest)</p></li>
+<li><p><strong>general_ideal</strong>: Extended modes without losses or reflections</p></li>
+<li><p><strong>general_loss_only</strong>: Extended modes with losses but no reflections</p></li>
+<li><p><strong>general</strong>: Full model with losses and reflections (most accurate but slow)</p></li>
+</ul>
+<p>Once compiled, even simulations with large numbers of modes are quite fast thanks to Numba acceleration:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">s_arange</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">6.5</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)</span>
@@ -369,9 +430,25 @@
 </pre></div>
 </div>
 </div>
-<p>The most realistic model takes into account both losses and reflections in the device, but it is more difficult to integrate for the ODE solver and usually takes around 10X more time to run than the other three models.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;matplotlib.legend.Legend at 0x7f48e694d960&gt;
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_04_generalized_cmes_7_1.png" src="../_images/notebooks_04_generalized_cmes_7_1.png" />
+</div>
+</div>
+<p>The most realistic model takes into account both losses and reflections in the device, but requires more computation time (typically ~10x the ideal models):</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">res_gain_with_reflections_wide</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">gain</span><span class="p">(</span>
@@ -385,8 +462,17 @@
 </pre></div>
 </div>
 </div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_04_generalized_cmes_9_0.png" src="../_images/notebooks_04_generalized_cmes_9_0.png" />
+</div>
+</div>
+<p>The full model including reflections can reveal fine structure in the gain profile that other models miss. For critical applications requiring quantitative agreement with experiment, this model provides the highest accuracy.</p>
+<p>Let’s zoom in on a narrower frequency range to see the gain ripples:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">s_arange</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mf">3.5</span><span class="p">,</span> <span class="mf">0.005</span><span class="p">)</span>
@@ -401,15 +487,49 @@
 </pre></div>
 </div>
 </div>
-<p>Another useful feature of <code class="docutils literal notranslate"><span class="pre">TWPAnalysis</span></code> is the ability to plot the average currents for each mode as a function of the position along the line. This is helpful to identify which processes are most relevant to the simulated response.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_04_generalized_cmes_11_0.png" src="../_images/notebooks_04_generalized_cmes_11_0.png" />
+</div>
+</div>
+</section>
+<section id="Mode-Current-Analysis">
+<h3>Mode Current Analysis<a class="headerlink" href="#Mode-Current-Analysis" title="Permalink to this heading">#</a></h3>
+<p>Another useful feature of <code class="docutils literal notranslate"><span class="pre">TWPAnalysis</span></code> is the ability to plot the average currents for each mode as a function of position along the transmission line. This helps identify which processes are most relevant to the simulated response and understand the energy flow between different modes:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">a</span><span class="o">.</span><span class="n">plot_mode_currents</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;Axes: title={&#39;center&#39;: &#39;Mean Mode Currents vs Cell Number\nPump Frequency: 7.4755 GHz&#39;}, xlabel=&#39;Cell Number&#39;, ylabel=&#39;Current (dBm)&#39;&gt;
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/notebooks_04_generalized_cmes_13_1.png" src="../_images/notebooks_04_generalized_cmes_13_1.png" />
+</div>
+</div>
+<p>The mode currents plot can show:</p>
+<ul class="simple">
+<li><p><strong>Pump depletion</strong>: The pump current typically decreases along the line as energy is transferred to signal and idler or is dissipated in a lossy device</p></li>
+<li><p><strong>Signal amplification</strong>: The signal current grows exponentially in the gain region</p></li>
+<li><p><strong>Idler generation</strong>: The idler current increases as the parametric process generates idler photons</p></li>
+<li><p><strong>Harmonic contributions</strong>: Higher-order modes show their relative importance</p></li>
+</ul>
+<p>Modes with negligible current levels throughout the device can often be safely excluded from the analysis to improve computational efficiency.</p>
 </section>
 </section>
 </section>
@@ -477,9 +597,11 @@
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Advanced Coupled Mode Equations models</a><ul>
+<li><a class="reference internal" href="#Overview">Overview</a></li>
 <li><a class="reference internal" href="#Initialize-TWPAnalysis">Initialize TWPAnalysis</a><ul>
 <li><a class="reference internal" href="#ModeArrays-and-ModeArrayFactory">ModeArrays and ModeArrayFactory</a></li>
 <li><a class="reference internal" href="#Gain-comparison-with-different-models">Gain comparison with different models</a></li>
+<li><a class="reference internal" href="#Mode-Current-Analysis">Mode Current Analysis</a></li>
 </ul>
 </li>
 </ul>

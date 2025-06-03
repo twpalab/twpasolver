@@ -241,7 +241,74 @@
         <article role="main">
           <section id="module-twpasolver.modes_rwa">
 <span id="twpasolver-modes-rwa-module"></span><h1>twpasolver.modes_rwa module<a class="headerlink" href="#module-twpasolver.modes_rwa" title="Permalink to this heading">#</a></h1>
-<p>Classes to represent frequency modes, their properties and the relations between them.</p>
+<p><code class="docutils literal notranslate"><span class="pre">modes_rwa</span></code> module.</p>
+<section id="mode-management-and-rotating-wave-approximation-analysis">
+<h2>Mode Management and Rotating Wave Approximation Analysis<a class="headerlink" href="#mode-management-and-rotating-wave-approximation-analysis" title="Permalink to this heading">#</a></h2>
+<p>Tools for managing complex mode relationships in TWPA analysis, enabling
+simulation of extended coupled mode equation (CME) systems with arbitrary
+numbers of modes beyond basic pump-signal-idler configuration.</p>
+<section id="key-components">
+<h3>Key Components<a class="headerlink" href="#key-components" title="Permalink to this heading">#</a></h3>
+<p><strong>ModeArray</strong>: Organizes related modes with automatic frequency propagation,
+parameter interpolation, and dependency graph management.</p>
+<p><strong>RWAAnalyzer</strong>: Identifies valid 3-wave and 4-wave mixing terms that satisfy
+the Rotating Wave Approximation for any given set of mode relationships.</p>
+<p><strong>ModeArrayFactory</strong>: Factory methods for creating standard and custom mode
+configurations including pump harmonics, frequency conversion terms, and harmonics.</p>
+<p><strong>ParameterInterpolator</strong>: Interpolation of mode parameters (kappa, gamma, alpha)
+from base TWPA circuit data across frequency ranges.</p>
+</section>
+<section id="capabilities">
+<h3>Capabilities<a class="headerlink" href="#capabilities" title="Permalink to this heading">#</a></h3>
+<dl class="simple">
+<dt><strong>RWA Term Selection</strong>:</dt><dd><ul class="simple">
+<li><p>Automatic discovery of valid 3WM and 4WM mixing processes</p></li>
+<li><p>Coefficient calculation including factorial corrections for repeated modes</p></li>
+<li><p>Caching of RWA terms for performance</p></li>
+</ul>
+</dd>
+<dt><strong>Mode Relationships</strong>:</dt><dd><ul class="simple">
+<li><p>Support for arbitrary frequency relationships between modes</p></li>
+<li><p>Forward and backward propagating modes</p></li>
+<li><p>Pump harmonics (p, p2, p3, …)</p></li>
+<li><p>Frequency conversion terms (p+s, p+i, …)</p></li>
+<li><p>Signal/idler harmonics (s2, i2, …)</p></li>
+</ul>
+</dd>
+<dt><strong>Symbolic Frequency Propagation</strong>:</dt><dd><ul class="simple">
+<li><p>O(n) frequency updates using pre-computed symbolic expressions</p></li>
+<li><p>Automatic identification of independent vs. dependent modes</p></li>
+<li><p>Topological sorting of mode dependencies</p></li>
+<li><p>Visualization of the mode relations with a graph</p></li>
+</ul>
+</dd>
+<dt><strong>Parameter Management</strong>:</dt><dd><ul class="simple">
+<li><p>Easy interpolation of mode parameters from base circuit data</p></li>
+<li><p>Automatic handling of mode directions for wavenumber calculation</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>See Tutorial 4 (<a class="reference internal" href="../tutorials.html#tutorials"><span class="std std-ref">Tutorials</span></a>) for complete examples covering:</p>
+<ul class="simple">
+<li><p>Basic 3WM mode array creation and visualization</p></li>
+<li><p>Extended mode arrays with pump harmonics and frequency conversion</p></li>
+<li><p>Custom mode configurations for specific processes</p></li>
+<li><p>RWA term analysis and CME integration</p></li>
+</ul>
+<p>The tutorial demonstrates the progression from simple mode relationships to
+complex multi-mode systems used in realistic TWPA simulations.</p>
+</section>
+<section id="performance-notes">
+<h3>Performance Notes<a class="headerlink" href="#performance-notes" title="Permalink to this heading">#</a></h3>
+<ul class="simple">
+<li><p>Symbolic frequency propagation enables O(n) scaling, useful when iterating over arrays.</p></li>
+<li><p>RWA term caching eliminates redundant calculations during CME solving</p></li>
+<li><p>Numba-compatible data structures for integration with fast CME solvers</p></li>
+<li><p>Efficient interpolation supports faster parameter sweeps</p></li>
+</ul>
+</section>
+</section>
 <dl class="py class">
 <dt class="sig sig-object py" id="twpasolver.modes_rwa.ParameterInterpolator">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.modes_rwa.</span></span><span class="sig-name descname"><span class="pre">ParameterInterpolator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frequencies</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kappas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gammas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alphas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kind</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cubic'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/modes_rwa.html#ParameterInterpolator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.modes_rwa.ParameterInterpolator" title="Permalink to this definition">#</a></dt>
@@ -587,6 +654,12 @@ kappa and alpha are real, gamma is complex</p>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">twpasolver.modes_rwa module</a><ul>
+<li><a class="reference internal" href="#mode-management-and-rotating-wave-approximation-analysis">Mode Management and Rotating Wave Approximation Analysis</a><ul>
+<li><a class="reference internal" href="#key-components">Key Components</a></li>
+<li><a class="reference internal" href="#capabilities">Capabilities</a></li>
+<li><a class="reference internal" href="#performance-notes">Performance Notes</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#twpasolver.modes_rwa.ParameterInterpolator"><code class="docutils literal notranslate"><span class="pre">ParameterInterpolator</span></code></a><ul>
 <li><a class="reference internal" href="#twpasolver.modes_rwa.ParameterInterpolator.get_parameters"><code class="docutils literal notranslate"><span class="pre">ParameterInterpolator.get_parameters()</span></code></a></li>
 </ul>

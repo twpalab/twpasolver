@@ -239,7 +239,59 @@
         </div>
         <article role="main">
           <h1>Source code for twpasolver.analysis</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Analysis class to simulate and plot the nonlinear behavior of TWPAs.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">``analysis`` module.</span>
+
+<span class="sd">TWPA Analysis and Simulation</span>
+<span class="sd">============================</span>
+
+<span class="sd">Main analysis module for simulating TWPA nonlinear behavior through coupled mode</span>
+<span class="sd">equations (CMEs). Provides automated analysis workflows with support for extended</span>
+<span class="sd">mode systems, parameter sweeps, and multiple gain models.</span>
+
+<span class="sd">The module centers around :class:`TWPAnalysis`, which integrates circuit modeling,</span>
+<span class="sd">mode management, and CME solving into a unified analysis framework.</span>
+
+<span class="sd">Key Components</span>
+<span class="sd">--------------</span>
+
+<span class="sd">**Analysis Engine**:</span>
+<span class="sd">- :class:`TWPAnalysis`: Main analysis class with automated workflows</span>
+<span class="sd">- :class:`Analyzer`: Base class for structured analysis with data management</span>
+
+<span class="sd">**Gain Models**:</span>
+<span class="sd">- :class:`GainModel`: Enumeration of available CME models with different accuracy/speed tradeoffs</span>
+
+<span class="sd">**Decorators**:</span>
+<span class="sd">- :func:`analysis_function`: Automatic result caching and data management</span>
+
+<span class="sd">Usage Patterns</span>
+<span class="sd">--------------</span>
+
+<span class="sd">**Basic Analysis Workflow**:</span>
+
+<span class="sd">1. Initialize TWPAnalysis with TWPA model and frequency range</span>
+<span class="sd">2. Run base analysis (response, phase matching)</span>
+<span class="sd">3. Compute gain with appropriate model complexity</span>
+<span class="sd">4. Perform parameter sweeps or bandwidth analysis</span>
+<span class="sd">5. Visualize results with built-in plotting methods</span>
+
+<span class="sd">**Extended Mode Analysis**:</span>
+
+<span class="sd">1. Create custom mode arrays using ModeArrayFactory</span>
+<span class="sd">2. Add to analysis instance with descriptive names</span>
+<span class="sd">3. Run gain analysis specifying mode array configuration</span>
+<span class="sd">4. Compare results across different mode configurations</span>
+
+<span class="sd">All analysis functions automatically cache results and support parameter sweeps</span>
+<span class="sd">through the :func:`parameter_sweep` method.</span>
+
+<span class="sd">See Also</span>
+<span class="sd">--------</span>
+<span class="sd">:mod:`twpasolver.modes_rwa` : Advanced mode relationship management</span>
+<span class="sd">:mod:`twpasolver.cmes` : High-performance CME solvers</span>
+<span class="sd">:mod:`twpasolver.models` : Circuit component and TWPA models</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">enum</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
@@ -268,13 +320,28 @@
 
 
 <div class="viewcode-block" id="GainModel"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.GainModel">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">GainModel</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">enum</span><span class="o">.</span><span class="n">Enum</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Available CMEs models.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Available CME models for gain analysis.</span>
 
-<span class="sd">    Available Models:</span>
-<span class="sd">        MINIMAL_3WM: Consider only pump, signal and ider. Faster simulation, but usually not accurate.</span>
-<span class="sd">        GENERAL_IDEAL: Solve CMEs with arbitrary set of modes, without considering losses nor reflections.</span>
-<span class="sd">        GENERAL_LOSS_ONLY: Solve CMEs with arbitrary set of modes, considering losses but not reflections.</span>
-<span class="sd">        GENERAL: Solve CMEs with arbitrary set of modes, including losses and reflections. Most accurate, but slowest.</span>
+<span class="sd">    Args</span>
+<span class="sd">    ----</span>
+<span class="sd">    MINIMAL_3WM : str</span>
+<span class="sd">        Basic pump-signal-idler model. Fastest computation but limited accuracy.</span>
+<span class="sd">        Suitable for quick design estimates and parameter space exploration.</span>
+
+<span class="sd">    GENERAL_IDEAL : str</span>
+<span class="sd">        Extended mode system without losses or reflections. Moderate computation</span>
+<span class="sd">        time with improved accuracy over basic model. Includes pump harmonics</span>
+<span class="sd">        and frequency conversion terms.</span>
+
+<span class="sd">    GENERAL_LOSS_ONLY : str</span>
+<span class="sd">        Extended mode system with device losses but no reflections. Similar</span>
+<span class="sd">        computation time to ideal case with better accuracy for lossy devices.</span>
+
+<span class="sd">    GENERAL : str</span>
+<span class="sd">        Full extended mode system with losses and reflections. Highest accuracy</span>
+<span class="sd">        but slowest computation (~10x general_ideal model). Use for quantitative</span>
+<span class="sd">        predictions matching experimental data.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">MINIMAL_3WM</span> <span class="o">=</span> <span class="s2">&quot;minimal_3wm&quot;</span>
@@ -300,12 +367,10 @@
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
-<span class="sd">    tuple</span>
-<span class="sd">        Contains:</span>
-<span class="sd">        - relations_3wm : List of mode indices for 3-wave mixing</span>
-<span class="sd">        - relations_4wm : List of mode indices for 4-wave mixing</span>
-<span class="sd">        - coeffs_3wm : numpy array of scaled coefficients for 3-wave mixing</span>
-<span class="sd">        - coeffs_4wm : numpy array of scaled coefficients for 4-wave mixing</span>
+<span class="sd">    relations_3wm : List of mode indices for 3-wave mixing</span>
+<span class="sd">    relations_4wm : List of mode indices for 4-wave mixing</span>
+<span class="sd">    coeffs_3wm : numpy array of scaled coefficients for 3-wave mixing</span>
+<span class="sd">    coeffs_4wm : numpy array of scaled coefficients for 4-wave mixing</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">extract_indices</span><span class="p">(</span><span class="n">terms</span><span class="p">):</span>
@@ -331,10 +396,35 @@
     <span class="n">func</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Wrap functions for analysis.</span>
+<span class="sd">    Decorate analysis methods providing automatic result caching and management.</span>
 
-<span class="sd">    Automatically saves results of each analysis function in data dictionary of an Analyzer class.</span>
-<span class="sd">    All analysis functions must return a dictionary to be compatible with this wrapper.</span>
+<span class="sd">    Wraps analysis functions to automatically:</span>
+<span class="sd">    - Update base TWPA data before analysis</span>
+<span class="sd">    - Cache results in the analysis instance&#39;s data dictionary</span>
+<span class="sd">    - Handle save/load operations with custom naming</span>
+<span class="sd">    - Provide consistent logging and error handling</span>
+
+<span class="sd">    The decorated function must return a dictionary to be compatible with caching.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    func : callable</span>
+<span class="sd">        Analysis function to decorate. Must be a method of an Analyzer subclass</span>
+<span class="sd">        and return a dictionary of results.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    wrapper : callable</span>
+<span class="sd">        Wrapped function with automatic data management capabilities.</span>
+
+<span class="sd">    Function Signature</span>
+<span class="sd">    ------------------</span>
+<span class="sd">    The wrapper adds the following parameters to any decorated function:</span>
+
+<span class="sd">    save : bool, default True</span>
+<span class="sd">        Whether to cache results in the analysis data dictionary</span>
+<span class="sd">    save_name : str, optional</span>
+<span class="sd">        Custom name for cached results. If None, uses function name</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>  <span class="c1"># Necessary for correct functioning of sphinx autodoc</span>
@@ -418,7 +508,49 @@
 
 
 <div class="viewcode-block" id="TWPAnalysis"><a class="viewcode-back" href="../../api-reference/twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">TWPAnalysis</span><span class="p">(</span><span class="n">Analyzer</span><span class="p">,</span> <span class="n">Frequencies</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Runner for standard analysis routines of TWPA models with enhanced ModeArray support.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    TWPA Analysis Engine with Extended Coupled Mode Equations.</span>
+
+<span class="sd">    Main interface for simulating TWPA nonlinear behavior. Solves coupled mode</span>
+<span class="sd">    equations (CMEs) with support for arbitrary numbers of modes and automatic</span>
+<span class="sd">    mode relationship management.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    twpa : TWPA or str</span>
+<span class="sd">        TWPA model instance or path to JSON file</span>
+<span class="sd">    f_list : list of float, optional</span>
+<span class="sd">        Explicit list of frequencies for analysis</span>
+<span class="sd">    f_arange : tuple of float, optional</span>
+<span class="sd">        Frequency range as (start, stop, step) for numpy.arange</span>
+<span class="sd">    unit : {&#39;Hz&#39;, &#39;kHz&#39;, &#39;MHz&#39;, &#39;GHz&#39;, &#39;THz&#39;}, default &#39;GHz&#39;</span>
+<span class="sd">        Frequency unit for the analysis</span>
+<span class="sd">    data_file : str, optional</span>
+<span class="sd">        Name for data file storage (auto-generated if not provided)</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    See the :ref:`tutorials` section for complete examples:</span>
+
+<span class="sd">    - Tutorial 3: Basic 3WM gain analysis and parameter sweeps</span>
+<span class="sd">    - Tutorial 4: Extended CME models with pump harmonics and custom modes</span>
+
+<span class="sd">    The tutorials cover everything from basic gain calculations to complex</span>
+<span class="sd">    multi-mode simulations with losses and reflections.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The analysis automatically extracts TWPA parameters (kappa, gamma, alpha) from</span>
+<span class="sd">    the circuit model and uses them to interpolate mode properties across frequency.</span>
+
+<span class="sd">    For extended CME models:</span>
+<span class="sd">    - Use ``general_ideal`` or ``general_loss_only`` for rapid design iterations</span>
+<span class="sd">    - Use ``general`` for highest accuracy including device imperfections</span>
+
+<span class="sd">    All analysis results are automatically cached in the ``data`` attribute and can</span>
+<span class="sd">    be saved/loaded using the ``save_data()`` and ``load_data()`` methods.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">validate_assignment</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">twpa</span><span class="p">:</span> <span class="n">TWPA</span>
@@ -585,21 +717,57 @@
         <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Build phase matching profile for specified modes.</span>
+<span class="sd">        Analyze phase matching conditions for nonlinear processes using mode arrays.</span>
 
-<span class="sd">        Args:</span>
-<span class="sd">            process: Type of process (&quot;PA&quot;, &quot;FCU&quot;, &quot;FCD&quot;)</span>
-<span class="sd">            signal_mode: Label of the signal mode</span>
-<span class="sd">            pump_mode: Label of the pump mode</span>
-<span class="sd">            idler_mode: Label of the idler mode</span>
-<span class="sd">            mode_array_config: Name of the mode array configuration to use</span>
-<span class="sd">            pump_Ip0: Optional pump current</span>
-<span class="sd">            signal_arange: Signal frequency range as (start, stop, step)</span>
-<span class="sd">            pump_arange: Pump frequency range as (start, stop, step)</span>
-<span class="sd">            thin: The step size to thin out the frequency and wavenumber arrays</span>
+<span class="sd">        Computes phase mismatch Δβ as a function of pump and signal frequencies</span>
+<span class="sd">        for different nonlinear processes. Uses ModeArray interpolation for</span>
+<span class="sd">        mode parameter calculation across frequency ranges.</span>
 
-<span class="sd">        Returns:</span>
-<span class="sd">            dict: A dictionary containing phase matching analysis results</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        process : {&#39;PA&#39;, &#39;FCU&#39;, &#39;FCD&#39;}, default &#39;PA&#39;</span>
+<span class="sd">            Nonlinear process type:</span>
+
+<span class="sd">            * ``PA``: Parametric amplification (signal + idler → pump)</span>
+<span class="sd">            * ``FCU``: Frequency conversion up (signal → idler, ω_i &gt; ω_s)</span>
+<span class="sd">            * ``FCD``: Frequency conversion down (signal → idler, ω_i &lt; ω_s)</span>
+
+<span class="sd">        signal_mode, pump_mode, idler_mode : str, default &#39;s&#39;, &#39;p&#39;, &#39;i&#39;</span>
+<span class="sd">            Mode labels in the mode array configuration</span>
+<span class="sd">        mode_array_config : str, default &#39;basic_3wm&#39;</span>
+<span class="sd">            Mode array configuration name for parameter interpolation</span>
+<span class="sd">        pump_Ip0 : float, optional</span>
+<span class="sd">            Pump current for nonlinear correction. If None, uses TWPA&#39;s Ip0</span>
+<span class="sd">        signal_arange : tuple of float, optional</span>
+<span class="sd">            Signal frequency range as (start, stop, step). If None, uses</span>
+<span class="sd">            automatic range from start of frequency span to stopband edge</span>
+<span class="sd">        pump_arange : tuple of float, optional</span>
+<span class="sd">            Pump frequency range as (start, stop, step). If None, uses</span>
+<span class="sd">            automatic range from stopband edge to maximum frequency</span>
+<span class="sd">        thin : int, default 20</span>
+<span class="sd">            Array thinning factor for computational efficiency</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            Phase matching analysis results:</span>
+
+<span class="sd">            * ``delta`` : ndarray - Phase mismatch matrix [n_signal, n_pump]</span>
+<span class="sd">            * ``triplets`` : dict - Frequency and wavenumber triplets</span>
+<span class="sd">            * ``pump_freqs`` : ndarray - Pump frequency array</span>
+<span class="sd">            * ``signal_freqs`` : ndarray - Signal frequency array</span>
+<span class="sd">            * ``mode_info`` : dict - Mode configuration metadata</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        See Tutorial 3 (:ref:`tutorials`) for basic phase matching analysis and</span>
+<span class="sd">        Tutorial 4 for extended mode configurations with frequency conversion.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        - The ``chi`` nonlinear parameter includes pump current corrections</span>
+<span class="sd">        - Optimal phase matching regions appear as minima in the phase mismatch</span>
+<span class="sd">        - Extended mode arrays enable analysis beyond basic pump-signal-idler</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Get the mode array</span>
         <span class="n">mode_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_mode_array</span><span class="p">(</span><span class="n">mode_array_config</span><span class="p">)</span>
@@ -713,26 +881,71 @@
         <span class="n">thin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Compute expected gain with selected gain model.</span>
+<span class="sd">        Compute the TWPA gain using coupled mode equation models.</span>
 
-<span class="sd">        Args:</span>
-<span class="sd">            signal_freqs: Array of signal frequencies to consider</span>
-<span class="sd">            pump: The pump frequency (if None, uses the optimal pump frequency from data)</span>
-<span class="sd">            Is0: Initial signal current (in A) for standard 3WM model</span>
-<span class="sd">            Ip0: Initial pump current (in A) (if None, uses the current TWPA&#39;s Ip0)</span>
-<span class="sd">            model: Gain model to use (minimal_3wm, general, general without reflections, or general with loss only)</span>
-<span class="sd">            mode_array_config: Name of the mode array configuration to use</span>
-<span class="sd">            signal_mode: Label of the signal mode</span>
-<span class="sd">            pump_mode: Label of the pump mode</span>
-<span class="sd">            idler_mode: Label of the idler mode (if None, will be determined from mode array relations)</span>
-<span class="sd">            initial_amplitudes: Initial amplitudes for all modes. Can be:</span>
-<span class="sd">                               - 1D array: Same initial conditions for all frequencies</span>
-<span class="sd">                               - 2D array: Different initial conditions for each frequency [n_freq, n_modes]</span>
-<span class="sd">                               - None: Use default values (specified Ip0 and Is0, 1e-14 for all other modes)</span>
-<span class="sd">            thin: The step size to thin out the position array</span>
+<span class="sd">        Supports multiple CME models from basic 3-wave mixing to extended systems</span>
+<span class="sd">        with arbitrary numbers of modes, losses, and reflections.</span>
 
-<span class="sd">        Returns:</span>
-<span class="sd">            dict: A dictionary containing gain calculation results</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        signal_freqs : array_like</span>
+<span class="sd">            Signal frequencies for gain calculation</span>
+<span class="sd">        pump : float, optional</span>
+<span class="sd">            Pump frequency. If None, uses automatically determined optimal frequency</span>
+<span class="sd">        Is0 : float, default 1e-6</span>
+<span class="sd">            Initial signal current amplitude (A) for standard 3WM model</span>
+<span class="sd">        Ip0 : float, optional</span>
+<span class="sd">            Initial pump current amplitude (A). If None, uses TWPA&#39;s Ip0 parameter</span>
+<span class="sd">        model : {&#39;minimal_3wm&#39;, &#39;general_ideal&#39;, &#39;general_loss_only&#39;, &#39;general&#39;}, default &#39;minimal_3wm&#39;</span>
+<span class="sd">            CME model complexity:</span>
+
+<span class="sd">            * ``minimal_3wm``: Basic pump-signal-idler only (fastest)</span>
+<span class="sd">            * ``general_ideal``: Extended modes, no losses/reflections</span>
+<span class="sd">            * ``general_loss_only``: Extended modes with losses</span>
+<span class="sd">            * ``general``: Full model with losses and reflections (most accurate)</span>
+
+<span class="sd">        mode_array_config : str, default &#39;basic_3wm&#39;</span>
+<span class="sd">            Name of mode array configuration to use. Built-in options:</span>
+
+<span class="sd">            * ``basic_3wm``: Standard pump, signal, idler modes</span>
+<span class="sd">            * Custom configurations added via ``add_mode_array()``</span>
+
+<span class="sd">        signal_mode, pump_mode, idler_mode : str, default &#39;s&#39;, &#39;p&#39;, &#39;i&#39;</span>
+<span class="sd">            Mode labels within the mode array for signal, pump, and idler</span>
+<span class="sd">        initial_amplitudes : array_like, optional</span>
+<span class="sd">            Initial current amplitudes for all modes. Can be:</span>
+
+<span class="sd">            * 1D array: Same conditions for all frequencies [n_modes]</span>
+<span class="sd">            * 2D array: Different conditions per frequency [n_freq, n_modes]</span>
+<span class="sd">            * None: Use default values (Ip0, Is0, 1e-14 for others)</span>
+
+<span class="sd">        thin : int, default 100</span>
+<span class="sd">            Position array thinning factor (higher = faster, lower resolution)</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            Gain analysis results containing:</span>
+
+<span class="sd">            * ``model`` : str - CME model used</span>
+<span class="sd">            * ``pump_freq`` : float - Pump frequency</span>
+<span class="sd">            * ``signal_freqs`` : ndarray - Signal frequencies</span>
+<span class="sd">            * ``x`` : ndarray - Position array along TWPA</span>
+<span class="sd">            * ``I_triplets`` : ndarray - Current evolution [n_freq, n_modes, n_pos]</span>
+<span class="sd">            * ``gain_db`` : ndarray - Gain in dB for each signal frequency</span>
+<span class="sd">            * ``mode_info`` : dict - Mode configuration metadata</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        See Tutorial 3 (:ref:`tutorials`) for basic gain analysis examples and</span>
+<span class="sd">        Tutorial 4 for extended CME models.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        - The ``general`` model is most accurate but ~10x slower than others</span>
+<span class="sd">        - Extended mode arrays capture more subtle effects and improve the accuracy of the simulation.</span>
+<span class="sd">        - Results are automatically cached in ``analysis.data[&#39;gain&#39;]``</span>
+<span class="sd">        - Use ``plot_gain()`` and ``plot_mode_currents()`` for visualization</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Process model parameter</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>

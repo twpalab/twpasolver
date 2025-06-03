@@ -241,17 +241,75 @@
         <article role="main">
           <section id="module-twpasolver.analysis">
 <span id="twpasolver-analysis-module"></span><h1>twpasolver.analysis module<a class="headerlink" href="#module-twpasolver.analysis" title="Permalink to this heading">#</a></h1>
-<p>Analysis class to simulate and plot the nonlinear behavior of TWPAs.</p>
+<p><code class="docutils literal notranslate"><span class="pre">analysis</span></code> module.</p>
+<section id="twpa-analysis-and-simulation">
+<h2>TWPA Analysis and Simulation<a class="headerlink" href="#twpa-analysis-and-simulation" title="Permalink to this heading">#</a></h2>
+<p>Main analysis module for simulating TWPA nonlinear behavior through coupled mode
+equations (CMEs). Provides automated analysis workflows with support for extended
+mode systems, parameter sweeps, and multiple gain models.</p>
+<p>The module centers around <a class="reference internal" href="#twpasolver.analysis.TWPAnalysis" title="twpasolver.analysis.TWPAnalysis"><code class="xref py py-class docutils literal notranslate"><span class="pre">TWPAnalysis</span></code></a>, which integrates circuit modeling,
+mode management, and CME solving into a unified analysis framework.</p>
+<section id="key-components">
+<h3>Key Components<a class="headerlink" href="#key-components" title="Permalink to this heading">#</a></h3>
+<p><strong>Analysis Engine</strong>:
+- <a class="reference internal" href="#twpasolver.analysis.TWPAnalysis" title="twpasolver.analysis.TWPAnalysis"><code class="xref py py-class docutils literal notranslate"><span class="pre">TWPAnalysis</span></code></a>: Main analysis class with automated workflows
+- <a class="reference internal" href="#twpasolver.analysis.Analyzer" title="twpasolver.analysis.Analyzer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Analyzer</span></code></a>: Base class for structured analysis with data management</p>
+<p><strong>Gain Models</strong>:
+- <a class="reference internal" href="#twpasolver.analysis.GainModel" title="twpasolver.analysis.GainModel"><code class="xref py py-class docutils literal notranslate"><span class="pre">GainModel</span></code></a>: Enumeration of available CME models with different accuracy/speed tradeoffs</p>
+<p><strong>Decorators</strong>:
+- <a class="reference internal" href="#twpasolver.analysis.analysis_function" title="twpasolver.analysis.analysis_function"><code class="xref py py-func docutils literal notranslate"><span class="pre">analysis_function()</span></code></a>: Automatic result caching and data management</p>
+</section>
+<section id="usage-patterns">
+<h3>Usage Patterns<a class="headerlink" href="#usage-patterns" title="Permalink to this heading">#</a></h3>
+<p><strong>Basic Analysis Workflow</strong>:</p>
+<ol class="arabic simple">
+<li><p>Initialize TWPAnalysis with TWPA model and frequency range</p></li>
+<li><p>Run base analysis (response, phase matching)</p></li>
+<li><p>Compute gain with appropriate model complexity</p></li>
+<li><p>Perform parameter sweeps or bandwidth analysis</p></li>
+<li><p>Visualize results with built-in plotting methods</p></li>
+</ol>
+<p><strong>Extended Mode Analysis</strong>:</p>
+<ol class="arabic simple">
+<li><p>Create custom mode arrays using ModeArrayFactory</p></li>
+<li><p>Add to analysis instance with descriptive names</p></li>
+<li><p>Run gain analysis specifying mode array configuration</p></li>
+<li><p>Compare results across different mode configurations</p></li>
+</ol>
+<p>All analysis functions automatically cache results and support parameter sweeps
+through the <code class="xref py py-func docutils literal notranslate"><span class="pre">parameter_sweep()</span></code> method.</p>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="twpasolver.modes_rwa.html#module-twpasolver.modes_rwa" title="twpasolver.modes_rwa"><code class="xref py py-mod docutils literal notranslate"><span class="pre">twpasolver.modes_rwa</span></code></a></dt><dd><p>Advanced mode relationship management</p>
+</dd>
+<dt><a class="reference internal" href="twpasolver.cmes.html#module-twpasolver.cmes" title="twpasolver.cmes"><code class="xref py py-mod docutils literal notranslate"><span class="pre">twpasolver.cmes</span></code></a></dt><dd><p>High-performance CME solvers</p>
+</dd>
+<dt><a class="reference internal" href="twpasolver.models.html#module-twpasolver.models" title="twpasolver.models"><code class="xref py py-mod docutils literal notranslate"><span class="pre">twpasolver.models</span></code></a></dt><dd><p>Circuit component and TWPA models</p>
+</dd>
+</dl>
+</div>
+</section>
+</section>
 <dl class="py class">
 <dt class="sig sig-object py" id="twpasolver.analysis.GainModel">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.analysis.</span></span><span class="sig-name descname"><span class="pre">GainModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/analysis.html#GainModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.GainModel" title="Permalink to this definition">#</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.Enum" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></a></p>
-<p>Available CMEs models.</p>
-<dl class="simple">
-<dt>Available Models:</dt><dd><p>MINIMAL_3WM: Consider only pump, signal and ider. Faster simulation, but usually not accurate.
-GENERAL_IDEAL: Solve CMEs with arbitrary set of modes, without considering losses nor reflections.
-GENERAL_LOSS_ONLY: Solve CMEs with arbitrary set of modes, considering losses but not reflections.
-GENERAL: Solve CMEs with arbitrary set of modes, including losses and reflections. Most accurate, but slowest.</p>
+<p>Available CME models for gain analysis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>MINIMAL_3WM</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – Basic pump-signal-idler model. Fastest computation but limited accuracy.
+Suitable for quick design estimates and parameter space exploration.</p></li>
+<li><p><strong>GENERAL_IDEAL</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – Extended mode system without losses or reflections. Moderate computation
+time with improved accuracy over basic model. Includes pump harmonics
+and frequency conversion terms.</p></li>
+<li><p><strong>GENERAL_LOSS_ONLY</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – Extended mode system with device losses but no reflections. Similar
+computation time to ideal case with better accuracy for lossy devices.</p></li>
+<li><p><strong>GENERAL</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – Full extended mode system with losses and reflections. Highest accuracy
+but slowest computation (~10x general_ideal model). Use for quantitative
+predictions matching experimental data.</p></li>
+</ul>
 </dd>
 </dl>
 <dl class="py attribute">
@@ -290,14 +348,13 @@ GENERAL: Solve CMEs with arbitrary set of modes, including losses and reflection
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Contains:
-- relations_3wm : List of mode indices for 3-wave mixing
-- relations_4wm : List of mode indices for 4-wave mixing
-- coeffs_3wm : numpy array of scaled coefficients for 3-wave mixing
-- coeffs_4wm : numpy array of scaled coefficients for 4-wave mixing</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)">tuple</a></p>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>relations_3wm</strong> (<em>List of mode indices for 3-wave mixing</em>)</p></li>
+<li><p><strong>relations_4wm</strong> (<em>List of mode indices for 4-wave mixing</em>)</p></li>
+<li><p><strong>coeffs_3wm</strong> (<em>numpy array of scaled coefficients for 3-wave mixing</em>)</p></li>
+<li><p><strong>coeffs_4wm</strong> (<em>numpy array of scaled coefficients for 4-wave mixing</em>)</p></li>
+</ul>
+</p>
 </dd>
 </dl>
 </dd></dl>
@@ -305,9 +362,30 @@ GENERAL: Solve CMEs with arbitrary set of modes, including losses and reflection
 <dl class="py function">
 <dt class="sig sig-object py" id="twpasolver.analysis.analysis_function">
 <span class="sig-prename descclassname"><span class="pre">twpasolver.analysis.</span></span><span class="sig-name descname"><span class="pre">analysis_function</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/twpasolver/analysis.html#analysis_function"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.analysis_function" title="Permalink to this definition">#</a></dt>
-<dd><p>Wrap functions for analysis.</p>
-<p>Automatically saves results of each analysis function in data dictionary of an Analyzer class.
-All analysis functions must return a dictionary to be compatible with this wrapper.</p>
+<dd><p>Decorate analysis methods providing automatic result caching and management.</p>
+<p>Wraps analysis functions to automatically:
+- Update base TWPA data before analysis
+- Cache results in the analysis instance’s data dictionary
+- Handle save/load operations with custom naming
+- Provide consistent logging and error handling</p>
+<p>The decorated function must return a dictionary to be compatible with caching.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Analysis function to decorate. Must be a method of an Analyzer subclass
+and return a dictionary of results.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>wrapper</strong> (<em>callable</em>) – Wrapped function with automatic data management capabilities.</p></li>
+<li><p><em>Function Signature</em></p></li>
+<li><p><em>——————</em></p></li>
+<li><p><em>The wrapper adds the following parameters to any decorated function</em></p></li>
+<li><p><strong>save</strong> (<em>bool, default True</em>) – Whether to cache results in the analysis data dictionary</p></li>
+<li><p><strong>save_name</strong> (<em>str, optional</em>) – Custom name for cached results. If None, uses function name</p></li>
+</ul>
+</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py class pydantic_model">
@@ -405,11 +483,41 @@ with all items organized in lists with an additional dimension.</p></li>
 <dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis">
 <em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">twpasolver.analysis.</span></span><span class="sig-name descname"><span class="pre">TWPAnalysis</span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis" title="Permalink to this definition">#</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#twpasolver.analysis.Analyzer" title="twpasolver.analysis.Analyzer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Analyzer</span></code></a>, <a class="reference internal" href="twpasolver.frequency.html#twpasolver.frequency.Frequencies" title="twpasolver.frequency.Frequencies"><code class="xref py py-class docutils literal notranslate"><span class="pre">Frequencies</span></code></a></p>
-<p>Runner for standard analysis routines of TWPA models with enhanced ModeArray support.</p>
+<p>TWPA Analysis Engine with Extended Coupled Mode Equations.</p>
+<p>Main interface for simulating TWPA nonlinear behavior. Solves coupled mode
+equations (CMEs) with support for arbitrary numbers of modes and automatic
+mode relationship management.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>twpa</strong> (<a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA" title="twpasolver.models.twoportarrays.TWPA"><em>TWPA</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – TWPA model instance or path to JSON file</p></li>
+<li><p><strong>f_list</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.13)"><em>list</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em>, </em><em>optional</em>) – Explicit list of frequencies for analysis</p></li>
+<li><p><strong>f_arange</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)"><em>tuple</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em>, </em><em>optional</em>) – Frequency range as (start, stop, step) for numpy.arange</p></li>
+<li><p><strong>unit</strong> (<em>{'Hz'</em><em>, </em><em>'kHz'</em><em>, </em><em>'MHz'</em><em>, </em><em>'GHz'</em><em>, </em><em>'THz'}</em><em>, </em><em>default 'GHz'</em>) – Frequency unit for the analysis</p></li>
+<li><p><strong>data_file</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><em>optional</em>) – Name for data file storage (auto-generated if not provided)</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>See the <a class="reference internal" href="../tutorials.html#tutorials"><span class="std std-ref">Tutorials</span></a> section for complete examples:</p>
+<ul class="simple">
+<li><p>Tutorial 3: Basic 3WM gain analysis and parameter sweeps</p></li>
+<li><p>Tutorial 4: Extended CME models with pump harmonics and custom modes</p></li>
+</ul>
+<p>The tutorials cover everything from basic gain calculations to complex
+multi-mode simulations with losses and reflections.</p>
+<p class="rubric">Notes</p>
+<p>The analysis automatically extracts TWPA parameters (kappa, gamma, alpha) from
+the circuit model and uses them to interpolate mode properties across frequency.</p>
+<p>For extended CME models:
+- Use <code class="docutils literal notranslate"><span class="pre">general_ideal</span></code> or <code class="docutils literal notranslate"><span class="pre">general_loss_only</span></code> for rapid design iterations
+- Use <code class="docutils literal notranslate"><span class="pre">general</span></code> for highest accuracy including device imperfections</p>
+<p>All analysis results are automatically cached in the <code class="docutils literal notranslate"><span class="pre">data</span></code> attribute and can
+be saved/loaded using the <code class="docutils literal notranslate"><span class="pre">save_data()</span></code> and <code class="docutils literal notranslate"><span class="pre">load_data()</span></code> methods.</p>
 <p><details  class="autodoc_pydantic_collapsable_json">
 <summary>Show JSON schema</summary><div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
 <span class="w">   </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TWPAnalysis&quot;</span><span class="p">,</span>
-<span class="w">   </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Runner for standard analysis routines of TWPA models with enhanced ModeArray support.&quot;</span><span class="p">,</span>
+<span class="w">   </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TWPA Analysis Engine with Extended Coupled Mode Equations.\n\nMain interface for simulating TWPA nonlinear behavior. Solves coupled mode\nequations (CMEs) with support for arbitrary numbers of modes and automatic\nmode relationship management.\n\nParameters\n----------\ntwpa : TWPA or str\n    TWPA model instance or path to JSON file\nf_list : list of float, optional\n    Explicit list of frequencies for analysis\nf_arange : tuple of float, optional\n    Frequency range as (start, stop, step) for numpy.arange\nunit : {&#39;Hz&#39;, &#39;kHz&#39;, &#39;MHz&#39;, &#39;GHz&#39;, &#39;THz&#39;}, default &#39;GHz&#39;\n    Frequency unit for the analysis\ndata_file : str, optional\n    Name for data file storage (auto-generated if not provided)\n\nExamples\n--------\nSee the :ref:`tutorials` section for complete examples:\n\n- Tutorial 3: Basic 3WM gain analysis and parameter sweeps\n- Tutorial 4: Extended CME models with pump harmonics and custom modes\n\nThe tutorials cover everything from basic gain calculations to complex\nmulti-mode simulations with losses and reflections.\n\nNotes\n-----\nThe analysis automatically extracts TWPA parameters (kappa, gamma, alpha) from\nthe circuit model and uses them to interpolate mode properties across frequency.\n\nFor extended CME models:\n- Use ``general_ideal`` or ``general_loss_only`` for rapid design iterations\n- Use ``general`` for highest accuracy including device imperfections\n\nAll analysis results are automatically cached in the ``data`` attribute and can\nbe saved/loaded using the ``save_data()`` and ``load_data()`` methods.&quot;</span><span class="p">,</span>
 <span class="w">   </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;object&quot;</span><span class="p">,</span>
 <span class="w">   </span><span class="nt">&quot;properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">      </span><span class="nt">&quot;f_list&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -1178,60 +1286,125 @@ with all items organized in lists with an additional dimension.</p></li>
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.phase_matching">
 <span class="sig-name descname"><span class="pre">phase_matching</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">process</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.13)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'PA'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'FCU'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'FCD'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'PA'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">signal_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'s'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'p'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idler_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'i'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode_array_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'basic_3wm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump_Ip0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">signal_arange</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump_arange</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">20</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.phase_matching"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.phase_matching" title="Permalink to this definition">#</a></dt>
-<dd><p>Build phase matching profile for specified modes.</p>
+<dd><p>Analyze phase matching conditions for nonlinear processes using mode arrays.</p>
+<p>Computes phase mismatch Δβ as a function of pump and signal frequencies
+for different nonlinear processes. Uses ModeArray interpolation for
+mode parameter calculation across frequency ranges.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>process</strong> – Type of process (“PA”, “FCU”, “FCD”)</p></li>
-<li><p><strong>signal_mode</strong> – Label of the signal mode</p></li>
-<li><p><strong>pump_mode</strong> – Label of the pump mode</p></li>
-<li><p><strong>idler_mode</strong> – Label of the idler mode</p></li>
-<li><p><strong>mode_array_config</strong> – Name of the mode array configuration to use</p></li>
-<li><p><strong>pump_Ip0</strong> – Optional pump current</p></li>
-<li><p><strong>signal_arange</strong> – Signal frequency range as (start, stop, step)</p></li>
-<li><p><strong>pump_arange</strong> – Pump frequency range as (start, stop, step)</p></li>
-<li><p><strong>thin</strong> – The step size to thin out the frequency and wavenumber arrays</p></li>
+<li><p><strong>process</strong> (<em>{'PA'</em><em>, </em><em>'FCU'</em><em>, </em><em>'FCD'}</em><em>, </em><em>default 'PA'</em>) – <p>Nonlinear process type:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">PA</span></code>: Parametric amplification (signal + idler → pump)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">FCU</span></code>: Frequency conversion up (signal → idler, ω_i &gt; ω_s)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">FCD</span></code>: Frequency conversion down (signal → idler, ω_i &lt; ω_s)</p></li>
+</ul>
+</p></li>
+<li><p><strong>signal_mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><em>default 's'</em><em>, </em><em>'p'</em><em>, </em><em>'i'</em>) – Mode labels in the mode array configuration</p></li>
+<li><p><strong>pump_mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><em>default 's'</em><em>, </em><em>'p'</em><em>, </em><em>'i'</em>) – Mode labels in the mode array configuration</p></li>
+<li><p><strong>idler_mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><em>default 's'</em><em>, </em><em>'p'</em><em>, </em><em>'i'</em>) – Mode labels in the mode array configuration</p></li>
+<li><p><strong>mode_array_config</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><em>default 'basic_3wm'</em>) – Mode array configuration name for parameter interpolation</p></li>
+<li><p><strong>pump_Ip0</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em>, </em><em>optional</em>) – Pump current for nonlinear correction. If None, uses TWPA’s Ip0</p></li>
+<li><p><strong>signal_arange</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)"><em>tuple</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em>, </em><em>optional</em>) – Signal frequency range as (start, stop, step). If None, uses
+automatic range from start of frequency span to stopband edge</p></li>
+<li><p><strong>pump_arange</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.13)"><em>tuple</em></a><em> of </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em>, </em><em>optional</em>) – Pump frequency range as (start, stop, step). If None, uses
+automatic range from stopband edge to maximum frequency</p></li>
+<li><p><strong>thin</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>, </em><em>default 20</em>) – Array thinning factor for computational efficiency</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A dictionary containing phase matching analysis results</p>
+<dd class="field-even"><p><p>Phase matching analysis results:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">delta</span></code> : ndarray - Phase mismatch matrix [n_signal, n_pump]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">triplets</span></code> : dict - Frequency and wavenumber triplets</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pump_freqs</span></code> : ndarray - Pump frequency array</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">signal_freqs</span></code> : ndarray - Signal frequency array</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mode_info</span></code> : dict - Mode configuration metadata</p></li>
+</ul>
+</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)">dict</a></p>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
+<p>See Tutorial 3 (<a class="reference internal" href="../tutorials.html#tutorials"><span class="std std-ref">Tutorials</span></a>) for basic phase matching analysis and
+Tutorial 4 for extended mode configurations with frequency conversion.</p>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">chi</span></code> nonlinear parameter includes pump current corrections</p></li>
+<li><p>Optimal phase matching regions appear as minima in the phase mismatch</p></li>
+<li><p>Extended mode arrays enable analysis beyond basic pump-signal-idler</p></li>
+</ul>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="twpasolver.analysis.TWPAnalysis.gain">
 <span class="sig-name descname"><span class="pre">gain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">signal_freqs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><span class="pre">Any</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dtype</span><span class="p"><span class="pre">[</span></span><span class="pre">float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Is0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ip0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#twpasolver.analysis.GainModel" title="twpasolver.analysis.GainModel"><span class="pre">GainModel</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">GainModel.MINIMAL_3WM</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode_array_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'basic_3wm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">signal_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'s'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pump_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'p'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idler_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'i'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_amplitudes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/twpasolver/analysis.html#TWPAnalysis.gain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#twpasolver.analysis.TWPAnalysis.gain" title="Permalink to this definition">#</a></dt>
-<dd><p>Compute expected gain with selected gain model.</p>
+<dd><p>Compute the TWPA gain using coupled mode equation models.</p>
+<p>Supports multiple CME models from basic 3-wave mixing to extended systems
+with arbitrary numbers of modes, losses, and reflections.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>signal_freqs</strong> – Array of signal frequencies to consider</p></li>
-<li><p><strong>pump</strong> – The pump frequency (if None, uses the optimal pump frequency from data)</p></li>
-<li><p><strong>Is0</strong> – Initial signal current (in A) for standard 3WM model</p></li>
-<li><p><strong>Ip0</strong> – Initial pump current (in A) (if None, uses the current TWPA’s Ip0)</p></li>
-<li><p><strong>model</strong> – Gain model to use (minimal_3wm, general, general without reflections, or general with loss only)</p></li>
-<li><p><strong>mode_array_config</strong> – Name of the mode array configuration to use</p></li>
-<li><p><strong>signal_mode</strong> – Label of the signal mode</p></li>
-<li><p><strong>pump_mode</strong> – Label of the pump mode</p></li>
-<li><p><strong>idler_mode</strong> – Label of the idler mode (if None, will be determined from mode array relations)</p></li>
-<li><p><strong>initial_amplitudes</strong> – Initial amplitudes for all modes. Can be:
-- 1D array: Same initial conditions for all frequencies
-- 2D array: Different initial conditions for each frequency [n_freq, n_modes]
-- None: Use default values (specified Ip0 and Is0, 1e-14 for all other modes)</p></li>
-<li><p><strong>thin</strong> – The step size to thin out the position array</p></li>
+<li><p><strong>signal_freqs</strong> (<em>array_like</em>) – Signal frequencies for gain calculation</p></li>
+<li><p><strong>pump</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em>, </em><em>optional</em>) – Pump frequency. If None, uses automatically determined optimal frequency</p></li>
+<li><p><strong>Is0</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em>, </em><em>default 1e-6</em>) – Initial signal current amplitude (A) for standard 3WM model</p></li>
+<li><p><strong>Ip0</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em>, </em><em>optional</em>) – Initial pump current amplitude (A). If None, uses TWPA’s Ip0 parameter</p></li>
+<li><p><strong>model</strong> (<em>{'minimal_3wm'</em><em>, </em><em>'general_ideal'</em><em>, </em><em>'general_loss_only'</em><em>, </em><em>'general'}</em><em>, </em><em>default 'minimal_3wm'</em>) – <p>CME model complexity:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">minimal_3wm</span></code>: Basic pump-signal-idler only (fastest)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">general_ideal</span></code>: Extended modes, no losses/reflections</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">general_loss_only</span></code>: Extended modes with losses</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">general</span></code>: Full model with losses and reflections (most accurate)</p></li>
+</ul>
+</p></li>
+<li><p><strong>mode_array_config</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><em>default 'basic_3wm'</em>) – <p>Name of mode array configuration to use. Built-in options:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">basic_3wm</span></code>: Standard pump, signal, idler modes</p></li>
+<li><p>Custom configurations added via <code class="docutils literal notranslate"><span class="pre">add_mode_array()</span></code></p></li>
+</ul>
+</p></li>
+<li><p><strong>signal_mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><em>default 's'</em><em>, </em><em>'p'</em><em>, </em><em>'i'</em>) – Mode labels within the mode array for signal, pump, and idler</p></li>
+<li><p><strong>pump_mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><em>default 's'</em><em>, </em><em>'p'</em><em>, </em><em>'i'</em>) – Mode labels within the mode array for signal, pump, and idler</p></li>
+<li><p><strong>idler_mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><em>default 's'</em><em>, </em><em>'p'</em><em>, </em><em>'i'</em>) – Mode labels within the mode array for signal, pump, and idler</p></li>
+<li><p><strong>initial_amplitudes</strong> (<em>array_like</em><em>, </em><em>optional</em>) – <p>Initial current amplitudes for all modes. Can be:</p>
+<ul>
+<li><p>1D array: Same conditions for all frequencies [n_modes]</p></li>
+<li><p>2D array: Different conditions per frequency [n_freq, n_modes]</p></li>
+<li><p>None: Use default values (Ip0, Is0, 1e-14 for others)</p></li>
+</ul>
+</p></li>
+<li><p><strong>thin</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>, </em><em>default 100</em>) – Position array thinning factor (higher = faster, lower resolution)</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A dictionary containing gain calculation results</p>
+<dd class="field-even"><p><p>Gain analysis results containing:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">model</span></code> : str - CME model used</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pump_freq</span></code> : float - Pump frequency</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">signal_freqs</span></code> : ndarray - Signal frequencies</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">x</span></code> : ndarray - Position array along TWPA</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">I_triplets</span></code> : ndarray - Current evolution [n_freq, n_modes, n_pos]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">gain_db</span></code> : ndarray - Gain in dB for each signal frequency</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mode_info</span></code> : dict - Mode configuration metadata</p></li>
+</ul>
+</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)">dict</a></p>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
+<p>See Tutorial 3 (<a class="reference internal" href="../tutorials.html#tutorials"><span class="std std-ref">Tutorials</span></a>) for basic gain analysis examples and
+Tutorial 4 for extended CME models.</p>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">general</span></code> model is most accurate but ~10x slower than others</p></li>
+<li><p>Extended mode arrays capture more subtle effects and improve the accuracy of the simulation.</p></li>
+<li><p>Results are automatically cached in <code class="docutils literal notranslate"><span class="pre">analysis.data['gain']</span></code></p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">plot_gain()</span></code> and <code class="docutils literal notranslate"><span class="pre">plot_mode_currents()</span></code> for visualization</p></li>
+</ul>
 </dd></dl>
 
 <dl class="py method">
@@ -1372,6 +1545,11 @@ with all items organized in lists with an additional dimension.</p></li>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">twpasolver.analysis module</a><ul>
+<li><a class="reference internal" href="#twpa-analysis-and-simulation">TWPA Analysis and Simulation</a><ul>
+<li><a class="reference internal" href="#key-components">Key Components</a></li>
+<li><a class="reference internal" href="#usage-patterns">Usage Patterns</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#twpasolver.analysis.GainModel"><code class="docutils literal notranslate"><span class="pre">GainModel</span></code></a><ul>
 <li><a class="reference internal" href="#twpasolver.analysis.GainModel.MINIMAL_3WM"><code class="docutils literal notranslate"><span class="pre">GainModel.MINIMAL_3WM</span></code></a></li>
 <li><a class="reference internal" href="#twpasolver.analysis.GainModel.GENERAL_IDEAL"><code class="docutils literal notranslate"><span class="pre">GainModel.GENERAL_IDEAL</span></code></a></li>

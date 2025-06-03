@@ -241,25 +241,73 @@
         <article role="main">
           <section id="module-twpasolver">
 <span id="twpasolver-package"></span><h1>twpasolver package<a class="headerlink" href="#module-twpasolver" title="Permalink to this heading">#</a></h1>
-<p>Twpasolver package.</p>
-<p>This module provides to the basic tools and utilities for the analysis and simulation of
-traveling wave parametric amplifiers (TWPAs). It includes classes and functions
-for performing analyses, handling files, and working with matrices and arrays
-specific to TWPA models.</p>
+<p><code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> package.</p>
+<section id="twpasolver-twpa-analysis-and-simulation-library">
+<h2>Twpasolver: TWPA Analysis and Simulation Library<a class="headerlink" href="#twpasolver-twpa-analysis-and-simulation-library" title="Permalink to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">twpasolver</span></code> is a Python library for analyzing and simulating Traveling Wave
+Parametric Amplifiers (TWPAs) by solving systems of Coupled Mode Equations (CMEs).</p>
+<section id="key-features">
+<h3>Key Features<a class="headerlink" href="#key-features" title="Permalink to this heading">#</a></h3>
 <dl class="simple">
-<dt>Classes:</dt><dd><ul class="simple">
-<li><p>TWPAnalysis: Runner for standard analysis routines of 3WM twpa models.</p></li>
-<li><p>ABCDArray: Represents ABCD matrices used in the analysis of two-port networks.</p></li>
-<li><p>TwoPortCell: Wraps an ABCDArray with additional data and conversion functions to other representations.</p></li>
-<li><p>Frequencies: respresents a frequency span with variable measurement unit.</p></li>
+<dt><strong>Extended CME Systems:</strong></dt><dd><ul class="simple">
+<li><p>Solve CMEs with arbitrary numbers of modes beyond pump-signal-idler</p></li>
+<li><p>Automatic inclusion of pump harmonics, frequency conversion terms, and harmonics</p></li>
+<li><p>Support for 3-wave mixing (3WM) and 4-wave mixing (4WM) processes</p></li>
+<li><p>Rotating Wave Approximation (RWA) term selection</p></li>
 </ul>
 </dd>
-<dt>Functions:</dt><dd><ul class="simple">
-<li><p>read_file: Reads data from a specified <code class="docutils literal notranslate"><span class="pre">`json`</span></code> or <code class="docutils literal notranslate"><span class="pre">`hdf5`</span></code> file.</p></li>
-<li><p>save_to_file: Saves data encoded in a dictionary to a specified <code class="docutils literal notranslate"><span class="pre">`json`</span></code> or <code class="docutils literal notranslate"><span class="pre">`hdf5`</span></code> file.</p></li>
+<dt><strong>Mode Management:</strong></dt><dd><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ModeArray</span></code> class with symbolic frequency dependency tracking</p></li>
+<li><p>Automatic mode relationship propagation using dependency graphs</p></li>
+<li><p>Support for forward and backward propagating modes</p></li>
+<li><p>Parameter interpolation (kappa, gamma, alpha) from base data</p></li>
+</ul>
+</dd>
+<dt><strong>Performance:</strong></dt><dd><ul class="simple">
+<li><p>Numba-accelerated parallel CME solvers</p></li>
+<li><p>Efficient matrix operations for 2x2 ABCD matrices</p></li>
+<li><p>Frequency array processing with caching</p></li>
+<li><p>Parameter sweeps with result caching</p></li>
+</ul>
+</dd>
+<dt><strong>Gain Models:</strong></dt><dd><ul class="simple">
+<li><p>MINIMAL_3WM: Basic three-wave mixing model with only pump, signal and idler</p></li>
+<li><p>GENERAL_IDEAL: Extended modes without losses or reflections</p></li>
+<li><p>GENERAL_LOSS_ONLY: Extended modes with losses</p></li>
+<li><p>GENERAL: Full model with losses and reflections</p></li>
+</ul>
+</dd>
+<dt><strong>Circuit Modeling:</strong></dt><dd><ul class="simple">
+<li><p>Hierarchical composition of one-port and two-port network elements</p></li>
+<li><p>Pre-built KITWPA cell models (lumped or distributed elements)</p></li>
+<li><p>Custom circuit elements with automatic ABCD matrix computation</p></li>
+</ul>
+</dd>
+<dt><strong>Analysis Tools:</strong></dt><dd><ul class="simple">
+<li><p>Phase matching analysis with custom mode configurations</p></li>
+<li><p>Gain and bandwidth calculations with pump depletion effects</p></li>
+<li><p>Parameter sweeps with automatic result caching</p></li>
+<li><p>Built-in plotting functions</p></li>
 </ul>
 </dd>
 </dl>
+</section>
+<section id="core-classes">
+<h3>Core Classes<a class="headerlink" href="#core-classes" title="Permalink to this heading">#</a></h3>
+<ul class="simple">
+<li><p><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.TWPAnalysis" title="twpasolver.analysis.TWPAnalysis"><code class="xref py py-class docutils literal notranslate"><span class="pre">TWPAnalysis</span></code></a>: Main analysis engine with extended CME support</p></li>
+<li><p><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArray" title="twpasolver.modes_rwa.ModeArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModeArray</span></code></a>: Mode relationship handler with symbolic frequency propagation</p></li>
+<li><p><a class="reference internal" href="twpasolver.models.twoportarrays.html#twpasolver.models.twoportarrays.TWPA" title="twpasolver.models.twoportarrays.TWPA"><code class="xref py py-class docutils literal notranslate"><span class="pre">TWPA</span></code></a>: Nonlinear TWPA model with circuit composition</p></li>
+<li><p><a class="reference internal" href="twpasolver.matrices_arrays.html#twpasolver.matrices_arrays.ABCDArray" title="twpasolver.matrices_arrays.ABCDArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABCDArray</span></code></a>: Optimized 2x2 matrix arrays</p></li>
+<li><p><a class="reference internal" href="twpasolver.twoport.html#twpasolver.twoport.TwoPortCell" title="twpasolver.twoport.TwoPortCell"><code class="xref py py-class docutils literal notranslate"><span class="pre">TwoPortCell</span></code></a>: Network parameter container with format conversion</p></li>
+</ul>
+</section>
+<section id="usage-examples">
+<h3>Usage Examples<a class="headerlink" href="#usage-examples" title="Permalink to this heading">#</a></h3>
+<p>See the <a class="reference internal" href="../tutorials.html#tutorials"><span class="std std-ref">Tutorials</span></a> section for detailed examples from simple linear component analysis to complex
+multi-mode simulations with pump harmonics and frequency conversion processes.</p>
+</section>
+</section>
 <section id="subpackages">
 <h2>Subpackages<a class="headerlink" href="#subpackages" title="Permalink to this heading">#</a></h2>
 <div class="toctree-wrapper compound">
@@ -322,6 +370,11 @@ specific to TWPA models.</p>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="twpasolver.analysis.html">twpasolver.analysis module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.analysis.html#twpa-analysis-and-simulation">TWPA Analysis and Simulation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#key-components">Key Components</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#usage-patterns">Usage Patterns</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.GainModel"><code class="docutils literal notranslate"><span class="pre">GainModel</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.GainModel.MINIMAL_3WM"><code class="docutils literal notranslate"><span class="pre">GainModel.MINIMAL_3WM</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.analysis.html#twpasolver.analysis.GainModel.GENERAL_IDEAL"><code class="docutils literal notranslate"><span class="pre">GainModel.GENERAL_IDEAL</span></code></a></li>
@@ -463,6 +516,12 @@ specific to TWPA models.</p>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="twpasolver.modes_rwa.html">twpasolver.modes_rwa module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="twpasolver.modes_rwa.html#mode-management-and-rotating-wave-approximation-analysis">Mode Management and Rotating Wave Approximation Analysis</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#key-components">Key Components</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#capabilities">Capabilities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#performance-notes">Performance Notes</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ParameterInterpolator"><code class="docutils literal notranslate"><span class="pre">ParameterInterpolator</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="twpasolver.modes_rwa.html#twpasolver.modes_rwa.ParameterInterpolator.get_parameters"><code class="docutils literal notranslate"><span class="pre">ParameterInterpolator.get_parameters()</span></code></a></li>
 </ul>
@@ -604,6 +663,12 @@ specific to TWPA models.</p>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">twpasolver package</a><ul>
+<li><a class="reference internal" href="#twpasolver-twpa-analysis-and-simulation-library">Twpasolver: TWPA Analysis and Simulation Library</a><ul>
+<li><a class="reference internal" href="#key-features">Key Features</a></li>
+<li><a class="reference internal" href="#core-classes">Core Classes</a></li>
+<li><a class="reference internal" href="#usage-examples">Usage Examples</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#subpackages">Subpackages</a></li>
 <li><a class="reference internal" href="#submodules">Submodules</a></li>
 </ul>

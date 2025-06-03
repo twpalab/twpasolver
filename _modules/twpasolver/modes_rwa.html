@@ -239,7 +239,75 @@
         </div>
         <article role="main">
           <h1>Source code for twpasolver.modes_rwa</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Classes to represent frequency modes, their properties and the relations between them.&quot;&quot;&quot;</span>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">``modes_rwa`` module.</span>
+
+<span class="sd">Mode Management and Rotating Wave Approximation Analysis</span>
+<span class="sd">========================================================</span>
+
+<span class="sd">Tools for managing complex mode relationships in TWPA analysis, enabling</span>
+<span class="sd">simulation of extended coupled mode equation (CME) systems with arbitrary</span>
+<span class="sd">numbers of modes beyond basic pump-signal-idler configuration.</span>
+
+<span class="sd">Key Components</span>
+<span class="sd">--------------</span>
+
+<span class="sd">**ModeArray**: Organizes related modes with automatic frequency propagation,</span>
+<span class="sd">parameter interpolation, and dependency graph management.</span>
+
+<span class="sd">**RWAAnalyzer**: Identifies valid 3-wave and 4-wave mixing terms that satisfy</span>
+<span class="sd">the Rotating Wave Approximation for any given set of mode relationships.</span>
+
+<span class="sd">**ModeArrayFactory**: Factory methods for creating standard and custom mode</span>
+<span class="sd">configurations including pump harmonics, frequency conversion terms, and harmonics.</span>
+
+<span class="sd">**ParameterInterpolator**: Interpolation of mode parameters (kappa, gamma, alpha)</span>
+<span class="sd">from base TWPA circuit data across frequency ranges.</span>
+
+<span class="sd">Capabilities</span>
+<span class="sd">------------</span>
+
+<span class="sd">**RWA Term Selection**:</span>
+<span class="sd">    - Automatic discovery of valid 3WM and 4WM mixing processes</span>
+<span class="sd">    - Coefficient calculation including factorial corrections for repeated modes</span>
+<span class="sd">    - Caching of RWA terms for performance</span>
+
+<span class="sd">**Mode Relationships**:</span>
+<span class="sd">    - Support for arbitrary frequency relationships between modes</span>
+<span class="sd">    - Forward and backward propagating modes</span>
+<span class="sd">    - Pump harmonics (p, p2, p3, ...)</span>
+<span class="sd">    - Frequency conversion terms (p+s, p+i, ...)</span>
+<span class="sd">    - Signal/idler harmonics (s2, i2, ...)</span>
+
+<span class="sd">**Symbolic Frequency Propagation**:</span>
+<span class="sd">    - O(n) frequency updates using pre-computed symbolic expressions</span>
+<span class="sd">    - Automatic identification of independent vs. dependent modes</span>
+<span class="sd">    - Topological sorting of mode dependencies</span>
+<span class="sd">    - Visualization of the mode relations with a graph</span>
+
+<span class="sd">**Parameter Management**:</span>
+<span class="sd">    - Easy interpolation of mode parameters from base circuit data</span>
+<span class="sd">    - Automatic handling of mode directions for wavenumber calculation</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">See Tutorial 4 (:ref:`tutorials`) for complete examples covering:</span>
+
+<span class="sd">- Basic 3WM mode array creation and visualization</span>
+<span class="sd">- Extended mode arrays with pump harmonics and frequency conversion</span>
+<span class="sd">- Custom mode configurations for specific processes</span>
+<span class="sd">- RWA term analysis and CME integration</span>
+
+<span class="sd">The tutorial demonstrates the progression from simple mode relationships to</span>
+<span class="sd">complex multi-mode systems used in realistic TWPA simulations.</span>
+
+<span class="sd">Performance Notes</span>
+<span class="sd">-----------------</span>
+<span class="sd">- Symbolic frequency propagation enables O(n) scaling, useful when iterating over arrays.</span>
+<span class="sd">- RWA term caching eliminates redundant calculations during CME solving</span>
+<span class="sd">- Numba-compatible data structures for integration with fast CME solvers</span>
+<span class="sd">- Efficient interpolation supports faster parameter sweeps</span>
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">it</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span><span class="p">,</span> <span class="n">defaultdict</span><span class="p">,</span> <span class="n">deque</span>

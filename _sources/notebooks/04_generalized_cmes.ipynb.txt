@@ -6,11 +6,22 @@
    "source": [
     "# Advanced Coupled Mode Equations models\n",
     "\n",
-    "This tutorial demonstrates how to use the more advanced CMEs models to simulate the nonlinear response of a TWPA.\n",
+    "This tutorial demonstrates how to use the advanced CMEs models to simulate the nonlinear response of a TWPA. We'll explore extended mode systems that go beyond the basic pump-signal-idler configuration to include pump harmonics, frequency conversion processes, and higher-order effects.\n",
+    "\n",
+    "### Overview\n",
+    "\n",
+    "While the basic 3-wave mixing (3WM) model provides a good starting point for TWPA analysis, real devices exhibit more complex behavior due to:\n",
+    "\n",
+    "* **Pump harmonics**: 2nd, 3rd, and higher harmonics of the pump frequency\n",
+    "* **Frequency conversion**: Processes like pump + signal, pump + idler\n",
+    "* **Signal/idler harmonics**: Higher harmonics of signal and idler modes\n",
+    "* **Device imperfections**: Losses and reflections throughout the transmission line\n",
+    "\n",
+    "The `twpasolver` library handles these effects automatically through its `ModeArray` system and advanced CME solvers.\n",
     "\n",
     "### Initialize TWPAnalysis\n",
     "\n",
-    "First, let's load a KITWPA model and plot its reponse. Since we are going to consider higher order processes, we will initialize TWPAnalysis with a larger frequency span"
+    "First, let's load a KITWPA model and plot its response. Since we are going to consider higher order processes, we will initialize TWPAnalysis with a larger frequency span to capture pump harmonics."
    ]
   },
   {
@@ -35,36 +46,36 @@
     "\n",
     "twpa_file = \"model_cpw_dartwars_13nm_Lk8_5.json\"\n",
     "a = TWPAnalysis(twpa=twpa_file, f_arange=(0.2, 30, 0.5e-3))\n",
-    "for c in a.twpa.cells:\n",
-    "    c.delta = 0e-4\n",
-    "a.twpa.Z0_ref = 50\n",
     "a.update_base_data()\n",
-    "optimal_pump = 7.4735\n",
+    "\n",
+    "optimal_pump = 7.4755\n",
     "a.data[\"optimal_pump_freq\"] = optimal_pump\n",
     "ax = a.plot_response(pump_freq=optimal_pump)\n",
-    "\n",
-    "# plot first and second pump harmonic\n",
-    "ax[0].axvline(2 * optimal_pump, ls=\"--\", c=\"r\")\n",
-    "ax[1].axvline(2 * optimal_pump, ls=\"--\", c=\"r\")\n",
-    "ax[0].axvline(3 * optimal_pump, ls=\"--\", c=\"r\")\n",
-    "ax[1].axvline(3 * optimal_pump, ls=\"--\", c=\"r\")\n",
-    "a.twpa.model_dump()\n",
-    "a.data[\"optimal_pump_freq\"]"
+    "for i in range(2):\n",
+    "    ax[i].axvline(2 * optimal_pump, ls=\"--\", c=\"r\")\n",
+    "    ax[i].axvline(3 * optimal_pump, ls=\"--\", c=\"r\")\n",
+    "ax[0].set_ylim(-20, 1)"
    ]
   },
   {
    "cell_type": "markdown",
    "metadata": {},
    "source": [
+    "Notice how we've extended the frequency range to 30 GHz to capture the 2nd and 3rd pump harmonics (marked with red dashed lines). The TWPA's dispersive response means these harmonics will have different propagation constants and can participate in additional mixing processes.\n",
+    "\n",
     "## ModeArrays and ModeArrayFactory\n",
-    "Properly describing the nonlinear response of TWPAs requires going beyond the basic CMEs system that considers only pump, signal and idler. ```twpasolver``` is able to automatically build and solve CMEs systems including an arbitrary number of physical modes connected by relations between their frequencies. A collection of related modes is represented in a ```ModeArray``` object, which has the following notable features:\n",
-    "- Organize the mode relations in a dependency graph, identifying the independent modes\n",
-    "- Automatically extrapolate and propagate the physical propertie of the modes (frequency, wavenumber...) according to the relations\n",
-    "- Automatically select the 3WM and 4WM terms that satisfy the Rotating Wave Approximation (RWA) when solving the CMEs\n",
     "\n",
-    "The ```ModeArray``` factory helps to set up custom mode arrays or create standard extended mode collections useful to improve the accuracy of your simulations.\n",
+    "Properly describing the nonlinear response of TWPAs requires going beyond the basic CMEs system that considers only pump, signal and idler. `twpasolver` uses `ModeArray` objects to automatically build and solve CMEs systems including an arbitrary number of physical modes connected by frequency relationships.\n",
     "\n",
-    "Here is to setup a ModeArray with custom defined modes and relations"
+    "A `ModeArray` has several key features:\n",
+    "* **Dependency graph management**: Organizes mode relations and identifies independent modes\n",
+    "* **Automatic parameter interpolation**: Extrapolates physical properties (frequency, wavenumber, losses) according to the relations\n",
+    "* **RWA term selection**: Automatically selects the 3WM and 4WM terms that satisfy the Rotating Wave Approximation when solving the CMEs\n",
+    "* **Symbolic frequency propagation**: Updates all related mode frequencies in O(n) time using pre-computed expressions\n",
+    "\n",
+    "The `ModeArrayFactory` helps set up custom mode arrays or create standard extended mode collections.\n",
+    "\n",
+    "Here's how to set up a ModeArray with custom defined modes and relations:"
    ]
   },
   {
@@ -90,7 +101,15 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "For obtaining more realistic simulations, you should consider pump harmonics, frequency conversion processes and signal/idler harmonics. The ```create_extended_3wm``` method helps you to do so. Let's also add this more complete set of mode to the analysis class"
+    "The graph shows the mode relationships where:\n",
+    "* **Green nodes**: Independent modes (pump `p` and signal `s`)\n",
+    "* **Blue nodes**: Dependent modes (idler `i` and 2nd pump harmonic `p2`)\n",
+    "* **Blue arrows**: Positive frequency contributions\n",
+    "* **Red dashed arrows**: Negative frequency contributions\n",
+    "\n",
+    "The symbolic expressions on the right show how each mode's frequency depends on the independent modes.\n",
+    "\n",
+    "For more realistic simulations, you should consider pump harmonics, frequency conversion processes and signal/idler harmonics. The `create_extended_3wm` method creates a comprehensive set of modes automatically:"
    ]
   },
   {
@@ -110,8 +129,24 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
+    "This extended mode array includes:\n",
+    "* **Pump harmonics**: `p`, `p2`, `p3` (fundamental, 2nd and 3rd harmonic)\n",
+    "* **Basic 3WM**: `s`, `i` (signal and idler)\n",
+    "* **Frequency conversion**: `ps` (p+s), `pi` (p+i), and higher order processes generated by the pump harmonics\n",
+    "* **Signal harmonics**: `s2`, `i2` (first harmonics of signal and idler)\n",
+    "\n",
+    "The hierarchical layout shows the dependency relationships, with independent modes at the top and increasingly complex derived modes below them.\n",
+    "\n",
     "## Gain comparison with different models\n",
-    "You can use the attributes of the ```gain``` analysis function to specify which CME model and array of modes you want to include in the simulation. Once compied, even simulations with quite a large number of modes compared to the basic CMEs system should still be quite fast"
+    "\n",
+    "You can use the `model` parameter of the `gain` analysis function to specify which CME model to use. The library provides four models with increasing complexity:\n",
+    "\n",
+    "* **minimal_3wm**: Basic pump-signal-idler model (fastest)\n",
+    "* **general_ideal**: Extended modes without losses or reflections\n",
+    "* **general_loss_only**: Extended modes with losses but no reflections  \n",
+    "* **general**: Full model with losses and reflections (most accurate but slow)\n",
+    "\n",
+    "Once compiled, even simulations with large numbers of modes are quite fast thanks to Numba acceleration:"
    ]
   },
   {
@@ -150,7 +185,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "The most realistic model takes into account both losses and reflections in the device, but it is more difficult to integrate for the ODE solver and usually takes around 10X more time to run than the other three models."
+    "The most realistic model takes into account both losses and reflections in the device, but requires more computation time (typically ~10x the ideal models):"
    ]
   },
   {
@@ -167,6 +202,15 @@
     "    mode_array_config=\"gain_extended\",\n",
     ")\n",
     "ax = a.plot_gain()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "The full model including reflections can reveal fine structure in the gain profile that other models miss. For critical applications requiring quantitative agreement with experiment, this model provides the highest accuracy.\n",
+    "\n",
+    "Let's zoom in on a narrower frequency range to see the gain ripples:"
    ]
   },
   {
@@ -190,7 +234,9 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "Another useful feature of ```TWPAnalysis``` is the ability to plot the average currents for each mode as a function of the position along the line. This is helpful to identify which processes are most relevant to the simulated response."
+    "## Mode Current Analysis\n",
+    "\n",
+    "Another useful feature of `TWPAnalysis` is the ability to plot the average currents for each mode as a function of position along the transmission line. This helps identify which processes are most relevant to the simulated response and understand the energy flow between different modes:"
    ]
   },
   {
@@ -200,6 +246,19 @@
    "outputs": [],
    "source": [
     "a.plot_mode_currents()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "The mode currents plot can show:\n",
+    "* **Pump depletion**: The pump current typically decreases along the line as energy is transferred to signal and idler or is dissipated in a lossy device\n",
+    "* **Signal amplification**: The signal current grows exponentially in the gain region\n",
+    "* **Idler generation**: The idler current increases as the parametric process generates idler photons\n",
+    "* **Harmonic contributions**: Higher-order modes show their relative importance\n",
+    "\n",
+    "Modes with negligible current levels throughout the device can often be safely excluded from the analysis to improve computational efficiency."
    ]
   }
  ],
