@@ -1,4 +1,56 @@
-"""Analysis class to simulate and plot the nonlinear behavior of TWPAs."""
+"""
+``analysis`` module.
+
+TWPA Analysis and Simulation
+============================
+
+Main analysis module for simulating TWPA nonlinear behavior through coupled mode
+equations (CMEs). Provides automated analysis workflows with support for extended
+mode systems, parameter sweeps, and multiple gain models.
+
+The module centers around :class:`TWPAnalysis`, which integrates circuit modeling,
+mode management, and CME solving into a unified analysis framework.
+
+Key Components
+--------------
+
+**Analysis Engine**:
+- :class:`TWPAnalysis`: Main analysis class with automated workflows
+- :class:`Analyzer`: Base class for structured analysis with data management
+
+**Gain Models**:
+- :class:`GainModel`: Enumeration of available CME models with different accuracy/speed tradeoffs
+
+**Decorators**:
+- :func:`analysis_function`: Automatic result caching and data management
+
+Usage Patterns
+--------------
+
+**Basic Analysis Workflow**:
+
+1. Initialize TWPAnalysis with TWPA model and frequency range
+2. Run base analysis (response, phase matching)
+3. Compute gain with appropriate model complexity
+4. Perform parameter sweeps or bandwidth analysis
+5. Visualize results with built-in plotting methods
+
+**Extended Mode Analysis**:
+
+1. Create custom mode arrays using ModeArrayFactory
+2. Add to analysis instance with descriptive names
+3. Run gain analysis specifying mode array configuration
+4. Compare results across different mode configurations
+
+All analysis functions automatically cache results and support parameter sweeps
+through the :func:`parameter_sweep` method.
+
+See Also
+--------
+:mod:`twpasolver.modes_rwa` : Advanced mode relationship management
+:mod:`twpasolver.cmes` : High-performance CME solvers
+:mod:`twpasolver.models` : Circuit component and TWPA models
+"""
 
 import enum
 from abc import ABC, abstractmethod
@@ -27,13 +79,28 @@ from twpasolver.plotting import (
 
 
 class GainModel(str, enum.Enum):
-    """Available CMEs models.
+    """
+    Available CME models for gain analysis.
 
-    Available Models:
-        MINIMAL_3WM: Consider only pump, signal and ider. Faster simulation, but usually not accurate.
-        GENERAL_IDEAL: Solve CMEs with arbitrary set of modes, without considering losses nor reflections.
-        GENERAL_LOSS_ONLY: Solve CMEs with arbitrary set of modes, considering losses but not reflections.
-        GENERAL: Solve CMEs with arbitrary set of modes, including losses and reflections. Most accurate, but slowest.
+    Args
+    ----
+    MINIMAL_3WM : str
+        Basic pump-signal-idler model. Fastest computation but limited accuracy.
+        Suitable for quick design estimates and parameter space exploration.
+
+    GENERAL_IDEAL : str
+        Extended mode system without losses or reflections. Moderate computation
+        time with improved accuracy over basic model. Includes pump harmonics
+        and frequency conversion terms.
+
+    GENERAL_LOSS_ONLY : str
+        Extended mode system with device losses but no reflections. Similar
+        computation time to ideal case with better accuracy for lossy devices.
+
+    GENERAL : str
+        Full extended mode system with losses and reflections. Highest accuracy
+        but slowest computation (~10x general_ideal model). Use for quantitative
+        predictions matching experimental data.
     """
 
     MINIMAL_3WM = "minimal_3wm"
@@ -59,12 +126,10 @@ def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
 
     Returns
     -------
-    tuple
-        Contains:
-        - relations_3wm : List of mode indices for 3-wave mixing
-        - relations_4wm : List of mode indices for 4-wave mixing
-        - coeffs_3wm : numpy array of scaled coefficients for 3-wave mixing
-        - coeffs_4wm : numpy array of scaled coefficients for 4-wave mixing
+    relations_3wm : List of mode indices for 3-wave mixing
+    relations_4wm : List of mode indices for 4-wave mixing
+    coeffs_3wm : numpy array of scaled coefficients for 3-wave mixing
+    coeffs_4wm : numpy array of scaled coefficients for 4-wave mixing
     """
 
     def extract_indices(terms):
@@ -90,10 +155,35 @@ def analysis_function(
     func,
 ):
     """
-    Wrap functions for analysis.
+    Decorate analysis methods providing automatic result caching and management.
 
-    Automatically saves results of each analysis function in data dictionary of an Analyzer class.
-    All analysis functions must return a dictionary to be compatible with this wrapper.
+    Wraps analysis functions to automatically:
+    - Update base TWPA data before analysis
+    - Cache results in the analysis instance's data dictionary
+    - Handle save/load operations with custom naming
+    - Provide consistent logging and error handling
+
+    The decorated function must return a dictionary to be compatible with caching.
+
+    Parameters
+    ----------
+    func : callable
+        Analysis function to decorate. Must be a method of an Analyzer subclass
+        and return a dictionary of results.
+
+    Returns
+    -------
+    wrapper : callable
+        Wrapped function with automatic data management capabilities.
+
+    Function Signature
+    ------------------
+    The wrapper adds the following parameters to any decorated function:
+
+    save : bool, default True
+        Whether to cache results in the analysis data dictionary
+    save_name : str, optional
+        Custom name for cached results. If None, uses function name
     """
 
     @wraps(func)  # Necessary for correct functioning of sphinx autodoc
@@ -177,7 +267,49 @@ class Analyzer(BaseModel, ABC):
 
 
 class TWPAnalysis(Analyzer, Frequencies):
-    """Runner for standard analysis routines of TWPA models with enhanced ModeArray support."""
+    """
+    TWPA Analysis Engine with Extended Coupled Mode Equations.
+
+    Main interface for simulating TWPA nonlinear behavior. Solves coupled mode
+    equations (CMEs) with support for arbitrary numbers of modes and automatic
+    mode relationship management.
+
+    Parameters
+    ----------
+    twpa : TWPA or str
+        TWPA model instance or path to JSON file
+    f_list : list of float, optional
+        Explicit list of frequencies for analysis
+    f_arange : tuple of float, optional
+        Frequency range as (start, stop, step) for numpy.arange
+    unit : {'Hz', 'kHz', 'MHz', 'GHz', 'THz'}, default 'GHz'
+        Frequency unit for the analysis
+    data_file : str, optional
+        Name for data file storage (auto-generated if not provided)
+
+    Examples
+    --------
+    See the :ref:`tutorials` section for complete examples:
+
+    - Tutorial 3: Basic 3WM gain analysis and parameter sweeps
+    - Tutorial 4: Extended CME models with pump harmonics and custom modes
+
+    The tutorials cover everything from basic gain calculations to complex
+    multi-mode simulations with losses and reflections.
+
+    Notes
+    -----
+    The analysis automatically extracts TWPA parameters (kappa, gamma, alpha) from
+    the circuit model and uses them to interpolate mode properties across frequency.
+
+    For extended CME models:
+    - Use ``general_ideal`` or ``general_loss_only`` for rapid design iterations
+    - Use ``general`` for highest accuracy including device imperfections
+
+    All analysis results are automatically cached in the ``data`` attribute and can
+    be saved/loaded using the ``save_data()`` and ``load_data()`` methods.
+
+    """
 
     model_config = ConfigDict(validate_assignment=True)
     twpa: TWPA
@@ -344,21 +476,57 @@ class TWPAnalysis(Analyzer, Frequencies):
         thin: int = 20,
     ) -> dict[str, Any]:
         """
-        Build phase matching profile for specified modes.
+        Analyze phase matching conditions for nonlinear processes using mode arrays.
 
-        Args:
-            process: Type of process ("PA", "FCU", "FCD")
-            signal_mode: Label of the signal mode
-            pump_mode: Label of the pump mode
-            idler_mode: Label of the idler mode
-            mode_array_config: Name of the mode array configuration to use
-            pump_Ip0: Optional pump current
-            signal_arange: Signal frequency range as (start, stop, step)
-            pump_arange: Pump frequency range as (start, stop, step)
-            thin: The step size to thin out the frequency and wavenumber arrays
+        Computes phase mismatch Δβ as a function of pump and signal frequencies
+        for different nonlinear processes. Uses ModeArray interpolation for
+        mode parameter calculation across frequency ranges.
 
-        Returns:
-            dict: A dictionary containing phase matching analysis results
+        Parameters
+        ----------
+        process : {'PA', 'FCU', 'FCD'}, default 'PA'
+            Nonlinear process type:
+
+            * ``PA``: Parametric amplification (signal + idler → pump)
+            * ``FCU``: Frequency conversion up (signal → idler, ω_i > ω_s)
+            * ``FCD``: Frequency conversion down (signal → idler, ω_i < ω_s)
+
+        signal_mode, pump_mode, idler_mode : str, default 's', 'p', 'i'
+            Mode labels in the mode array configuration
+        mode_array_config : str, default 'basic_3wm'
+            Mode array configuration name for parameter interpolation
+        pump_Ip0 : float, optional
+            Pump current for nonlinear correction. If None, uses TWPA's Ip0
+        signal_arange : tuple of float, optional
+            Signal frequency range as (start, stop, step). If None, uses
+            automatic range from start of frequency span to stopband edge
+        pump_arange : tuple of float, optional
+            Pump frequency range as (start, stop, step). If None, uses
+            automatic range from stopband edge to maximum frequency
+        thin : int, default 20
+            Array thinning factor for computational efficiency
+
+        Returns
+        -------
+        dict
+            Phase matching analysis results:
+
+            * ``delta`` : ndarray - Phase mismatch matrix [n_signal, n_pump]
+            * ``triplets`` : dict - Frequency and wavenumber triplets
+            * ``pump_freqs`` : ndarray - Pump frequency array
+            * ``signal_freqs`` : ndarray - Signal frequency array
+            * ``mode_info`` : dict - Mode configuration metadata
+
+        Examples
+        --------
+        See Tutorial 3 (:ref:`tutorials`) for basic phase matching analysis and
+        Tutorial 4 for extended mode configurations with frequency conversion.
+
+        Notes
+        -----
+        - The ``chi`` nonlinear parameter includes pump current corrections
+        - Optimal phase matching regions appear as minima in the phase mismatch
+        - Extended mode arrays enable analysis beyond basic pump-signal-idler
         """
         # Get the mode array
         mode_array = self.get_mode_array(mode_array_config)
@@ -472,26 +640,71 @@ class TWPAnalysis(Analyzer, Frequencies):
         thin: int = 100,
     ) -> dict[str, Any]:
         """
-        Compute expected gain with selected gain model.
+        Compute the TWPA gain using coupled mode equation models.
 
-        Args:
-            signal_freqs: Array of signal frequencies to consider
-            pump: The pump frequency (if None, uses the optimal pump frequency from data)
-            Is0: Initial signal current (in A) for standard 3WM model
-            Ip0: Initial pump current (in A) (if None, uses the current TWPA's Ip0)
-            model: Gain model to use (minimal_3wm, general, general without reflections, or general with loss only)
-            mode_array_config: Name of the mode array configuration to use
-            signal_mode: Label of the signal mode
-            pump_mode: Label of the pump mode
-            idler_mode: Label of the idler mode (if None, will be determined from mode array relations)
-            initial_amplitudes: Initial amplitudes for all modes. Can be:
-                               - 1D array: Same initial conditions for all frequencies
-                               - 2D array: Different initial conditions for each frequency [n_freq, n_modes]
-                               - None: Use default values (specified Ip0 and Is0, 1e-14 for all other modes)
-            thin: The step size to thin out the position array
+        Supports multiple CME models from basic 3-wave mixing to extended systems
+        with arbitrary numbers of modes, losses, and reflections.
 
-        Returns:
-            dict: A dictionary containing gain calculation results
+        Parameters
+        ----------
+        signal_freqs : array_like
+            Signal frequencies for gain calculation
+        pump : float, optional
+            Pump frequency. If None, uses automatically determined optimal frequency
+        Is0 : float, default 1e-6
+            Initial signal current amplitude (A) for standard 3WM model
+        Ip0 : float, optional
+            Initial pump current amplitude (A). If None, uses TWPA's Ip0 parameter
+        model : {'minimal_3wm', 'general_ideal', 'general_loss_only', 'general'}, default 'minimal_3wm'
+            CME model complexity:
+
+            * ``minimal_3wm``: Basic pump-signal-idler only (fastest)
+            * ``general_ideal``: Extended modes, no losses/reflections
+            * ``general_loss_only``: Extended modes with losses
+            * ``general``: Full model with losses and reflections (most accurate)
+
+        mode_array_config : str, default 'basic_3wm'
+            Name of mode array configuration to use. Built-in options:
+
+            * ``basic_3wm``: Standard pump, signal, idler modes
+            * Custom configurations added via ``add_mode_array()``
+
+        signal_mode, pump_mode, idler_mode : str, default 's', 'p', 'i'
+            Mode labels within the mode array for signal, pump, and idler
+        initial_amplitudes : array_like, optional
+            Initial current amplitudes for all modes. Can be:
+
+            * 1D array: Same conditions for all frequencies [n_modes]
+            * 2D array: Different conditions per frequency [n_freq, n_modes]
+            * None: Use default values (Ip0, Is0, 1e-14 for others)
+
+        thin : int, default 100
+            Position array thinning factor (higher = faster, lower resolution)
+
+        Returns
+        -------
+        dict
+            Gain analysis results containing:
+
+            * ``model`` : str - CME model used
+            * ``pump_freq`` : float - Pump frequency
+            * ``signal_freqs`` : ndarray - Signal frequencies
+            * ``x`` : ndarray - Position array along TWPA
+            * ``I_triplets`` : ndarray - Current evolution [n_freq, n_modes, n_pos]
+            * ``gain_db`` : ndarray - Gain in dB for each signal frequency
+            * ``mode_info`` : dict - Mode configuration metadata
+
+        Examples
+        --------
+        See Tutorial 3 (:ref:`tutorials`) for basic gain analysis examples and
+        Tutorial 4 for extended CME models.
+
+        Notes
+        -----
+        - The ``general`` model is most accurate but ~10x slower than others
+        - Extended mode arrays capture more subtle effects and improve the accuracy of the simulation.
+        - Results are automatically cached in ``analysis.data['gain']``
+        - Use ``plot_gain()`` and ``plot_mode_currents()`` for visualization
         """
         # Process model parameter
         if isinstance(model, str):
