@@ -1,4 +1,72 @@
-"""Classes to represent frequency modes, their properties and the relations between them."""
+"""
+``modes_rwa`` module.
+
+Mode Management and Rotating Wave Approximation Analysis
+========================================================
+
+Tools for managing complex mode relationships in TWPA analysis, enabling
+simulation of extended coupled mode equation (CME) systems with arbitrary
+numbers of modes beyond basic pump-signal-idler configuration.
+
+Key Components
+--------------
+
+**ModeArray**: Organizes related modes with automatic frequency propagation,
+parameter interpolation, and dependency graph management.
+
+**RWAAnalyzer**: Identifies valid 3-wave and 4-wave mixing terms that satisfy
+the Rotating Wave Approximation for any given set of mode relationships.
+
+**ModeArrayFactory**: Factory methods for creating standard and custom mode
+configurations including pump harmonics, frequency conversion terms, and harmonics.
+
+**ParameterInterpolator**: Interpolation of mode parameters (kappa, gamma, alpha)
+from base TWPA circuit data across frequency ranges.
+
+Capabilities
+------------
+
+**RWA Term Selection**:
+    - Automatic discovery of valid 3WM and 4WM mixing processes
+    - Coefficient calculation including factorial corrections for repeated modes
+    - Caching of RWA terms for performance
+
+**Mode Relationships**:
+    - Support for arbitrary frequency relationships between modes
+    - Forward and backward propagating modes
+    - Pump harmonics (p, p2, p3, ...)
+    - Frequency conversion terms (p+s, p+i, ...)
+    - Signal/idler harmonics (s2, i2, ...)
+
+**Symbolic Frequency Propagation**:
+    - O(n) frequency updates using pre-computed symbolic expressions
+    - Automatic identification of independent vs. dependent modes
+    - Topological sorting of mode dependencies
+    - Visualization of the mode relations with a graph
+
+**Parameter Management**:
+    - Easy interpolation of mode parameters from base circuit data
+    - Automatic handling of mode directions for wavenumber calculation
+
+Examples
+--------
+See Tutorial 4 (:ref:`tutorials`) for complete examples covering:
+
+- Basic 3WM mode array creation and visualization
+- Extended mode arrays with pump harmonics and frequency conversion
+- Custom mode configurations for specific processes
+- RWA term analysis and CME integration
+
+The tutorial demonstrates the progression from simple mode relationships to
+complex multi-mode systems used in realistic TWPA simulations.
+
+Performance Notes
+-----------------
+- Symbolic frequency propagation enables O(n) scaling, useful when iterating over arrays.
+- RWA term caching eliminates redundant calculations during CME solving
+- Numba-compatible data structures for integration with fast CME solvers
+- Efficient interpolation supports faster parameter sweeps
+"""
 
 import itertools as it
 from collections import Counter, defaultdict, deque
