@@ -19,6 +19,7 @@ def plot_mode_currents(
     colors: Optional[List[str]] = None,
     title: Optional[str] = None,
     ylim: Optional[tuple] = None,
+    lw=2,
 ) -> Axes:
     """
     Plot the mean current of each mode in dB as a function of cell number.
@@ -98,6 +99,7 @@ def plot_mode_currents(
                 label=mode_names[i],
                 linestyle=line_styles[i % len(line_styles)],
                 color=colors[i % len(colors)],
+                lw=lw,
             )
         else:
             # Linear scale
@@ -107,6 +109,7 @@ def plot_mode_currents(
                 label=mode_names[i],
                 linestyle=line_styles[i % len(line_styles)],
                 color=colors[i % len(colors)],
+                lw=lw,
             )
 
     # Set labels and title
@@ -122,7 +125,7 @@ def plot_mode_currents(
     else:
         pump_freq = gain_result.get("pump_freq", "N/A")
         ax.set_title(
-            f"Mean Mode Currents vs Cell Number\nPump Frequency: {pump_freq} GHz"
+            f"Mean Mode Currents vs Cell Number\nPump Frequency: {np.round(pump_freq, 3)} GHz"
         )
 
     if ylim:

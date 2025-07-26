@@ -356,14 +356,14 @@ class TWPAnalysis(Analyzer, Frequencies):
                 freqs[np.argmax(s21_db_diff)],
             ]
             Z0 = self.twpa.Z0_ref
-            ac, b, c, d = (
+            a, b, c, d = (
                 self.data["abcd"][:, 0, 0],
                 self.data["abcd"][:, 0, 1],
                 self.data["abcd"][:, 1, 0],
                 self.data["abcd"][:, 1, 1],
             )
-            Zbp = np.abs(2 * b / (ac - d - np.sqrt((ac + d) ** 2 - 4)))
-            gammas = np.abs(Z0 - Zbp) / (Z0 + Zbp)
+            Zbp = np.abs(2 * b / (a - d - np.sqrt((a + d) ** 2 - 4)))
+            gamma_bloch = np.abs(Z0 - Zbp) / (Z0 + Zbp)
             self.data["Zb"] = Zbp
             self.data["gammas"] = cell.s.S11
 
@@ -456,9 +456,8 @@ class TWPAnalysis(Analyzer, Frequencies):
         deltas = np.abs(
             pump_k
             - 2 * signal_k
-            + (1 + np.abs(self.data["gammas"][min_p_idx:-1]) ** 2)
-            * self.twpa.chi
-            * (pump_k - 4 * signal_k)
+            # + (1 + np.abs(self.data["gammas"][min_p_idx:-1]) ** 2)
+            + 1 * self.twpa.chi * (pump_k - 4 * signal_k)
         )
         return pump_f[np.argmin(deltas)]
 

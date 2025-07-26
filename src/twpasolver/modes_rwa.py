@@ -946,6 +946,7 @@ class ModeArray:
 
         plt.tight_layout()
         plt.show()
+        return fig
 
     def _hierarchical_layout(self, G: nx.DiGraph) -> Dict[str, Tuple[float, float]]:
         """Create hierarchical layout with independent modes at bottom."""
@@ -1146,7 +1147,8 @@ class ModeArrayFactory:
         #     modes.append(Mode(label=f"i{n}p", direction=direction))
         #     relations.append([f"s{n}p", "s+s-p"])
         #     relations.append([f"i{n}p", "i+i-p"])
-
+        modes.append(Mode(label=f"d", direction=direction))
+        relations.append(["d", "s-p"])
         return ModeArray(modes, relations, interpolator)
 
     @staticmethod
