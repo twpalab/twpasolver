@@ -1060,7 +1060,7 @@ class ModeArrayFactory:
         # Extract required arrays from base_data
         freqs = base_data["freqs"]
         kappas = base_data["k"]
-        gammas = base_data["gammas"]
+        gammas = base_data["reflection_coeff"]
         alphas = base_data["alpha"]
 
         # Create interpolator
@@ -1102,7 +1102,7 @@ class ModeArrayFactory:
         # Extract required arrays from base_data
         freqs = base_data["freqs"]
         kappas = base_data["k"]
-        gammas = base_data["gammas"]
+        gammas = base_data["reflection_coeff"]
         alphas = base_data["alpha"]
 
         # Create interpolator
@@ -1178,7 +1178,7 @@ class ModeArrayFactory:
         # Extract required arrays from base_data
         freqs = base_data["freqs"]
         kappas = base_data["k"]
-        gammas = base_data["gammas"]
+        gammas = base_data["reflection_coeff"]
         alphas = base_data["alpha"]
 
         # Create interpolator
