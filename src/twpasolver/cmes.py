@@ -13,6 +13,13 @@ from twpasolver.bonus_types import (
     nb_int2d,
 )
 
+# Global solver configuration
+SOLVER_ATOL = 1e-14
+SOLVER_RTOL = 1e-10
+SOLVER_MAX_STEPS = 0
+SOLVER_RK_METHOD = 1
+SOLVER_FIRST_STEP = 1
+
 
 @nb.njit(
     nb_complex1d(
@@ -123,12 +130,12 @@ def general_cme_ideal(
     nb_complex1d(
         nb.float64,
         nb_complex1d,
-        nb_complex1d,  # kappas as float64
-        nb_int2d,
-        nb_int2d,
-        nb_complex1d,  # coeffs_3wm should be complex
         nb_complex1d,
-    ),  # coeffs_4wm should be complex
+        nb_int2d,
+        nb_int2d,
+        nb_complex1d,
+        nb_complex1d,
+    ),
     cache=True,
 )
 def general_cme_first_round(
@@ -142,7 +149,7 @@ def general_cme_first_round(
 ):
     """Return derivatives of Coupled Mode Equations system including arbitrary 3WM and 4WM relations."""
     num_modes = len(currents)
-    derivs = np.zeros(num_modes*3, nb.complex128)
+    derivs = np.zeros(num_modes * 3, nb.complex128)
     exp_pos = np.exp(gammas * x)
 
     alphas_rhs = np.empty(2 * num_modes, dtype=np.complex128)
@@ -167,11 +174,11 @@ def general_cme_first_round(
     nb_complex1d(
         nb.float64,
         nb_complex1d,
-        nb_complex1d,  # kappas as float64
+        nb_complex1d,
         nb_int2d,
         nb_int2d,
-        nb_complex1d,  # coeffs_3wm should be complex
-        nb_complex1d,  # coeffs_4wm should be complex
+        nb_complex1d,
+        nb_complex1d,
         nb_float1d,
         nb_complex2d,
         nb_complex2d,
@@ -192,7 +199,7 @@ def general_cme_with_backward(
 ):
     """Return derivatives of Coupled Mode Equations system including arbitrary 3WM and 4WM relations."""
     num_modes = len(currents)
-    derivs = np.zeros(3*num_modes, nb.complex128)
+    derivs = np.zeros(3 * num_modes, nb.complex128)
     exp_pos = np.exp(gammas * x)
 
     alphas_rhs = np.empty(2 * num_modes, dtype=np.complex128)
@@ -217,160 +224,10 @@ def general_cme_with_backward(
         )
         di = gammas[i] ** 2 * derivs[i] - dc_interp
         derivs[i] = di * np.conj(exp_pos[i]) / gammas[i]
-        derivs[num_modes + i] = di
+        derivs[num_modes + i] = gammas[i] * derivs[i] * exp_pos[i]
         derivs[2 * num_modes + i] = currents[i] * exp_pos[i]
     return derivs
 
-@nb.njit(parallel=True)
-def cme_general_solve_freq_array_fb(
-    x_array: FloatArray,
-    y0_array_fwd: ComplexArray,
-    y0_array_bwd: ComplexArray,
-    gammas_array: ComplexArray,
-    reflections_array: ComplexArray,
-    relations_3wm,
-    relations_4wm,
-    coeffs_3wm,
-    coeffs_4wm,
-    thin: int = 200,
-    n_passes: int = 3,
-) -> ComplexArray:
-    """Solve full general CMEs (with reflections) for multiple frequency points using numba prange."""
-    cme_model = general_cme
-    n_freq = gammas_array.shape[0]
-    n_modes = gammas_array.shape[1]
-    transmission_in = 1 - reflections_array
-
-    x_span = (x_array[0], x_array[-1])
-    x_end = x_array[-1]
-    I_tuples = np.empty((2*n_freq, n_modes, len(x_array)), dtype=np.complex128)
-    for i in nb.prange(n_freq):
-        A_bwd=np.empty((n_modes, len(x_array)), dtype=np.complex128) # Required for proper compilation
-        A_fwd=np.empty((n_modes, len(x_array)), dtype=np.complex128) # Required for proper compilation
-        I_init_fwd = y0_array_fwd * transmission_in[i]
-        for k in range(n_passes):
-            if k == 0:
-                result = nbsolve_ivp(
-                    general_cme_first_round,
-                    x_span,
-                    I_init_fwd,
-                    args=(
-                        gammas_array[i],
-                        relations_3wm,
-                        relations_4wm,
-                        coeffs_3wm,
-                        coeffs_4wm,
-                    ),
-                    atol=1e-14,
-                    rtol=1e-10,
-                    max_num_steps=0,
-                    t_eval=x_array,
-                    rk_method=1,
-                    first_step=1,
-                    capture_extra=True,
-                )
-            else:
-                result= nbsolve_ivp(
-                    general_cme_with_backward,
-                    x_span,
-                    I_init_fwd,
-                    args=(
-                        gammas_array[i],
-                        relations_3wm,
-                        relations_4wm,
-                        coeffs_3wm,
-                        coeffs_4wm,
-                        x_array,
-                        A_bwd[n_modes : 2 * n_modes, ::-1],
-                        A_bwd[2 * n_modes :, ::-1],
-                    ),
-                    atol=1e-14,
-                    rtol=1e-10,
-                    max_num_steps=0,
-                    t_eval=x_array,
-                    rk_method=1,
-                    first_step=1,
-                    capture_extra=True,
-                )
-            A_fwd = result.y
-            I_init_bwd = y0_array_bwd * transmission_in[i] + reflections_array[i] * A_fwd[
-                :n_modes, -1
-            ] * np.exp(gammas_array[i] * x_end)
-            result = nbsolve_ivp(
-                general_cme_with_backward,
-                x_span,
-                I_init_bwd,
-                args=(
-                    gammas_array[i],
-                    relations_3wm,
-                    relations_4wm,
-                    coeffs_3wm,
-                    coeffs_4wm,
-                    x_array,
-                    A_fwd[n_modes : 2 * n_modes, ::-1],
-                    A_fwd[2 * n_modes :, ::-1],
-                ),
-                atol=1e-14,
-                rtol=1e-10,
-                max_num_steps=0,
-                t_eval=x_array,
-                rk_method=1,
-                first_step=1,
-                capture_extra=True,
-            )
-            A_bwd = result.y
-            I_init_fwd = y0_array_fwd * transmission_in[i] + reflections_array[i] * A_bwd[
-                :n_modes, -1
-            ] * np.exp(gammas_array[i] * x_end)
-        I_tuples[i] = A_fwd[:n_modes, :] #* np.exp(gammas_array[i] * x_array)
-        I_tuples[i+n_freq] = A_bwd[:n_modes, :] #* np.exp(gammas_array[i] * x_array)
-    return I_tuples
-
-
-def cme_solve_forward_backward(
-    x_array: FloatArray,
-    y0_array_fwd: ComplexArray,
-    y0_array_bwd: ComplexArray,
-    data_kappas_alpha_reflections_array,
-    relations_coefficients,
-    thin: int = 200,
-    passes: int = 3,
-) -> ComplexArray:
-    n_freq = len(data_kappas_alpha_reflections_array)
-    n_modes = len(data_kappas_alpha_reflections_array[0][0])
-
-    # Convert relations_coefficients to numpy arrays with proper dtypes
-    relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm = relations_coefficients
-    relations_3wm = np.array(relations_3wm, dtype=np.int64)
-    relations_4wm = np.array(relations_4wm, dtype=np.int64)
-    coeffs_3wm = np.array(coeffs_3wm, dtype=np.complex128)  # Ensure complex type
-    coeffs_4wm = np.array(coeffs_4wm, dtype=np.complex128)  # Ensure complex type
-
-    gammas_array = np.empty((n_freq, n_modes), dtype=np.complex128)
-    reflections_array = np.empty((n_freq, n_modes), dtype=np.complex128)
-    for i in range(n_freq):
-        gammas_array[i] = np.array(
-            1j * data_kappas_alpha_reflections_array[i][0]
-            - data_kappas_alpha_reflections_array[i][1],
-            dtype=np.complex128,
-        )
-        reflections_array[i] = np.array(
-            data_kappas_alpha_reflections_array[i][2], dtype=np.complex128
-        )
-
-    return cme_general_solve_freq_array_fb(
-        x_array,
-        y0_array_fwd,
-        y0_array_bwd,
-        gammas_array,
-        reflections_array,
-        relations_3wm,
-        relations_4wm,
-        coeffs_3wm,
-        coeffs_4wm,
-        thin,
-        passes,
-    )
 
 
 @nb.njit(
@@ -445,7 +302,7 @@ def general_cme(
     """Return derivatives of Coupled Mode Equations system including reflection and arbitrary 3WM and 4WM relations."""
     num_modes = len(currents)
     common_term_pos = ts_reflection * np.exp(1j * kappas * x)
-    common_term_neg = 0 * np.exp(-1j * kappas * x)
+    common_term_neg = ts_reflection_neg * np.exp(-1j * kappas * x)
     alphas_rhs = np.empty(2 * num_modes, dtype=np.complex128)
     for i in range(num_modes):
         alphas_rhs[i] = currents[i] * (common_term_pos[i] + common_term_neg[i])
@@ -459,26 +316,46 @@ def general_cme(
             coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
         )
 
-    return ((1j * kappas - alphas) * derivs - alphas * alphas_rhs[:num_modes]) / (
+    return ((1j * kappas) * derivs) / (
         common_term_pos - common_term_neg
     )
 
 
+@nb.njit
+def _solve_single_frequency_general(
+    x_array: FloatArray,
+    y0: ComplexArray,
+    cme_model,  # Function reference
+    args: tuple,  # Arguments for the CME model
+) -> ComplexArray:
+    """Solve CME for a single frequency point using nbsolve_ivp."""
+    x_span = (x_array[0], x_array[-1])
+
+    result = nbsolve_ivp(
+        cme_model,
+        x_span,
+        y0,
+        args=args,
+        atol=SOLVER_ATOL,
+        rtol=SOLVER_RTOL,
+        max_num_steps=SOLVER_MAX_STEPS,
+        t_eval=x_array,
+        rk_method=SOLVER_RK_METHOD,
+        first_step=SOLVER_FIRST_STEP,
+    )
+    return result.y
+
+
 @nb.njit(parallel=True)
-def cme_general_solve_freq_array_ideal(
+def _solve_multiple_frequencies_general(
     x_array: FloatArray,
     y0_array: ComplexArray,
-    kappas_array: FloatArray,  # 2D array: [n_freq, n_modes] - float64
-    relations_3wm,
-    relations_4wm,
-    coeffs_3wm,
-    coeffs_4wm,
-    thin: int = 200,
+    cme_model,  # Function reference
+    args_array,  # Array of argument tuples for each frequency
+    n_modes: int,
 ) -> ComplexArray:
-    """Solve ideal general CMEs for multiple frequency points using numba prange."""
-    cme_model = general_cme_ideal
-    n_freq = kappas_array.shape[0]
-    n_modes = kappas_array.shape[1]
+    """Solve CMEs for multiple frequency points using numba prange."""
+    n_freq = len(args_array)
 
     # Handle initial conditions - broadcast if 1D
     if y0_array.ndim == 1:
@@ -486,134 +363,208 @@ def cme_general_solve_freq_array_ideal(
     else:
         y0_broadcast = y0_array
 
-    x_span = (x_array[0], x_array[-1])
     I_triplets = np.empty((n_freq, n_modes, len(x_array)), dtype=np.complex128)
 
     # Use parallel loop for frequency iteration
     for i in nb.prange(n_freq):
-        _, I_triplets[i], _, _ = nbsolve_ivp(
-            cme_model,
-            x_span,
-            y0_broadcast[i],
-            args=(
-                kappas_array[i],
-                relations_3wm,
-                relations_4wm,
-                coeffs_3wm,
-                coeffs_4wm,
-            ),
-            atol=1e-14,
-            rtol=1e-10,
-            max_num_steps=0,
-            t_eval=x_array,
-            rk_method=1,
-            first_step=1,
+        result = _solve_single_frequency_general(
+            x_array, y0_broadcast[i], cme_model, args_array[i]
         )
+        I_triplets[i] = result
+
     return I_triplets
 
 
 @nb.njit(parallel=True)
-def cme_general_solve_freq_array_loss(
+def cme_general_solve_freq_array_fb(
     x_array: FloatArray,
-    y0_array: ComplexArray,
-    kappas_array: FloatArray,  # 2D array: [n_freq, n_modes] - float64
-    alphas_array: FloatArray,  # 2D array: [n_freq, n_modes] - float64
+    y0_array_fwd: ComplexArray,
+    y0_array_bwd: ComplexArray,
+    gammas_array: ComplexArray,
+    reflections_array: ComplexArray,
     relations_3wm,
     relations_4wm,
     coeffs_3wm,
     coeffs_4wm,
     thin: int = 200,
-) -> ComplexArray:
-    """Solve loss-only general CMEs for multiple frequency points using numba prange."""
-    cme_model = general_cme_loss_only
-    n_freq = kappas_array.shape[0]
-    n_modes = kappas_array.shape[1]
-
-    # Handle initial conditions - broadcast if 1D
-    if y0_array.ndim == 1:
-        y0_broadcast = np.repeat(y0_array, n_freq).reshape((-1, n_freq)).transpose()
-    else:
-        y0_broadcast = y0_array
-
-    x_span = (x_array[0], x_array[-1])
-    I_triplets = np.empty((n_freq, n_modes, len(x_array)), dtype=np.complex128)
-
-    # Use parallel loop for frequency iteration
-    for i in nb.prange(n_freq):
-        _, I_triplets[i], _, _ = nbsolve_ivp(
-            cme_model,
-            x_span,
-            y0_broadcast[i],
-            args=(
-                kappas_array[i],
-                alphas_array[i],
-                relations_3wm,
-                relations_4wm,
-                coeffs_3wm,
-                coeffs_4wm,
-            ),
-            atol=1e-14,
-            rtol=1e-10,
-            max_num_steps=0,
-            t_eval=x_array,
-            rk_method=1,
-            first_step=1,
-        )
-    return I_triplets
-
-
-@nb.njit(parallel=True)
-def cme_general_solve_freq_array_full(
-    x_array: FloatArray,
-    y0_array: ComplexArray,
-    kappas_array: FloatArray,  # 2D array: [n_freq, n_modes] - float64
-    alphas_array: FloatArray,  # 2D array: [n_freq, n_modes] - float64
-    ts_reflection_array: ComplexArray,  # 2D array: [n_freq, n_modes]
-    ts_reflection_neg_array: ComplexArray,  # 2D array: [n_freq, n_modes]
-    relations_3wm,
-    relations_4wm,
-    coeffs_3wm,
-    coeffs_4wm,
-    thin: int = 200,
+    n_passes: int = 3,
 ) -> ComplexArray:
     """Solve full general CMEs (with reflections) for multiple frequency points using numba prange."""
-    cme_model = general_cme
-    n_freq = kappas_array.shape[0]
-    n_modes = kappas_array.shape[1]
-
-    # Handle initial conditions - broadcast if 1D
-    if y0_array.ndim == 1:
-        y0_broadcast = np.repeat(y0_array, n_freq).reshape((-1, n_freq)).transpose()
-    else:
-        y0_broadcast = y0_array
+    n_freq = gammas_array.shape[0]
+    n_modes = gammas_array.shape[1]
+    transmission_in = 1 - reflections_array
 
     x_span = (x_array[0], x_array[-1])
-    I_triplets = np.empty((n_freq, n_modes, len(x_array)), dtype=np.complex128)
+    x_end = x_array[-1]
+    # Modified to store results for all passes
+    I_tuples = np.empty(
+        (2 * n_freq * n_passes, n_modes, len(x_array)), dtype=np.complex128
+    )
 
-    # Use parallel loop for frequency iteration
     for i in nb.prange(n_freq):
-        _, I_triplets[i], _, _ = nbsolve_ivp(
-            cme_model,
-            x_span,
-            y0_broadcast[i],
-            args=(
-                kappas_array[i],
-                alphas_array[i],
-                ts_reflection_array[i],
-                ts_reflection_neg_array[i],
-                relations_3wm,
-                relations_4wm,
-                coeffs_3wm,
-                coeffs_4wm,
-            ),
-            atol=1e-14,
-            rtol=1e-10,
-            max_num_steps=0,
-            t_eval=x_array,
-            rk_method=1,
-            first_step=1,
+        A_bwd = np.empty(
+            (n_modes, len(x_array)), dtype=np.complex128
+        )  # Required for proper compilation
+        A_fwd = np.empty(
+            (n_modes, len(x_array)), dtype=np.complex128
+        )  # Required for proper compilation
+        I_init_fwd = y0_array_fwd * transmission_in[i]
+
+        for k in range(n_passes):
+            if k == 0:
+                result = nbsolve_ivp(
+                    general_cme_first_round,
+                    x_span,
+                    I_init_fwd,
+                    args=(
+                        gammas_array[i],
+                        relations_3wm,
+                        relations_4wm,
+                        coeffs_3wm,
+                        coeffs_4wm,
+                    ),
+                    atol=SOLVER_ATOL,
+                    rtol=SOLVER_RTOL,
+                    max_num_steps=SOLVER_MAX_STEPS,
+                    t_eval=x_array,
+                    rk_method=SOLVER_RK_METHOD,
+                    first_step=SOLVER_FIRST_STEP,
+                    capture_extra=True,
+                )
+                A_fwd = result.y
+
+                I_init_bwd = y0_array_bwd * transmission_in[i] + reflections_array[
+                i] * A_fwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
+                result = nbsolve_ivp(
+                    general_cme_first_round,
+                    x_span,
+                    I_init_bwd,
+                    args=(
+                        gammas_array[i],
+                        relations_3wm,
+                        relations_4wm,
+                        coeffs_3wm,
+                        coeffs_4wm,
+                    ),
+                    atol=SOLVER_ATOL,
+                    rtol=SOLVER_RTOL,
+                    max_num_steps=SOLVER_MAX_STEPS,
+                    t_eval=x_array,
+                    rk_method=SOLVER_RK_METHOD,
+                    first_step=SOLVER_FIRST_STEP,
+                    capture_extra=True,
+                )
+                A_bwd = result.y
+
+            else:
+                result = nbsolve_ivp(
+                    general_cme_with_backward,
+                    x_span,
+                    I_init_fwd,
+                    args=(
+                        gammas_array[i],
+                        relations_3wm,
+                        relations_4wm,
+                        coeffs_3wm,
+                        coeffs_4wm,
+                        x_array,
+                        A_bwd[n_modes : 2 * n_modes, ::-1],
+                        A_bwd[2 * n_modes :, ::-1],
+                    ),
+                    atol=SOLVER_ATOL,
+                    rtol=SOLVER_RTOL,
+                    max_num_steps=SOLVER_MAX_STEPS,
+                    t_eval=x_array,
+                    rk_method=SOLVER_RK_METHOD,
+                    first_step=SOLVER_FIRST_STEP,
+                    capture_extra=True,
+                )
+                A_fwd = result.y
+
+                # Store forward pass results for this pass
+
+                I_init_bwd = y0_array_bwd * transmission_in[i] + reflections_array[
+                    i
+                ] * A_fwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
+                result = nbsolve_ivp(
+                    general_cme_with_backward,
+                    x_span,
+                    I_init_bwd,
+                    args=(
+                        gammas_array[i],
+                        relations_3wm,
+                        relations_4wm,
+                        coeffs_3wm,
+                        coeffs_4wm,
+                        x_array,
+                        A_fwd[n_modes : 2 * n_modes, ::-1],
+                        A_fwd[2 * n_modes :, ::-1],
+                    ),
+                    atol=SOLVER_ATOL,
+                    rtol=SOLVER_RTOL,
+                    max_num_steps=SOLVER_MAX_STEPS,
+                    t_eval=x_array,
+                    rk_method=SOLVER_RK_METHOD,
+                    first_step=SOLVER_FIRST_STEP,
+                    capture_extra=True,
+                )
+                A_bwd = result.y
+
+            # Store backward pass results for this pass
+
+            I_init_fwd = y0_array_fwd * transmission_in[i] + reflections_array[
+                i
+            ] * A_bwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
+            I_tuples[i + k * n_freq] = A_fwd[2*n_modes:, :]
+            I_tuples[i + k * n_freq + n_freq * n_passes] = A_bwd[2*n_modes:, :]
+
+    return I_tuples
+
+
+def cme_solve_forward_backward(
+    x_array: FloatArray,
+    y0_array_fwd: ComplexArray,
+    y0_array_bwd: ComplexArray,
+    data_kappas_alpha_reflections_array,
+    relations_coefficients,
+    thin: int = 200,
+    passes: int = 3,
+) -> ComplexArray:
+    n_freq = len(data_kappas_alpha_reflections_array)
+    n_modes = len(data_kappas_alpha_reflections_array[0][0])
+
+    # Convert relations_coefficients to numpy arrays with proper dtypes
+    relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm = relations_coefficients
+    relations_3wm = np.array(relations_3wm, dtype=np.int64)
+    relations_4wm = np.array(relations_4wm, dtype=np.int64)
+    coeffs_3wm = np.array(coeffs_3wm, dtype=np.complex128)  # Ensure complex type
+    coeffs_4wm = np.array(coeffs_4wm, dtype=np.complex128)  # Ensure complex type
+
+    gammas_array = np.empty((n_freq, n_modes), dtype=np.complex128)
+    reflections_array = np.empty((n_freq, n_modes), dtype=np.complex128)
+    for i in range(n_freq):
+        gammas_array[i] = np.array(
+            1j * data_kappas_alpha_reflections_array[i][0]
+            - data_kappas_alpha_reflections_array[i][1],
+            dtype=np.complex128,
         )
-    return I_triplets
+        reflections_array[i] = np.array(
+            data_kappas_alpha_reflections_array[i][2], dtype=np.complex128
+        )
+
+    return cme_general_solve_freq_array_fb(
+        x_array,
+        y0_array_fwd,
+        y0_array_bwd,
+        gammas_array,
+        reflections_array,
+        relations_3wm,
+        relations_4wm,
+        coeffs_3wm,
+        coeffs_4wm,
+        thin,
+        passes,
+    )
 
 
 def cme_general_solve_freq_array(
@@ -641,87 +592,70 @@ def cme_general_solve_freq_array(
         ComplexArray: Solution of the coupled mode equations for all frequencies (3D array: [n_freq, n_modes, n_positions]).
     """
     n_freq = len(data_kappas_gammas_array)
-
-    # Determine number of modes from the first data element
     n_modes = len(data_kappas_gammas_array[0][0])  # kappas is always the first element
 
     # Convert relations_coefficients to numpy arrays with proper dtypes
     relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm = relations_coefficients
     relations_3wm = np.array(relations_3wm, dtype=np.int64)
     relations_4wm = np.array(relations_4wm, dtype=np.int64)
-    coeffs_3wm = np.array(coeffs_3wm, dtype=np.complex128)  # Ensure complex type
-    coeffs_4wm = np.array(coeffs_4wm, dtype=np.complex128)  # Ensure complex type
+    coeffs_3wm = np.array(coeffs_3wm, dtype=np.complex128)
+    coeffs_4wm = np.array(coeffs_4wm, dtype=np.complex128)
 
-    # Convert list of heterogeneous data to properly typed arrays
-    if with_loss and not reflections:
-        # Loss-only model: data contains [kappas, alphas]
-        kappas_array = np.empty((n_freq, n_modes), dtype=np.float64)
-        alphas_array = np.empty((n_freq, n_modes), dtype=np.float64)
+    # # Route to appropriate solver based on model complexity
+    # if with_loss and not reflections:
+    #     # Loss-only model
+    #     args_array = []
+    #     for i in range(n_freq):
+    #         kappas = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
+    #         alphas = np.array(data_kappas_gammas_array[i][1], dtype=np.float64)
+    #         args_array.append(
+    #             (kappas, alphas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm)
+    #         )
 
-        for i in range(n_freq):
-            kappas_array[i] = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
-            alphas_array[i] = np.array(data_kappas_gammas_array[i][1], dtype=np.float64)
+    #     return _solve_multiple_frequencies_general(
+    #         x_array, y0_array, general_cme_loss_only, args_array, n_modes
+    #     )
 
-        return cme_general_solve_freq_array_loss(
-            x_array,
-            y0_array,
-            kappas_array,
-            alphas_array,
-            relations_3wm,
-            relations_4wm,
-            coeffs_3wm,
-            coeffs_4wm,
-            thin,
+    #elif reflections and not with_loss:
+    # Full model with reflections
+    args_array = []
+    for i in range(n_freq):
+        kappas = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
+        alphas = np.array(data_kappas_gammas_array[i][1], dtype=np.float64)
+        ts_reflection = np.array(
+            data_kappas_gammas_array[i][2], dtype=np.complex128
         )
-
-    elif reflections and not with_loss:
-        # Full model: data contains [kappas, alphas, ts_reflection, ts_reflection_neg]
-        kappas_array = np.empty((n_freq, n_modes), dtype=np.float64)
-        alphas_array = np.empty((n_freq, n_modes), dtype=np.float64)
-        ts_reflection_array = np.empty((n_freq, n_modes), dtype=np.complex128)
-        ts_reflection_neg_array = np.empty((n_freq, n_modes), dtype=np.complex128)
-
-        for i in range(n_freq):
-            kappas_array[i] = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
-            alphas_array[i] = np.array(data_kappas_gammas_array[i][1], dtype=np.float64)
-            ts_reflection_array[i] = np.array(
-                data_kappas_gammas_array[i][2], dtype=np.complex128
+        ts_reflection_neg = np.array(
+            data_kappas_gammas_array[i][3], dtype=np.complex128
+        )
+        args_array.append(
+            (
+                kappas,
+                alphas,
+                ts_reflection,
+                ts_reflection_neg,
+                relations_3wm,
+                relations_4wm,
+                coeffs_3wm,
+                coeffs_4wm,
             )
-            ts_reflection_neg_array[i] = np.array(
-                data_kappas_gammas_array[i][3], dtype=np.complex128
-            )
-
-        return cme_general_solve_freq_array_full(
-            x_array,
-            y0_array,
-            kappas_array,
-            alphas_array,
-            ts_reflection_array,
-            ts_reflection_neg_array,
-            relations_3wm,
-            relations_4wm,
-            coeffs_3wm,
-            coeffs_4wm,
-            thin,
         )
+    return _solve_multiple_frequencies_general(
+        x_array, y0_array, general_cme, args_array, n_modes
+    )
 
-    else:
-        # Ideal model: data contains only [kappas]
-        kappas_array = np.empty((n_freq, n_modes), dtype=np.float64)
+    # else:
+    #     # Ideal model
+    #     args_array = []
+    #     for i in range(n_freq):
+    #         kappas = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
+    #         args_array.append(
+    #             (kappas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm)
+    #         )
 
-        for i in range(n_freq):
-            kappas_array[i] = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
-
-        return cme_general_solve_freq_array_ideal(
-            x_array,
-            y0_array,
-            kappas_array,
-            relations_3wm,
-            relations_4wm,
-            coeffs_3wm,
-            coeffs_4wm,
-            thin,
-        )
+    #     return _solve_multiple_frequencies_general(
+    #         x_array, y0_array, general_cme_ideal, args_array, n_modes
+    #     )
 
 
 @nb.njit(parallel=True)
@@ -761,24 +695,66 @@ def cme_solve(
     I_triplets = np.empty((len_k, 3, len(x_array)), dtype=np.complex128)
 
     for i in nb.prange(len_k):
-        k = k_signal[i]
         result = nbsolve_ivp(
             CMEode_complete,
             x_span,
             y0_broadcast[i],
             args=(
                 k_pump,
-                k,
+                k_signal[i],
                 k_idler[i],
                 xi,
                 epsi,
             ),
-            atol=1e-14,
-            rtol=1e-10,
-            max_num_steps=0,
+            atol=SOLVER_ATOL,
+            rtol=SOLVER_RTOL,
+            max_num_steps=SOLVER_MAX_STEPS,
             t_eval=x_array,
-            rk_method=1,
-            first_step=1,
+            rk_method=SOLVER_RK_METHOD,
+            first_step=SOLVER_FIRST_STEP,
         )
         I_triplets[i] = result.y
     return I_triplets
+
+
+def configure_solver(
+    atol=None, rtol=None, max_steps=None, rk_method=None, first_step=None
+):
+    """
+    Configure global solver parameters.
+
+    Args:
+        atol (float, optional): Absolute tolerance for the solver
+        rtol (float, optional): Relative tolerance for the solver
+        max_steps (int, optional): Maximum number of steps (0 = unlimited)
+        rk_method (int, optional): Runge-Kutta method (1=RK45, 2=DOP853, etc.)
+        first_step (float, optional): Initial step size
+    """
+    global SOLVER_ATOL, SOLVER_RTOL, SOLVER_MAX_STEPS, SOLVER_RK_METHOD, SOLVER_FIRST_STEP
+
+    if atol is not None:
+        SOLVER_ATOL = atol
+    if rtol is not None:
+        SOLVER_RTOL = rtol
+    if max_steps is not None:
+        SOLVER_MAX_STEPS = max_steps
+    if rk_method is not None:
+        SOLVER_RK_METHOD = rk_method
+    if first_step is not None:
+        SOLVER_FIRST_STEP = first_step
+
+
+def get_solver_config():
+    """
+    Get current solver configuration.
+
+    Returns:
+        dict: Dictionary with current solver parameters
+    """
+    return {
+        "atol": SOLVER_ATOL,
+        "rtol": SOLVER_RTOL,
+        "max_steps": SOLVER_MAX_STEPS,
+        "rk_method": SOLVER_RK_METHOD,
+        "first_step": SOLVER_FIRST_STEP,
+    }
