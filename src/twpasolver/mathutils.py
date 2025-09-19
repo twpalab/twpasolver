@@ -231,7 +231,7 @@ def I_to_dBm(curr: float, Z0: float = 50) -> float:
         float: Power in dBm.
     """
     pw = curr**2 / 2 * Z0
-    return 10 * np.log10(pw * 1000)
+    return 10 * np.log10(np.abs(pw) * 1000)
 
 
 @nb.njit(cache=True)

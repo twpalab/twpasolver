@@ -28,16 +28,16 @@ from twpasolver.cmes import (
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.frequency import Frequencies
 from twpasolver.logger import log
-from twpasolver.models import TWPA
-from twpasolver.twoport import TwoPortCell
-from twpasolver.modes_rwa import ModeArray, ModeArrayFactory, ParameterInterpolator
 from twpasolver.mathutils import to_dB
+from twpasolver.models import TWPA
+from twpasolver.modes_rwa import ModeArray, ModeArrayFactory, ParameterInterpolator
 from twpasolver.plotting import (
     plot_gain,
     plot_mode_currents,
     plot_phase_matching,
     plot_response,
 )
+from twpasolver.twoport import TwoPortCell
 
 
 class GainModel(str, enum.Enum):
@@ -120,9 +120,7 @@ def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
 
 
 def analysis_function(func):
-    """
-    Decorate analysis methods providing automatic result caching and management.
-    """
+    """Decorate analysis methods providing automatic result caching and management."""
 
     @wraps(func)
     def wrapper(self, *args, save=True, save_name: Optional[str] = None, **kwargs):
@@ -370,7 +368,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         Is0: float,
         initial_amplitudes: Optional[Union[List[float], np.ndarray]] = None,
     ) -> np.ndarray:
-        """Setup initial conditions for CME solving."""
+        """Set initial conditions for CME solving."""
         if initial_amplitudes is None:
             n_modes = len(mode_array.modes)
             y0 = np.zeros(n_modes, dtype=np.complex128)
@@ -709,12 +707,12 @@ class TWPAnalysis(Analyzer, Frequencies):
             I_tuples_bwd_pass = I_tuples[start_bwd:end_bwd]
 
             # # Apply propagation phase correction
-            # I_tuples_fwd_pass = I_tuples_fwd_pass * np.exp(
-            #     np.einsum("ij,k->ijk", gammas, x)
-            # )
-            # I_tuples_bwd_pass = I_tuples_bwd_pass * np.exp(
-            #     np.einsum("ij,k->ijk", gammas, x)
-            # )
+            I_tuples_fwd_pass = I_tuples_fwd_pass * np.exp(
+                np.einsum("ij,k->ijk", gammas, x)
+            )
+            I_tuples_bwd_pass = I_tuples_bwd_pass * np.exp(
+                np.einsum("ij,k->ijk", gammas, x)
+            )
 
             I_tuples_all_passes[pass_idx] = {
                 "forward": I_tuples_fwd_pass,
@@ -722,8 +720,8 @@ class TWPAnalysis(Analyzer, Frequencies):
             }
 
         # Use final pass results for main calculation
-        I_tuples_fwd = I_tuples_all_passes[passes-1]["forward"]
-        I_tuples_bwd = I_tuples_all_passes[passes-1]["backward"]
+        I_tuples_fwd = I_tuples_all_passes[passes - 1]["forward"]
+        I_tuples_bwd = I_tuples_all_passes[passes - 1]["backward"]
 
         # Calculate transmission coefficients and output currents
         transmission_coeffs = 1 + cme_data_array[:, 2, :]
@@ -751,20 +749,22 @@ class TWPAnalysis(Analyzer, Frequencies):
                 I_bwd_pass[:, signal_idx, -1] * transmission_coeffs[:, signal_idx]
             )
 
-            gains_all_passes.append({
-                "gain_db_fwd": to_dB(
-                    np.abs(I_out_fwd_pass / np.repeat(y0_fwd[signal_idx], n_freq))
-                ),
-                "gain_db_bwd": to_dB(
-                    np.abs(I_out_bwd_pass / np.repeat(y0_bwd[signal_idx], n_freq))
-                ),
-                "gain_db_11": to_dB(
-                    np.abs(I_out_bwd_pass / np.repeat(y0_fwd[signal_idx], n_freq))
-                ),
-                "gain_db_22": to_dB(
-                    np.abs(I_out_fwd_pass / np.repeat(y0_bwd[signal_idx], n_freq))
-                ),
-            })
+            gains_all_passes.append(
+                {
+                    "gain_db_fwd": to_dB(
+                        np.abs(I_out_fwd_pass / np.repeat(y0_fwd[signal_idx], n_freq))
+                    ),
+                    "gain_db_bwd": to_dB(
+                        np.abs(I_out_bwd_pass / np.repeat(y0_bwd[signal_idx], n_freq))
+                    ),
+                    "gain_db_11": to_dB(
+                        np.abs(I_out_bwd_pass / np.repeat(y0_fwd[signal_idx], n_freq))
+                    ),
+                    "gain_db_22": to_dB(
+                        np.abs(I_out_fwd_pass / np.repeat(y0_bwd[signal_idx], n_freq))
+                    ),
+                }
+            )
 
         # Create mode maps
         mode_map = {label: idx for idx, label in enumerate(mode_labels)}
@@ -852,7 +852,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                     )
                     # Calculate reflection terms
                     gammas_tilde = gammas * np.exp(1j * kappas * N_tot)
-                    #gammas_tilde[np.abs(gammas) > 0.99] = 0
+                    # gammas_tilde[np.abs(gammas) > 0.99] = 0
                     ts_reflection_neg = gammas_tilde / (1 - gammas_tilde**2)
                     ts_reflection = 1 / (1 - gammas_tilde**2)
 
@@ -889,12 +889,16 @@ class TWPAnalysis(Analyzer, Frequencies):
             kappas_signal = mode_params[signal_mode]["k"]
 
             # Calculate transmission coefficient
-            ts_signal = 1 / (1 - gammas_signal**2 * np.exp(2j * kappas_signal * N_tot))
+            ts_signal = 1 / (
+                1 - gammas_signal**2 * np.exp(2j * kappas_signal * N_tot)
+            )
 
             gain_db = 10 * np.log10(
-                np.abs((I_tuples_array[:, signal_idx, -1] / initial_signal) ** 2
-                * (1 - gammas_signal ** 2) ** 2
-                * np.abs(ts_signal) ** 2)
+                np.abs(
+                    (I_tuples_array[:, signal_idx, -1] / initial_signal) ** 2
+                    * (1 - gammas_signal**2) ** 2
+                    * np.abs(ts_signal) ** 2
+                )
             )
         else:
             # Simple gain calculation for ideal or loss-only cases
