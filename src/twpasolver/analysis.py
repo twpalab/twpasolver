@@ -23,8 +23,9 @@ from twpasolver.bonus_types import FloatArray
 from twpasolver.cmes import (
     cme_general_solve_freq_array,
     cme_solve,
-    cme_solve_forward_backward,
+    cme_solve_forward_backward
 )
+from twpasolver.cmes_fb import cme_solve_forward_backward_cut
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.frequency import Frequencies
 from twpasolver.logger import log
@@ -38,7 +39,8 @@ from twpasolver.plotting import (
     plot_response,
 )
 from twpasolver.twoport import TwoPortCell
-
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 class GainModel(str, enum.Enum):
     """
@@ -412,6 +414,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         signal_arange: Optional[Tuple[float, float, float]] = None,
         pump_arange: Optional[Tuple[float, float, float]] = None,
         thin: int = 20,
+        relative=True
     ) -> dict[str, Any]:
         """Analyze phase matching conditions for nonlinear processes using mode arrays."""
         # Get the mode array
@@ -486,6 +489,8 @@ class TWPAnalysis(Analyzer, Frequencies):
                         + 2 * idler_sign * idler_k_array
                     )
                 )
+                if relative:
+                    deltas[:,i] =  deltas[:,i]/signal_k_array
 
         return {
             "delta": deltas,
@@ -517,6 +522,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         thin: int = 100,
         passes: int = 3,
+        cutoff = 0.1
     ) -> dict[str, Any]:
         """
         Compute the TWPA gain using coupled mode equation models.
@@ -600,6 +606,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 initial_amplitudes_fwd,
                 initial_amplitudes_bwd,
                 passes,
+                cutoff=cutoff
             )
         else:
             return self._compute_general_gain(
@@ -628,6 +635,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         passes: int = 3,
+        cutoff = False
     ) -> dict[str, Any]:
         """Compute gain using the forward-backward propagation model."""
         # Get the mode array
@@ -668,6 +676,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         # Build CME data arrays
         cme_data_array = []
         gammas = []
+
         for i in range(n_freq):
             kappas = np.array([mode_params[mode]["k"][i] for mode in mode_labels])
             alphas = np.array([mode_params[mode]["alpha"][i] for mode in mode_labels])
@@ -681,7 +690,19 @@ class TWPAnalysis(Analyzer, Frequencies):
         cme_data_array = np.array(cme_data_array, dtype=np.complex128)
 
         # Solve forward-backward CMEs
-        I_tuples = cme_solve_forward_backward(
+        if cutoff:
+            I_tuples = cme_solve_forward_backward_cut(
+            x,
+            y0_fwd,
+            y0_bwd,
+            cme_data_array,
+            relations_coefficients,
+            thin=1,
+            passes=passes,
+            cutoff=cutoff
+        )
+        else:
+            I_tuples = cme_solve_forward_backward(
             x,
             y0_fwd,
             y0_bwd,

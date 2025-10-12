@@ -18,7 +18,7 @@ SOLVER_ATOL = 1e-14
 SOLVER_RTOL = 1e-10
 SOLVER_MAX_STEPS = 0
 SOLVER_RK_METHOD = 1
-SOLVER_FIRST_STEP = 1
+SOLVER_FIRST_STEP = 10
 
 
 @nb.njit(
@@ -164,7 +164,7 @@ def general_cme_first_round(
             coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
         )
     # return derivs
-    derivs[:num_modes] = gammas * derivs[:num_modes] * np.conj(exp_pos)
+    derivs[:num_modes] = gammas * derivs[:num_modes] / exp_pos
     derivs[num_modes : 2 * num_modes] = derivs[:num_modes]
     derivs[2 * num_modes :] = currents  # * exp_pos
     return derivs
@@ -229,7 +229,7 @@ def general_cme_with_backward(
             x, x_evals, dcurrents_evals[i].imag
         )
         di = gammas[i] * derivs[i] - dc_interp * exp_neg[i]
-        derivs[i] = di * np.conj(exp_pos[i])  # / gammas[i]
+        derivs[i] = di /exp_pos[i]  # / gammas[i]
         derivs[num_modes + i] = derivs[i]  # * exp_pos[i]
         derivs[2 * num_modes + i] = currents[i]  # * exp_pos[i]
     return derivs
@@ -274,7 +274,7 @@ def general_cme_loss_only(
             coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
         )
     # return derivs
-    return (1j * kappas - alphas) * derivs * np.conj(exp_pos) - alphas * currents
+    return (1j * kappas - alphas) * derivs /exp_pos - alphas * currents
 
 
 @nb.njit(
@@ -403,7 +403,7 @@ def cme_general_solve_freq_array_fb(
     I_tuples = np.empty(
         (2 * n_freq * n_passes, n_modes, len(x_array)), dtype=np.complex128
     )
-
+    print(relations_3wm, relations_4wm)
     for i in nb.prange(n_freq):
         A_bwd = np.empty(
             (n_modes, len(x_array)), dtype=np.complex128
@@ -528,7 +528,7 @@ def cme_general_solve_freq_array_fb(
             I_tuples[i + k * n_freq] = A_fwd[2 * n_modes :, :]
             I_tuples[i + k * n_freq + n_freq * n_passes] = A_bwd[2 * n_modes :, :]
 
-    return I_tuples
+    return I_tuples 
 
 
 @nb.njit(parallel=True)
