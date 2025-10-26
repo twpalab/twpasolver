@@ -229,7 +229,7 @@ def general_cme_with_backward(
             x, x_evals, dcurrents_evals[i].imag
         )
         di = gammas[i] * derivs[i] - dc_interp * exp_neg[i]
-        derivs[i] = di /exp_pos[i]  # / gammas[i]
+        derivs[i] = di / exp_pos[i]  # / gammas[i]
         derivs[num_modes + i] = derivs[i]  # * exp_pos[i]
         derivs[2 * num_modes + i] = currents[i]  # * exp_pos[i]
     return derivs
@@ -274,7 +274,7 @@ def general_cme_loss_only(
             coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
         )
     # return derivs
-    return (1j * kappas - alphas) * derivs /exp_pos - alphas * currents
+    return (1j * kappas - alphas) * derivs / exp_pos - alphas * currents
 
 
 @nb.njit(
@@ -403,7 +403,6 @@ def cme_general_solve_freq_array_fb(
     I_tuples = np.empty(
         (2 * n_freq * n_passes, n_modes, len(x_array)), dtype=np.complex128
     )
-    print(relations_3wm, relations_4wm)
     for i in nb.prange(n_freq):
         A_bwd = np.empty(
             (n_modes, len(x_array)), dtype=np.complex128
@@ -528,7 +527,7 @@ def cme_general_solve_freq_array_fb(
             I_tuples[i + k * n_freq] = A_fwd[2 * n_modes :, :]
             I_tuples[i + k * n_freq + n_freq * n_passes] = A_bwd[2 * n_modes :, :]
 
-    return I_tuples 
+    return I_tuples
 
 
 @nb.njit(parallel=True)
@@ -760,58 +759,60 @@ def cme_general_solve_freq_array(
     coeffs_4wm = np.array(coeffs_4wm, dtype=np.complex128)
 
     # # Route to appropriate solver based on model complexity
-    # if with_loss and not reflections:
-    #     # Loss-only model
-    #     args_array = []
-    #     for i in range(n_freq):
-    #         kappas = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
-    #         alphas = np.array(data_kappas_gammas_array[i][1], dtype=np.float64)
-    #         args_array.append(
-    #             (kappas, alphas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm)
-    #         )
-
-    #     return _solve_multiple_frequencies_general(
-    #         x_array, y0_array, general_cme_loss_only, args_array, n_modes
-    #     )
-
-    # elif reflections and not with_loss:
-    # Full model with reflections
-    args_array = []
-    for i in range(n_freq):
-        kappas = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
-        alphas = np.array(data_kappas_gammas_array[i][1], dtype=np.float64)
-        ts_reflection = np.array(data_kappas_gammas_array[i][2], dtype=np.complex128)
-        ts_reflection_neg = np.array(
-            data_kappas_gammas_array[i][3], dtype=np.complex128
-        )
-        args_array.append(
-            (
-                kappas,
-                alphas,
-                ts_reflection,
-                ts_reflection_neg,
-                relations_3wm,
-                relations_4wm,
-                coeffs_3wm,
-                coeffs_4wm,
+    if with_loss and not reflections:
+        # Loss-only model
+        args_array = []
+        for i in range(n_freq):
+            kappas = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
+            alphas = np.array(data_kappas_gammas_array[i][1], dtype=np.float64)
+            args_array.append(
+                (kappas, alphas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm)
             )
+
+        return _solve_multiple_frequencies_general(
+            x_array, y0_array, general_cme_loss_only, args_array, n_modes
         )
-    return _solve_multiple_frequencies_general(
-        x_array, y0_array, general_cme, args_array, n_modes
-    )
 
-    # else:
-    #     # Ideal model
-    #     args_array = []
-    #     for i in range(n_freq):
-    #         kappas = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
-    #         args_array.append(
-    #             (kappas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm)
-    #         )
+    elif reflections and not with_loss:
+        # Full model with reflections
+        args_array = []
+        for i in range(n_freq):
+            kappas = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
+            alphas = np.array(data_kappas_gammas_array[i][1], dtype=np.float64)
+            ts_reflection = np.array(
+                data_kappas_gammas_array[i][2], dtype=np.complex128
+            )
+            ts_reflection_neg = np.array(
+                data_kappas_gammas_array[i][3], dtype=np.complex128
+            )
+            args_array.append(
+                (
+                    kappas,
+                    alphas,
+                    ts_reflection,
+                    ts_reflection_neg,
+                    relations_3wm,
+                    relations_4wm,
+                    coeffs_3wm,
+                    coeffs_4wm,
+                )
+            )
+        return _solve_multiple_frequencies_general(
+            x_array, y0_array, general_cme, args_array, n_modes
+        )
 
-    #     return _solve_multiple_frequencies_general(
-    #         x_array, y0_array, general_cme_ideal, args_array, n_modes
-    #     )
+    else:
+        # Ideal model
+        args_array = []
+        for i in range(n_freq):
+            kappas = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
+            args_array.append(
+                (kappas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm)
+            )
+
+        return _solve_multiple_frequencies_general(
+            x_array, y0_array, general_cme_ideal, args_array, n_modes
+        )
 
 
 @nb.njit(parallel=True)

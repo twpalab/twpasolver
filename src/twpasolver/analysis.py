@@ -23,7 +23,7 @@ from twpasolver.bonus_types import FloatArray
 from twpasolver.cmes import (
     cme_general_solve_freq_array,
     cme_solve,
-    cme_solve_forward_backward
+    cme_solve_forward_backward,
 )
 from twpasolver.cmes_fb import cme_solve_forward_backward_cut
 from twpasolver.file_utils import read_file, save_to_file
@@ -39,8 +39,7 @@ from twpasolver.plotting import (
     plot_response,
 )
 from twpasolver.twoport import TwoPortCell
-import matplotlib.pyplot as plt
-import matplotlib as mpl
+
 
 class GainModel(str, enum.Enum):
     """
@@ -406,6 +405,7 @@ class TWPAnalysis(Analyzer, Frequencies):
     def phase_matching(
         self,
         process: Literal["PA", "FCU", "FCD"] = "PA",
+        mixing: Literal["3WM", "4WM"] = "3WM",
         signal_mode: str = "s",
         pump_mode: str = "p",
         idler_mode: str = "i",
@@ -414,22 +414,28 @@ class TWPAnalysis(Analyzer, Frequencies):
         signal_arange: Optional[Tuple[float, float, float]] = None,
         pump_arange: Optional[Tuple[float, float, float]] = None,
         thin: int = 20,
-        relative=True
+        relative=True,
     ) -> dict[str, Any]:
         """Analyze phase matching conditions for nonlinear processes using mode arrays."""
         # Get the mode array
         mode_array = self.get_mode_array(mode_array_config)
         freqs = self.data["freqs"]
 
-        if pump_arange:
-            pump_f = np.arange(*pump_arange)[::thin]
+        if pump_arange is not None:
+            if len(pump_arange) == 3:
+                pump_f = np.arange(*pump_arange)[::thin]
+            else:
+                pump_f = np.array(pump_arange)
         else:
             min_p_idx = np.where(freqs == self.data["stopband_freqs"][1])[0][0]
             max_p_idx = -1
             pump_f = freqs[min_p_idx:max_p_idx:thin]
 
-        if signal_arange:
-            signal_f = np.arange(*signal_arange)[::thin]
+        if signal_arange is not None:
+            if len(signal_arange) == 3:
+                signal_f = np.arange(*signal_arange)[::thin]
+            else:
+                signal_f = np.array(signal_arange)
         else:
             max_s_idx = np.where(freqs == self.data["stopband_freqs"][0])[0][0]
             signal_f = freqs[:max_s_idx:thin]
@@ -450,6 +456,10 @@ class TWPAnalysis(Analyzer, Frequencies):
         else:
             idler_sign = -1
             signal_sign = 1
+
+        pump_coeff = 1
+        if mixing == "4WM":
+            pump_coeff = 2
 
         mode_array_keys = list(mode_array.modes.keys())
         signal_idx = mode_array_keys.index(signal_mode)
@@ -478,7 +488,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 for param in [gamma, pump_k, signal_k_array, idler_k_array]
             ):
                 deltas[:, i] = (
-                    pump_k
+                    pump_coeff * pump_k
                     + signal_sign * signal_k_array
                     + idler_sign * idler_k_array
                     + chi
@@ -490,7 +500,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                     )
                 )
                 if relative:
-                    deltas[:,i] =  deltas[:,i]/signal_k_array
+                    deltas[:, i] = deltas[:, i] / signal_k_array
 
         return {
             "delta": deltas,
@@ -522,7 +532,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         thin: int = 100,
         passes: int = 3,
-        cutoff = 0.1
+        cutoff=0.1,
     ) -> dict[str, Any]:
         """
         Compute the TWPA gain using coupled mode equation models.
@@ -606,7 +616,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 initial_amplitudes_fwd,
                 initial_amplitudes_bwd,
                 passes,
-                cutoff=cutoff
+                cutoff=cutoff,
             )
         else:
             return self._compute_general_gain(
@@ -635,7 +645,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         passes: int = 3,
-        cutoff = False
+        cutoff=False,
     ) -> dict[str, Any]:
         """Compute gain using the forward-backward propagation model."""
         # Get the mode array
@@ -692,25 +702,25 @@ class TWPAnalysis(Analyzer, Frequencies):
         # Solve forward-backward CMEs
         if cutoff:
             I_tuples = cme_solve_forward_backward_cut(
-            x,
-            y0_fwd,
-            y0_bwd,
-            cme_data_array,
-            relations_coefficients,
-            thin=1,
-            passes=passes,
-            cutoff=cutoff
-        )
+                x,
+                y0_fwd,
+                y0_bwd,
+                cme_data_array,
+                relations_coefficients,
+                thin=1,
+                passes=passes,
+                cutoff=cutoff,
+            )
         else:
             I_tuples = cme_solve_forward_backward(
-            x,
-            y0_fwd,
-            y0_bwd,
-            cme_data_array,
-            relations_coefficients,
-            thin=1,
-            passes=passes,
-        )
+                x,
+                y0_fwd,
+                y0_bwd,
+                cme_data_array,
+                relations_coefficients,
+                thin=1,
+                passes=passes,
+            )
 
         # Extract results for all passes
         # I_tuples now has shape (2 * n_freq * passes, n_modes, len(x))
