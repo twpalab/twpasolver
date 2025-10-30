@@ -366,16 +366,16 @@ def _solve_multiple_frequencies_general(
     else:
         y0_broadcast = y0_array
 
-    I_triplets = np.empty((n_freq, n_modes, len(x_array)), dtype=np.complex128)
+    I_tuples = np.empty((n_freq, n_modes, len(x_array)), dtype=np.complex128)
 
     # Use parallel loop for frequency iteration
     for i in nb.prange(n_freq):
         result = _solve_single_frequency_general(
             x_array, y0_broadcast[i], cme_model, args_array[i]
         )
-        I_triplets[i] = result
+        I_tuples[i] = result
 
-    return I_triplets
+    return I_tuples
 
 
 @nb.njit(parallel=True)
@@ -849,7 +849,7 @@ def cme_solve(
         y0_broadcast = y0
 
     x_span = (x_array[0], x_array[-1])
-    I_triplets = np.empty((len_k, 3, len(x_array)), dtype=np.complex128)
+    I_tuples = np.empty((len_k, 3, len(x_array)), dtype=np.complex128)
 
     for i in nb.prange(len_k):
         result = nbsolve_ivp(
@@ -870,8 +870,8 @@ def cme_solve(
             rk_method=SOLVER_RK_METHOD,
             first_step=SOLVER_FIRST_STEP,
         )
-        I_triplets[i] = result.y
-    return I_triplets
+        I_tuples[i] = result.y
+    return I_tuples
 
 
 def configure_solver(

@@ -20,6 +20,7 @@ def plot_mode_currents(
     title: Optional[str] = None,
     ylim: Optional[tuple] = None,
     lw=2,
+    backward=False,
 ) -> Axes:
     """
     Plot the mean current of each mode in dB as a function of cell number.
@@ -44,22 +45,25 @@ def plot_mode_currents(
     # Determine the dimensionality and mode names based on the model
     if model == "minimal_3wm":
         # Standard 3WM model with pump, signal, idler
-        I_triplets = gain_result["I_triplets"]
-        n_freqs = I_triplets.shape[0]
-        n_modes = I_triplets.shape[1]
+        I_tuples = gain_result["I_tuples"]
+        n_freqs = I_tuples.shape[0]
+        n_modes = I_tuples.shape[1]
 
         # Use default mode names for standard model
         if mode_names is None:
             mode_names = ["Pump", "Signal", "Idler"]
 
         # Compute mean current across all frequencies
-        mean_currents = np.mean(np.abs(I_triplets), axis=0)
+        mean_currents = np.mean(np.abs(I_tuples), axis=0)
 
     else:  # general model
         # General model with arbitrary number of modes
-        I_triplets = gain_result["I_triplets"]
-        n_freqs = I_triplets.shape[0]
-        n_modes = I_triplets.shape[1]
+        if backward and "I_tuples_bwd" in gain_result:
+            I_tuples = gain_result["I_tuples_bwd"]
+        else:
+            I_tuples = gain_result["I_tuples"]
+        n_freqs = I_tuples.shape[0]
+        n_modes = I_tuples.shape[1]
 
         # Extract mode names from the result if available
         if mode_names is None and "mode_info" in gain_result:
@@ -75,7 +79,7 @@ def plot_mode_currents(
             mode_names = [f"Mode {i}" for i in range(n_modes)]
 
         # Compute mean current across all frequencies
-        mean_currents = np.mean(np.abs(I_triplets), axis=0)
+        mean_currents = np.mean(np.abs(I_tuples), axis=0)
 
     # Create figure
     fig, ax = plt.subplots(figsize=figsize)

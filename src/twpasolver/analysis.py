@@ -806,7 +806,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             "pump_freq": pump,
             "signal_freqs": signal_freqs,
             "x": x,
-            "I_triplets": I_tuples_fwd,  # Final pass forward results for backward compatibility
+            "I_tuples": I_tuples_fwd,  # Final pass forward results for backward compatibility
             "I_tuples_fwd": I_tuples_fwd,  # Final pass forward results
             "I_tuples_bwd": I_tuples_bwd,  # Final pass backward results
             "I_tuples_all_passes": I_tuples_all_passes,  # All passes results
@@ -1080,6 +1080,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         if "gain" not in self.data:
             raise RuntimeError("Gain data not found, please run analysis function.")
         gain_data = self.data["gain"]
+
         return plot_mode_currents(gain_data, **kwargs)
 
     def plot_phase_matching(self, **kwargs) -> Axes:
