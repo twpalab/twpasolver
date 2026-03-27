@@ -170,9 +170,13 @@ def general_cme_first_round(
             coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
         )
     # return derivs
-    derivs[:num_modes] = gammas * derivs[:num_modes] / exp_pos
-    derivs[num_modes : 2 * num_modes] = derivs[:num_modes]
-    derivs[2 * num_modes :] = currents
+    for i in range(num_modes):
+        derivs[i] = gammas[i] * derivs[i] / exp_pos[i]
+        if (derivs[i] / currents[i]).real < 0.0 and np.abs(currents[i]) < 1e-15:
+            derivs[i] = 0
+        derivs[num_modes + i] = derivs[i]
+        derivs[2 * num_modes + i] = currents[i]
+
     return derivs
 
 
@@ -231,8 +235,11 @@ def general_cme_with_backward_cutoff(
     for i in range(num_modes):
         di = gammas[i] * derivs[i]
         derivs[i] = di / exp_pos[i]
+        if (derivs[i] / currents[i]).real < 0.0 and np.abs(currents[i]) < 1e-15:
+            derivs[i] = 0
         derivs[num_modes + i] = derivs[i]
         derivs[2 * num_modes + i] = currents[i]
+
     return derivs
 
 
@@ -467,6 +474,8 @@ def cme_general_solve_freq_array_fb_cutoff(
     thin: int = 200,
     n_passes: int = 3,
     cutoff: float = 0.1,
+    update_rate: float = 0.8,
+    conv_threshold: float = 0.05,
 ) -> ComplexArray:
     """Solve full general CMEs (with reflections) for multiple frequency points using numba prange."""
     n_freq = gammas_array.shape[0]
@@ -481,130 +490,203 @@ def cme_general_solve_freq_array_fb_cutoff(
     )
     Z0 = 50
     Zb = Z0 * (1 + reflections_array) / (1 - reflections_array)
+
     for i in nb.prange(n_freq):
-        A_bwd = np.empty(
-            (n_modes, len(x_array)), dtype=np.complex128
+        # Convergence tracking
+        converged = False
+        stable_count = 0
+        prev_fwd_end = np.zeros(n_modes, dtype=np.complex128)
+        prev_bwd_end = np.zeros(n_modes, dtype=np.complex128)
+
+        A_bwd = np.full(
+            (3 * n_modes, len(x_array)), 1e-15, dtype=np.complex128
         )  # Required for proper compilation
-        A_fwd = np.empty(
-            (n_modes, len(x_array)), dtype=np.complex128
+        A_fwd = np.full(
+            (3 * n_modes, len(x_array)), 1e-15, dtype=np.complex128
         )  # Required for proper compilation
         I_init_fwd = y0_array_fwd * transmission_in[i]
         relations_3wm_optimized, relations_4wm_optimized = _filter_wm_terms(
             gammas_array[i].imag, relations_3wm, relations_4wm, cutoff
         )
         for k in range(n_passes):
-            if k == 0:
-                result = nbsolve_ivp(
-                    general_cme_first_round,
-                    x_span,
-                    I_init_fwd,
-                    args=(
-                        gammas_array[i],
-                        relations_3wm_optimized,
-                        relations_4wm_optimized,
-                        coeffs_3wm,
-                        coeffs_4wm,
-                    ),
-                    atol=SOLVER_ATOL,
-                    rtol=SOLVER_RTOL,
-                    max_num_steps=SOLVER_MAX_STEPS,
-                    t_eval=x_array,
-                    rk_method=SOLVER_RK_METHOD,
-                    first_step=SOLVER_FIRST_STEP,
-                    capture_extra=True,
+            if not converged:
+                if k == 0:
+                    result = nbsolve_ivp(
+                        general_cme_first_round,
+                        x_span,
+                        I_init_fwd,
+                        args=(
+                            gammas_array[i],
+                            relations_3wm_optimized,
+                            relations_4wm_optimized,
+                            coeffs_3wm,
+                            coeffs_4wm,
+                        ),
+                        atol=SOLVER_ATOL,
+                        rtol=SOLVER_RTOL,
+                        max_num_steps=SOLVER_MAX_STEPS,
+                        t_eval=x_array,
+                        rk_method=SOLVER_RK_METHOD,
+                        first_step=SOLVER_FIRST_STEP,
+                        capture_extra=True,
+                    )
+                    A_fwd = result.y
+                    A_fwd_end = A_fwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
+                    I_init_bwd = (
+                        y0_array_bwd * transmission_in[i]
+                        + reflections_array[i] * A_fwd_end
+                    )
+                    result = nbsolve_ivp(
+                        general_cme_with_backward_cutoff,
+                        x_span,
+                        I_init_bwd,
+                        args=(
+                            gammas_array[i],
+                            relations_3wm_optimized,
+                            relations_4wm_optimized,
+                            coeffs_3wm,
+                            coeffs_4wm,
+                            x_array,
+                            A_fwd[n_modes : 2 * n_modes, ::-1],
+                            A_fwd[:n_modes, ::-1],
+                            x_end,
+                        ),
+                        atol=SOLVER_ATOL,
+                        rtol=SOLVER_RTOL,
+                        max_num_steps=SOLVER_MAX_STEPS,
+                        t_eval=x_array,
+                        rk_method=SOLVER_RK_METHOD,
+                        first_step=SOLVER_FIRST_STEP,
+                        capture_extra=True,
+                    )
+                    A_bwd = result.y
+                else:
+                    result = nbsolve_ivp(
+                        general_cme_with_backward_cutoff,
+                        x_span,
+                        I_init_fwd,
+                        args=(
+                            gammas_array[i],
+                            relations_3wm_optimized,
+                            relations_4wm_optimized,
+                            coeffs_3wm,
+                            coeffs_4wm,
+                            x_array,
+                            A_bwd[n_modes : 2 * n_modes, ::-1],
+                            A_bwd[:n_modes, ::-1],
+                            x_end,
+                        ),
+                        atol=SOLVER_ATOL,
+                        rtol=SOLVER_RTOL,
+                        max_num_steps=SOLVER_MAX_STEPS,
+                        t_eval=x_array,
+                        rk_method=SOLVER_RK_METHOD,
+                        first_step=SOLVER_FIRST_STEP,
+                        capture_extra=True,
+                    )
+                    A_fwd = result.y * update_rate + (1 - update_rate) * A_fwd
+                    if k > 0:
+                        reflection_coeff = np.empty(n_modes, dtype=np.complex128)
+                        for j in range(n_modes):
+                            derivs_bwd = A_bwd[n_modes + j, 0]
+                            currents_bwd = A_bwd[j, 0]
+                            derivs_fwd = A_fwd[n_modes + j, -1]
+                            currents_fwd = A_fwd[j, -1]
+                            gamma = gammas_array[i, j]
+                            Zbvals = Zb[i, j]
+                            reflection_coeff[j] = (
+                                -currents_fwd
+                                / currents_bwd
+                                * (
+                                    (Z0 - Zbvals) * gamma * currents_bwd
+                                    + Zbvals * derivs_bwd
+                                )
+                                / (
+                                    (Z0 + Zbvals) * gamma * currents_fwd
+                                    + Zbvals * derivs_fwd
+                                )
+                            )
+                    else:
+                        reflection_coeff = reflections_array[i]
+                    A_fwd_end = A_fwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
+                    I_init_bwd = (
+                        y0_array_bwd * transmission_in[i] + reflection_coeff * A_fwd_end
+                    )
+                    result = nbsolve_ivp(
+                        general_cme_with_backward_cutoff,
+                        x_span,
+                        I_init_bwd,
+                        args=(
+                            gammas_array[i],
+                            relations_3wm_optimized,
+                            relations_4wm_optimized,
+                            coeffs_3wm,
+                            coeffs_4wm,
+                            x_array,
+                            A_fwd[n_modes : 2 * n_modes, ::-1],
+                            A_fwd[:n_modes, ::-1],
+                            x_end,
+                        ),
+                        atol=SOLVER_ATOL,
+                        rtol=SOLVER_RTOL,
+                        max_num_steps=SOLVER_MAX_STEPS,
+                        t_eval=x_array,
+                        rk_method=SOLVER_RK_METHOD,
+                        first_step=SOLVER_FIRST_STEP,
+                        capture_extra=True,
+                    )
+                    A_bwd = result.y * update_rate + (1 - update_rate) * A_bwd
+                if k > 0:
+                    reflection_coeff = np.empty(n_modes, dtype=np.complex128)
+                    for j in range(n_modes):
+                        derivs_bwd = A_fwd[n_modes + j, 0]
+                        currents_bwd = A_fwd[j, 0]
+                        derivs_fwd = A_bwd[n_modes + j, -1]
+                        currents_fwd = A_bwd[j, -1]
+                        gamma = gammas_array[i, j]
+                        Zbvals = Zb[i, j]
+                        reflection_coeff[j] = (
+                            -currents_fwd
+                            / currents_bwd
+                            * (
+                                (Z0 - Zbvals) * gamma * currents_bwd
+                                + Zbvals * derivs_bwd
+                            )
+                            / (
+                                (Z0 + Zbvals) * gamma * currents_fwd
+                                + Zbvals * derivs_fwd
+                            )
+                        )
+                else:
+                    reflection_coeff = reflections_array[i]
+                # Store backward pass results for this pass
+                A_bwd_end = A_bwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
+                I_init_fwd = (
+                    y0_array_fwd * transmission_in[i] + reflection_coeff * A_bwd_end
                 )
-                A_fwd = result.y
-                A_fwd_end = A_fwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
-                I_init_bwd = (
-                    y0_array_bwd * transmission_in[i] + reflections_array[i] * A_fwd_end
-                )
-                result = nbsolve_ivp(
-                    general_cme_with_backward_cutoff,
-                    x_span,
-                    I_init_bwd,
-                    args=(
-                        gammas_array[i],
-                        relations_3wm_optimized,
-                        relations_4wm_optimized,
-                        coeffs_3wm,
-                        coeffs_4wm,
-                        x_array,
-                        A_fwd[n_modes : 2 * n_modes, ::-1],
-                        A_fwd[:n_modes, ::-1],
-                        x_end,
-                    ),
-                    atol=SOLVER_ATOL,
-                    rtol=SOLVER_RTOL,
-                    max_num_steps=SOLVER_MAX_STEPS,
-                    t_eval=x_array,
-                    rk_method=SOLVER_RK_METHOD,
-                    first_step=SOLVER_FIRST_STEP,
-                    capture_extra=True,
-                )
-                A_bwd = result.y
-            else:
-                result = nbsolve_ivp(
-                    general_cme_with_backward_cutoff,
-                    x_span,
-                    I_init_fwd,
-                    args=(
-                        gammas_array[i],
-                        relations_3wm_optimized,
-                        relations_4wm_optimized,
-                        coeffs_3wm,
-                        coeffs_4wm,
-                        x_array,
-                        A_bwd[n_modes : 2 * n_modes, ::-1],
-                        A_bwd[:n_modes, ::-1],
-                        x_end,
-                    ),
-                    atol=SOLVER_ATOL,
-                    rtol=SOLVER_RTOL,
-                    max_num_steps=SOLVER_MAX_STEPS,
-                    t_eval=x_array,
-                    rk_method=SOLVER_RK_METHOD,
-                    first_step=SOLVER_FIRST_STEP,
-                    capture_extra=True,
-                )
-                A_fwd = result.y
 
-                # Store forward pass results for this pass
-                A_fwd_end = A_fwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
-                I_init_bwd = (
-                    y0_array_bwd * transmission_in[i] + reflection_coeff * A_fwd_end
-                )
-                result = nbsolve_ivp(
-                    general_cme_with_backward_cutoff,
-                    x_span,
-                    I_init_bwd,
-                    args=(
-                        gammas_array[i],
-                        relations_3wm_optimized,
-                        relations_4wm_optimized,
-                        coeffs_3wm,
-                        coeffs_4wm,
-                        x_array,
-                        A_fwd[n_modes : 2 * n_modes, ::-1],
-                        A_fwd[:n_modes, ::-1],
-                        x_end,
-                    ),
-                    atol=SOLVER_ATOL,
-                    rtol=SOLVER_RTOL,
-                    max_num_steps=SOLVER_MAX_STEPS,
-                    t_eval=x_array,
-                    rk_method=SOLVER_RK_METHOD,
-                    first_step=SOLVER_FIRST_STEP,
-                    capture_extra=True,
-                )
-                A_bwd = result.y
+                if k > 1:  # need at least 2 passes before checking
+                    curr_fwd_end = A_fwd[:n_modes, -1]
+                    curr_bwd_end = A_bwd[:n_modes, -1]
+                    norm_fwd = np.max(
+                        np.abs(curr_fwd_end - prev_fwd_end)
+                        / (np.abs(curr_fwd_end) + 1e-30)
+                    )
+                    norm_bwd = np.max(
+                        np.abs(curr_bwd_end - prev_bwd_end)
+                        / (np.abs(curr_bwd_end) + 1e-30)
+                    )
+                    if norm_fwd < conv_threshold and norm_bwd < conv_threshold:
+                        stable_count += 1
+                    else:
+                        stable_count = 0
+                    if stable_count >= 3:
+                        converged = True
 
-            # Store backward pass results for this pass
-            A_bwd_end = A_bwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
-            I_init_fwd = (
-                y0_array_fwd * transmission_in[i] + reflection_coeff * A_bwd_end
-            )
             I_tuples[i + k * n_freq] = A_fwd[2 * n_modes :, :]
             I_tuples[i + k * n_freq + n_freq * n_passes] = A_bwd[2 * n_modes :, :]
+            prev_fwd_end = A_fwd[:n_modes, -1].copy()
+            prev_bwd_end = A_bwd[:n_modes, -1].copy()
 
     return I_tuples
 

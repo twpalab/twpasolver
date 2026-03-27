@@ -12,7 +12,7 @@ from pydantic import ConfigDict, Field, PrivateAttr, field_validator
 
 from twpasolver.basemodel import BaseModel
 from twpasolver.bonus_types import FloatArray
-from twpasolver.cmes.base import basic_3wm_cmes_solve, cme_general_solve_freq_array
+from twpasolver.cmes.base import basic_3wm_cmes_solve, no_reflections_cmes_solve
 from twpasolver.cmes.cmes_fb import cme_solve_forward_backward
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.frequency import Frequencies
@@ -348,7 +348,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         """Set initial conditions for CME solving."""
         if initial_amplitudes is None:
             n_modes = len(mode_array.modes)
-            y0 = np.zeros(n_modes, dtype=np.complex128)
+            y0 = np.full(n_modes, 1e-14, dtype=np.complex128)
             mode_labels = list(mode_array.modes.keys())
             signal_idx = mode_labels.index(signal_mode)
             pump_idx = mode_labels.index(pump_mode)
@@ -509,6 +509,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         thin: int = 100,
         passes: int = 3,
         cutoff: Optional[float] = None,
+        second_order=False,
     ) -> dict[str, Any]:
         """
         Compute the TWPA gain using coupled mode equation models.
@@ -529,9 +530,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             CME model complexity:
             * 'minimal_3wm': Basic pump-signal-idler only (fastest)
             * 'general_no_reflections': Extended modes, no losses/reflections
-            * 'general_loss_only': Extended modes with losses
-            * 'general': Full model with losses and reflections
-            * 'general': Forward-backward model with iterative solving
+            * 'general': Full model with losses and reflections, uses iterative solving
         mode_array_config : str, default 'basic_3wm'
             Name of mode array configuration to use
         signal_mode, pump_mode, idler_mode : str
@@ -595,7 +594,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 cutoff=cutoff,
             )
         else:
-            return self._compute_general_gain(
+            return self._compute_general_gain_no_reflections(
                 signal_freqs,
                 pump,
                 mode_array_config,
@@ -606,6 +605,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 model,
                 initial_amplitudes,
                 Is0,
+                second_order=second_order,
             )
 
     def _compute_forward_backward_gain(
@@ -792,7 +792,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             },
         }
 
-    def _compute_general_gain(
+    def _compute_general_gain_no_reflections(
         self,
         signal_freqs: FloatArray,
         pump: float,
@@ -804,6 +804,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         model: GainModel,
         initial_amplitudes: Optional[Union[List[float], np.ndarray]] = None,
         Is0: float = 1e-6,
+        second_order=False,
     ) -> dict[str, Any]:
         """Compute gain using the general coupled mode equations models."""
         # Get the mode array
@@ -832,8 +833,6 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         # Build CME data arrays based on model type
         cme_data_array = []
-        reflections = model == GainModel.GENERAL
-        with_loss = model in [GainModel.GENERAL_LOSS_ONLY, GainModel.GENERAL]
 
         gammas = []
         for i in range(n_freq):
@@ -844,12 +843,13 @@ class TWPAnalysis(Analyzer, Frequencies):
         gammas = np.array(gammas)
 
         # Solve the CMEs
-        I_tuples_array = cme_general_solve_freq_array(
+        I_tuples_array = no_reflections_cmes_solve(
             x,
             y0,
             cme_data_array,
             relations_coefficients,
             thin=1,
+            second_order=second_order,
         )
 
         I_tuples_array = I_tuples_array * np.exp(np.einsum("ij,k->ijk", gammas, x))

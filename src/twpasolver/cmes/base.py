@@ -173,61 +173,103 @@ def no_reflections_cmes(
     return derivs
 
 
-def cme_general_solve_freq_array(
+@nb.njit(
+    nb_complex1d(
+        nb.float64,
+        nb_complex1d,
+        nb_complex1d,
+        nb_int2d,
+        nb_int2d,
+        nb_complex1d,
+        nb_complex1d,
+    ),
+    cache=True,
+)
+def no_reflections_cmes_second_order(
+    x,
+    currents,
+    gammas,
+    relations_3wm,
+    relations_4wm,
+    coeffs_3wm,
+    coeffs_4wm,
+):
+    """Return derivatives of Coupled Mode Equations system including arbitrary 3WM and 4WM relations."""
+    num_modes = len(gammas)
+    derivs = np.zeros(2 * num_modes, nb.complex128)
+    exp_pos = np.exp(gammas * x)
+
+    alphas_rhs = np.zeros(4 * num_modes, dtype=np.complex128)
+    for i in range(num_modes):
+        alphas_rhs[i] = currents[i] * exp_pos[i]
+        alphas_rhs[i + num_modes] = np.conj(alphas_rhs[i])
+
+    for idx, idx1, idx2 in relations_3wm:
+        derivs[idx] += coeffs_3wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2]
+    for idx, idx1, idx2, idx3 in relations_4wm:
+        derivs[idx] += (
+            coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
+        )
+    derivs[num_modes:] = (
+        2 * gammas * gammas.imag * derivs[:num_modes] / exp_pos
+        - 2 * gammas.imag * currents[num_modes:]
+    )  # dB = f-dA/dx
+    derivs[:num_modes] = currents[num_modes:]  # B = dA/dx
+
+    return derivs
+
+
+#   for i in range(num_modes):
+#       if (derivs[i]/currents[i]).real < 0. and np.abs(currents[i]) < 1e-10:
+#           derivs[i] = 0
+
+
+@nb.njit(parallel=True)
+def _no_reflections_cmes_solve_parallel(
     x_array: FloatArray,
-    y0_array: ComplexArray,
-    data_kappas_gammas_array,
-    relations_coefficients,
-    thin: int = 200,
-    reflections: bool = True,
-    with_loss: bool = False,
+    y0_broadcast: ComplexArray,
+    gammas_array: ComplexArray,
+    relations_3wm: nb_int2d,
+    relations_4wm: nb_int2d,
+    coeffs_3wm: nb_complex1d,
+    coeffs_4wm: nb_complex1d,
 ) -> ComplexArray:
     """
-    Solve coupled mode equations for multiple frequency points using numba prange.
+    Parallel inner loop: solve no_reflections_cmes for every frequency point.
+
+    Separated from the Python wrapper so that nb.prange executes in parallel
+    (requires @nb.njit(parallel=True)).
 
     Args:
-        x_array (FloatArray): Array of position values for evaluation.
-        y0_array (ComplexArray): Initial currents for each mode and frequency (2D array: [n_freq, n_modes] or 1D array for single condition).
-        data_kappas_gammas_array: List of parameter arrays for each frequency point.
-        relations_coefficients: tables with indexes representing mixing relations between modes and relative coefficients.
-        thin (int): Thinning factor for plotting.
+        x_array: Output positions, shape (n_positions,).
+        y0_broadcast: Initial amplitudes, shape (n_freq, n_modes).
+        gammas_array: Propagation constants 1j*kappa - alpha, shape (n_freq, n_modes).
+        relations_3wm: 3WM index table, shape (n_3wm, 3).
+        relations_4wm: 4WM index table, shape (n_4wm, 4).
+        coeffs_3wm: 3WM coefficients, length n_3wm.
+        coeffs_4wm: 4WM coefficients, length n_4wm.
 
     Returns:
-        ComplexArray: Solution of the coupled mode equations for all frequencies (3D array: [n_freq, n_modes, n_positions]).
+        Amplitudes, shape (n_freq, n_modes, n_positions).
     """
-    n_freq = len(data_kappas_gammas_array)
-    n_modes = len(data_kappas_gammas_array[0][0])  # kappas is always the first element
+    n_freq = y0_broadcast.shape[0]
+    n_modes = y0_broadcast.shape[1]
+    x_span = (x_array[0], x_array[-1])
 
-    # Convert relations_coefficients to numpy arrays with proper dtypes
-    relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm = relations_coefficients
-    relations_3wm = np.array(relations_3wm, dtype=np.int64)
-    relations_4wm = np.array(relations_4wm, dtype=np.int64)
-    coeffs_3wm = np.array(coeffs_3wm, dtype=np.complex128)
-    coeffs_4wm = np.array(coeffs_4wm, dtype=np.complex128)
+    I_tuples = np.empty((n_freq, n_modes, len(x_array)), dtype=nb.complex128)
 
-    # Ideal model
-    args_array = []
-    for i in range(n_freq):
-        kappas = np.array(data_kappas_gammas_array[i][0], dtype=np.float64)
-        args_array.append(
-            (kappas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm)
-        )
-    n_freq = len(args_array)
-    # Handle initial conditions - broadcast if 1D
-    if y0_array.ndim == 1:
-        y0_broadcast = np.repeat(y0_array, n_freq).reshape((-1, n_freq)).transpose()
-    else:
-        y0_broadcast = y0_array
-    I_tuples = np.empty((n_freq, n_modes, len(x_array)), dtype=np.complex128)
-    # Use parallel loop for frequency iteration
     for i in nb.prange(n_freq):
-        x_span = (x_array[0], x_array[-1])
-
         result = nbsolve_ivp(
             no_reflections_cmes,
             x_span,
             y0_broadcast[i],
-            args=args_array[i],
+            args=(
+                gammas_array[i],
+                relations_3wm,
+                relations_4wm,
+                coeffs_3wm,
+                coeffs_4wm,
+            ),
             atol=SOLVER_ATOL,
             rtol=SOLVER_RTOL,
             max_num_steps=SOLVER_MAX_STEPS,
@@ -236,4 +278,128 @@ def cme_general_solve_freq_array(
             first_step=SOLVER_FIRST_STEP,
         )
         I_tuples[i] = result.y
+
     return I_tuples
+
+
+@nb.njit(parallel=True)
+def _no_reflections_cmes_second_order_solve_parallel(
+    x_array: FloatArray,
+    y0_broadcast: ComplexArray,
+    gammas_array: ComplexArray,
+    relations_3wm: nb_int2d,
+    relations_4wm: nb_int2d,
+    coeffs_3wm: nb_complex1d,
+    coeffs_4wm: nb_complex1d,
+) -> ComplexArray:
+    n_freq = y0_broadcast.shape[0]
+    n_modes = gammas_array.shape[1]  # true mode count, not 2*n_modes
+    x_span = (x_array[0], x_array[-1])
+
+    I_tuples = np.empty((n_freq, n_modes, len(x_array)), dtype=nb.complex128)
+
+    for i in nb.prange(n_freq):
+        result = nbsolve_ivp(
+            no_reflections_cmes_second_order,
+            x_span,
+            y0_broadcast[i],  # length 2*n_modes
+            args=(
+                gammas_array[i],
+                relations_3wm,
+                relations_4wm,
+                coeffs_3wm,
+                coeffs_4wm,
+            ),
+            atol=SOLVER_ATOL,
+            rtol=SOLVER_RTOL,
+            max_num_steps=SOLVER_MAX_STEPS,
+            t_eval=x_array,
+            rk_method=SOLVER_RK_METHOD,
+            first_step=SOLVER_FIRST_STEP,
+        )
+        # result.y has shape (2*n_modes, n_positions); keep only amplitude block
+        I_tuples[i] = result.y[:n_modes]
+
+    return I_tuples
+
+
+def no_reflections_cmes_solve(
+    x_array: FloatArray,
+    y0_array: ComplexArray,
+    data_kappas_gammas_array,
+    relations_coefficients,
+    thin: int = 200,
+    second_order: bool = False,
+) -> ComplexArray:
+    """
+    Solve coupled mode equations for multiple frequency points in parallel.
+
+    Python-level wrapper that converts flexible input formats to the strictly
+    typed numpy arrays required by the njit inner loop.
+
+    Args:
+        x_array (FloatArray): Output positions, shape (n_positions,).
+        y0_array (ComplexArray): Initial amplitudes, shape (n_freq, n_modes)
+            or (n_modes,) broadcast to all frequencies.
+        data_kappas_gammas_array: Per-frequency list of (kappas, alphas, ...);
+            only the first two entries are used.
+        relations_coefficients: Tuple (relations_3wm, relations_4wm,
+            coeffs_3wm, coeffs_4wm) as returned by build_relations_coefficients.
+        thin (int): Unused; retained for API compatibility.
+        second_order (bool): If True, use the second-order CME formulation
+            (no_reflections_cmes_second_order) with zero-derivative BCs.
+            The derivative block dA_n/dx(0) = 0 is appended automatically.
+            Output shape is identical to the first-order solver: (n_freq, n_modes, n_positions).
+
+    Returns:
+        ComplexArray: Amplitudes, shape (n_freq, n_modes, n_positions).
+    """
+    n_freq = len(data_kappas_gammas_array)
+    n_modes = len(data_kappas_gammas_array[0][0])
+
+    relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm = relations_coefficients
+    relations_3wm = np.array(relations_3wm, dtype=np.int64)
+    relations_4wm = np.array(relations_4wm, dtype=np.int64)
+    coeffs_3wm = np.array(coeffs_3wm, dtype=np.complex128)
+    coeffs_4wm = np.array(coeffs_4wm, dtype=np.complex128)
+
+    # Build typed 2D gammas array from the per-frequency parameter lists
+    gammas_array = np.empty((n_freq, n_modes), dtype=np.complex128)
+    for i in range(n_freq):
+        kappas = np.asarray(data_kappas_gammas_array[i][0], dtype=np.float64)
+        alphas = np.asarray(data_kappas_gammas_array[i][1], dtype=np.float64)
+        gammas_array[i] = 1j * kappas - alphas
+
+    # Broadcast initial conditions to (n_freq, n_modes)
+    if y0_array.ndim == 1:
+        y0_broadcast = np.repeat(y0_array, n_freq).reshape((-1, n_freq)).T.copy()
+    else:
+        y0_broadcast = np.ascontiguousarray(y0_array)
+
+    if second_order:
+        # Append zero-derivative block: dA_n/dx(0) = 0 for all modes.
+        # This encodes the first-pass BC derived from the SVEA constraint
+        # when no backward wave is present at the input.
+        zeros = np.zeros_like(y0_broadcast)  # shape (n_freq, n_modes)
+        y0_broadcast_2nd = np.ascontiguousarray(
+            np.concatenate((y0_broadcast, zeros), axis=1)  # shape (n_freq, 2*n_modes)
+        )
+        return _no_reflections_cmes_second_order_solve_parallel(
+            x_array,
+            y0_broadcast_2nd,
+            gammas_array,
+            relations_3wm,
+            relations_4wm,
+            coeffs_3wm,
+            coeffs_4wm,
+        )
+
+    return _no_reflections_cmes_solve_parallel(
+        x_array,
+        y0_broadcast,
+        gammas_array,
+        relations_3wm,
+        relations_4wm,
+        coeffs_3wm,
+        coeffs_4wm,
+    )

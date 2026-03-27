@@ -6,6 +6,7 @@ SOLVER_RTOL = 1e-10
 SOLVER_MAX_STEPS = 0
 SOLVER_RK_METHOD = 1
 SOLVER_FIRST_STEP = 10
+UPDATE_RATE = 0.9
 
 
 def configure_solver(
@@ -48,4 +49,5 @@ def get_solver_config():
         "max_steps": SOLVER_MAX_STEPS,
         "rk_method": SOLVER_RK_METHOD,
         "first_step": SOLVER_FIRST_STEP,
+        "update_rate": UPDATE_RATE,
     }

@@ -30,8 +30,7 @@ Key Features
 
 **Gain Models:**
     - MINIMAL_3WM: Basic three-wave mixing model with only pump, signal and idler
-    - GENERAL_IDEAL: Extended modes without losses or reflections
-    - GENERAL_LOSS_ONLY: Extended modes with losses
+    - GENERAL_NO_REFLECTIONS: Extended modes without reflections
     - GENERAL: Full model with losses and reflections
 
 **Circuit Modeling:**
