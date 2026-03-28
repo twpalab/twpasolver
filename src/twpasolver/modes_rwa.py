@@ -465,6 +465,7 @@ class ModeArray:
 
         # Validate initial state
         self._validate_modes()
+        self._compute_mode_graph()
 
     def _parse_expression_for_propagation(self, expr: str) -> List[Tuple[str, int]]:
         """Parse expression into list of (mode, coefficient) pairs for frequency propagation."""
@@ -752,6 +753,28 @@ class ModeArray:
 
         return mode_params
 
+    def get_dependent_modes(self, mode_label="s"):
+        dg = self.dependency_graph
+        allmodes = dg[mode_label]
+        for mode in dg[mode_label]:
+            if dg[mode]:
+                allmodes = allmodes.union(self.get_dependent_modes(mode))
+        return allmodes
+
+    def _compute_mode_graph(self):
+        # Create directed graph
+        G = nx.DiGraph()
+
+        # Add nodes for all modes
+        for mode_label, mode in self.modes.items():
+            node_attrs = {
+                "frequency": mode.frequency,
+                "direction": mode.direction,
+                "is_independent": mode_label in self.independent_modes,
+            }
+            G.add_node(mode_label, **node_attrs)
+        self.mode_graph = G
+
     def plot_mode_relations(
         self,
         figsize: Tuple[float, float] = (12, 8),
@@ -772,17 +795,7 @@ class ModeArray:
             show_directions: Whether to show mode propagation directions
             layout: Graph layout algorithm ('spring', 'circular', 'hierarchical')
         """
-        # Create directed graph
-        G = nx.DiGraph()
-
-        # Add nodes for all modes
-        for mode_label, mode in self.modes.items():
-            node_attrs = {
-                "frequency": mode.frequency,
-                "direction": mode.direction,
-                "is_independent": mode_label in self.independent_modes,
-            }
-            G.add_node(mode_label, **node_attrs)
+        G = self.mode_graph
 
         # Add edges based on relations
         edge_labels: dict[Tuple[str, str], str] = {}
@@ -1043,9 +1056,10 @@ class ModeArrayFactory:
     """Factory for creating standard ModeArray configurations."""
 
     @staticmethod
-    def create_basic_3wm(
+    def create_basic(
         base_data: Dict[str, Any],
         forward_modes: bool = True,
+        three_wave: bool = True
     ) -> ModeArray:
         """
         Create a basic 3WM ModeArray with pump, signal, and idler modes.
@@ -1053,6 +1067,7 @@ class ModeArrayFactory:
         Args:
             base_data: Dictionary containing 'freqs', 'k', 'gammas', and 'alpha' arrays
             forward_modes: Whether to create forward (True) or backward (False) propagating modes
+            Three wave: Whether to include 3WM or 4WM mode relations
 
         Returns:
             ModeArray: Configured for basic 3WM operation
@@ -1072,10 +1087,12 @@ class ModeArrayFactory:
             Mode(label="s", direction=direction),
             Mode(label="i", direction=direction),
         ]
-
-        relations = [["i", "p-s"]]  # Idler is pump minus signal
-
+        if three_wave:
+            relations = [["i", "p-s"]]
+        else:
+            relations = [["i", "p+p-s"]]
         return ModeArray(modes, relations, interpolator)
+
 
     @staticmethod
     def create_extended_3wm(

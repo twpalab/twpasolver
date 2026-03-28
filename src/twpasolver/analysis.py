@@ -12,8 +12,8 @@ from pydantic import ConfigDict, Field, PrivateAttr, field_validator
 
 from twpasolver.basemodel import BaseModel
 from twpasolver.bonus_types import FloatArray
-from twpasolver.cmes.base import basic_3wm_cmes_solve, no_reflections_cmes_solve
-from twpasolver.cmes.cmes_fb import cme_solve_forward_backward
+from twpasolver.cmes.base import no_reflections_cmes_solve
+from twpasolver.cmes.cmes_fb import general_cmes_solve_fb_cutoff
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.frequency import Frequencies
 from twpasolver.logger import log
@@ -46,12 +46,25 @@ class GainModel(str, enum.Enum):
     GENERAL : str
         Forward-backward propagation model with iterative solving for reflections.
         Most complete model including multiple passes for reflection convergence.
-        Use phase mismatch cutoff limit to greatly increase computation speed.
+        Use phase mismatch kappa_cutoff limit to greatly increase computation speed.
     """
 
     MINIMAL_3WM = "minimal_3wm"
     GENERAL_NO_REFLECTIONS = "general_no_reflections"
     GENERAL = "general"
+
+
+def compute_quantum_efficiency_ideal(
+    mode_array, currents_in, currents_out, target_mode="s"
+):
+    mode_to_idx = {mode: idx for idx, mode in enumerate(mode_array.modes)}
+    mixing_modes = mode_array.get_dependent_modes(target_mode)
+    mixing_modes_idx = np.array(
+        [idx for m, idx in mode_to_idx.items() if m in mixing_modes], dtype=np.int32
+    )
+    mixing_out = np.abs(currents_out[:, mixing_modes_idx] / currents_in) ** 2
+    target_out = np.abs(currents_out[:, mode_to_idx[target_mode]] / currents_in) ** 2
+    return target_out / (1 + np.sum(mixing_out, axis=1))
 
 
 def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
@@ -83,15 +96,20 @@ def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
     def calculate_coefficients(terms, scaling_factor):
         return np.array([term[-1] * scaling_factor for term in terms])
 
-    relations_3wm = extract_indices(terms_3wm) if terms_3wm else []
-    relations_4wm = extract_indices(terms_4wm) if terms_4wm else []
+    relations_3wm = extract_indices(terms_3wm) if terms_3wm else [[0, 0, 0]]
+    relations_4wm = extract_indices(terms_4wm) if terms_4wm else [[0, 0, 0, 0]]
 
     coeffs_3wm = (
-        calculate_coefficients(terms_3wm, epsilon / 4) if terms_3wm else np.array([])
+        calculate_coefficients(terms_3wm, epsilon / 4) if terms_3wm else np.array([0])
     )
     coeffs_4wm = (
-        calculate_coefficients(terms_4wm, xi / 4) if terms_4wm else np.array([])
+        calculate_coefficients(terms_4wm, xi / 4) if terms_4wm else np.array([0])
     )
+
+    relations_3wm = np.array(relations_3wm, dtype=np.int64)
+    relations_4wm = np.array(relations_4wm, dtype=np.int64)
+    coeffs_3wm = np.array(coeffs_3wm, dtype=np.complex128)
+    coeffs_4wm = np.array(coeffs_4wm, dtype=np.complex128)
 
     return relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm
 
@@ -123,7 +141,7 @@ def analysis_function(func):
 class Analyzer(BaseModel, ABC):
     """Base class for structured analysis."""
 
-    use_block: bool = False
+    use_block: bool = True
     data_file: str = Field(default_factory=partial(strftime, "data_%m_%d_%H_%M_%S"))
     data: dict[str, Any] = Field(default_factory=dict, exclude=True)
 
@@ -195,7 +213,7 @@ class TWPAnalysis(Analyzer, Frequencies):
 
     def update_base_data(self) -> None:
         """Update data extracted from the twpa model with clearer notation."""
-        current_state = self.model_dump()
+        current_state = self.twpa.model_dump()
         if (
             not hasattr(self, "_previous_state")
             or current_state != self._previous_state
@@ -287,7 +305,10 @@ class TWPAnalysis(Analyzer, Frequencies):
 
     def _initialize_standard_mode_arrays(self) -> None:
         """Initialize standard mode arrays using the computed base data."""
-        self._mode_arrays["basic_3wm"] = ModeArrayFactory.create_basic_3wm(self.data)
+        self._mode_arrays["basic_3wm"] = ModeArrayFactory.create_basic(self.data)
+        self._mode_arrays["basic_4wm"] = ModeArrayFactory.create_basic(
+            self.data, three_wave=False
+        )
 
     def _update_all_mode_arrays(self) -> None:
         """Update all registered mode arrays with current base data using clearer notation."""
@@ -343,10 +364,10 @@ class TWPAnalysis(Analyzer, Frequencies):
         signal_mode: str,
         pump_mode: str,
         Is0: float,
-        initial_amplitudes: Optional[Union[List[float], np.ndarray]] = None,
+        initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
     ) -> np.ndarray:
         """Set initial conditions for CME solving."""
-        if initial_amplitudes is None:
+        if initial_amplitudes_fwd is None:
             n_modes = len(mode_array.modes)
             y0 = np.full(n_modes, 1e-14, dtype=np.complex128)
             mode_labels = list(mode_array.modes.keys())
@@ -355,7 +376,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             y0[pump_idx] = self.twpa.Ip0
             y0[signal_idx] = Is0
         else:
-            y0 = np.array(initial_amplitudes, dtype=np.complex128)
+            y0 = np.array(initial_amplitudes_fwd, dtype=np.complex128)
         return y0
 
     def _prepare_mode_parameters(
@@ -503,13 +524,13 @@ class TWPAnalysis(Analyzer, Frequencies):
         signal_mode: str = "s",
         pump_mode: str = "p",
         idler_mode: str = "i",
-        initial_amplitudes: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         thin: int = 100,
         passes: int = 3,
-        cutoff: Optional[float] = None,
-        second_order=False,
+        kappa_cutoff: float = 0.2,
+        update_rate: float = 0.9,
+        convergence_threshold: float = 0.05,
     ) -> dict[str, Any]:
         """
         Compute the TWPA gain using coupled mode equation models.
@@ -529,16 +550,14 @@ class TWPAnalysis(Analyzer, Frequencies):
         model : GainModel or str, default 'minimal_3wm'
             CME model complexity:
             * 'minimal_3wm': Basic pump-signal-idler only (fastest)
-            * 'general_no_reflections': Extended modes, no losses/reflections
+            * 'no_reflections': Extended modes, no losses/reflections
             * 'general': Full model with losses and reflections, uses iterative solving
         mode_array_config : str, default 'basic_3wm'
             Name of mode array configuration to use
         signal_mode, pump_mode, idler_mode : str
             Mode labels within the mode array
-        initial_amplitudes : array_like, optional
-            Initial current amplitudes for unidirectional models
         initial_amplitudes_fwd, initial_amplitudes_bwd : array_like, optional
-            Initial conditions for forward-backward model
+            Initial conditions for forward and backward waves, overrides Is0 and Ip0
         thin : int, default 100
             Position array thinning factor
         passes : int, default 3
@@ -573,12 +592,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         N_tot = self.twpa.N_tot
         x = np.linspace(0, N_tot, int(N_tot / thin), endpoint=True)
 
-        # Route to appropriate computation method
-        if model == GainModel.MINIMAL_3WM:
-            return self._compute_minimal_3wm_gain(
-                signal_freqs, pump, Is0, x, initial_amplitudes
-            )
-        elif model == GainModel.GENERAL:
+        if model == GainModel.GENERAL:
             return self._compute_forward_backward_gain(
                 signal_freqs,
                 pump,
@@ -591,7 +605,8 @@ class TWPAnalysis(Analyzer, Frequencies):
                 initial_amplitudes_fwd,
                 initial_amplitudes_bwd,
                 passes,
-                cutoff=cutoff,
+                kappa_cutoff=kappa_cutoff,
+                convergence_threshold=convergence_threshold,
             )
         else:
             return self._compute_general_gain_no_reflections(
@@ -603,9 +618,8 @@ class TWPAnalysis(Analyzer, Frequencies):
                 idler_mode,
                 x,
                 model,
-                initial_amplitudes,
+                initial_amplitudes_fwd,
                 Is0,
-                second_order=second_order,
             )
 
     def _compute_forward_backward_gain(
@@ -621,7 +635,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         passes: int = 3,
-        cutoff: Optional[float] = None,
+        kappa_cutoff: Optional[float] = None,
+        convergence_threshold: float = 0.05,
+        save_all_passes: bool = False,
     ) -> dict[str, Any]:
         """Compute gain using the forward-backward propagation model."""
         # Get the mode array
@@ -655,52 +671,55 @@ class TWPAnalysis(Analyzer, Frequencies):
         # Get RWA terms
         terms_3wm = mode_array.get_rwa_terms(power=2)
         terms_4wm = mode_array.get_rwa_terms(power=3)
-        relations_coefficients = prepare_relations_coefficients(
-            terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
+        relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm = (
+            prepare_relations_coefficients(
+                terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
+            )
         )
 
         # Build CME data arrays
-        cme_data_array = []
-        gammas = []
-
+        gammas = np.empty((n_freq, n_modes), dtype=np.complex128)
+        reflections = np.empty((n_freq, n_modes), dtype=np.complex128)
         for i in range(n_freq):
             kappas = np.array([mode_params[mode]["k"][i] for mode in mode_labels])
             alphas = np.array([mode_params[mode]["alpha"][i] for mode in mode_labels])
-            reflections = np.array(
+            reflections[i] = np.array(
                 [mode_params[mode]["gamma"][i] for mode in mode_labels]
             )
-            cme_data_array.append([kappas, alphas, reflections])
-            gammas.append(-alphas + 1j * kappas)
+            gammas[i] = -alphas + 1j * kappas
 
-        gammas = np.array(gammas)
-        cme_data_array = np.array(cme_data_array, dtype=np.complex128)
-
-        use_cutoff = False if cutoff is None else True
-        I_tuples = cme_solve_forward_backward(
+        I_tuples = general_cmes_solve_fb_cutoff(
             x,
             y0_fwd,
             y0_bwd,
-            cme_data_array,
-            relations_coefficients,
-            thin=1,
-            passes=passes,
-            cutoff=cutoff,
-            use_cutoff=use_cutoff,
+            gammas,
+            reflections,
+            relations_3wm,
+            relations_4wm,
+            coeffs_3wm,
+            coeffs_4wm,
+            passes,
+            kappa_cutoff,
+            conv_threshold=convergence_threshold,
+            save_all_passes=save_all_passes,
         )
 
         # Extract results for all passes
         # I_tuples now has shape (2 * n_freq * passes, n_modes, len(x))
         I_tuples_all_passes = {}
-
-        for pass_idx in range(passes):
+        if save_all_passes:
+            num_saved_passes = passes
+        else:
+            num_saved_passes = 1
+        for pass_idx in range(num_saved_passes):
             # Forward results for this pass
             start_fwd = pass_idx * n_freq
             end_fwd = (pass_idx + 1) * n_freq
             I_tuples_fwd_pass = I_tuples[start_fwd:end_fwd]
 
             # Backward results for this pass
-            start_bwd = n_freq * passes + pass_idx * n_freq
-            end_bwd = n_freq * passes + (pass_idx + 1) * n_freq
+            start_bwd = n_freq * num_saved_passes + pass_idx * n_freq
+            end_bwd = n_freq * num_saved_passes + (pass_idx + 1) * n_freq
             I_tuples_bwd_pass = I_tuples[start_bwd:end_bwd]
 
             # # Apply propagation phase correction
@@ -717,11 +736,11 @@ class TWPAnalysis(Analyzer, Frequencies):
             }
 
         # Use final pass results for main calculation
-        I_tuples_fwd = I_tuples_all_passes[passes - 1]["forward"]
-        I_tuples_bwd = I_tuples_all_passes[passes - 1]["backward"]
+        I_tuples_fwd = I_tuples_all_passes[num_saved_passes - 1]["forward"]
+        I_tuples_bwd = I_tuples_all_passes[num_saved_passes - 1]["backward"]
 
         # Calculate transmission coefficients and output currents
-        transmission_coeffs = 1 + cme_data_array[:, 2, :]
+        transmission_coeffs = 1 + reflections
         signal_idx = mode_labels.index(signal_mode)
 
         I_out_fwd = I_tuples_fwd[:, signal_idx, -1] * transmission_coeffs[:, signal_idx]
@@ -733,9 +752,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         gains_fwd_11 = to_dB(np.abs(I_out_bwd / np.repeat(y0_fwd[signal_idx], n_freq)))
         gains_bwd_22 = to_dB(np.abs(I_out_fwd / np.repeat(y0_bwd[signal_idx], n_freq)))
 
-        # Calculate gains for all passes
+        # Calculate gains for all num_saved_passes
         gains_all_passes = []
-        for pass_idx in range(passes):
+        for pass_idx in range(num_saved_passes):
             I_fwd_pass = I_tuples_all_passes[pass_idx]["forward"]
             I_bwd_pass = I_tuples_all_passes[pass_idx]["backward"]
 
@@ -763,6 +782,13 @@ class TWPAnalysis(Analyzer, Frequencies):
                 }
             )
 
+        qe_ideal = compute_quantum_efficiency_ideal(
+            mode_array,
+            y0_fwd[signal_idx],
+            I_fwd_pass[:, :, -1] * transmission_coeffs,
+            target_mode=signal_mode,
+        )
+
         # Create mode maps
         mode_map = {label: idx for idx, label in enumerate(mode_labels)}
         reverse_mode_map = {idx: label for label, idx in mode_map.items()}
@@ -775,12 +801,13 @@ class TWPAnalysis(Analyzer, Frequencies):
             "I_tuples": I_tuples_fwd,  # Final pass forward results for backward compatibility
             "I_tuples_fwd": I_tuples_fwd,  # Final pass forward results
             "I_tuples_bwd": I_tuples_bwd,  # Final pass backward results
-            "I_tuples_all_passes": I_tuples_all_passes,  # All passes results
+            "I_tuples_all_passes": I_tuples_all_passes,  # All num_saved_passes results
             "gain_db": gains_fwd,  # Final pass forward gain
             "gain_db_12": gains_bwd,  # Final pass backward gain
             "gain_db_11": gains_fwd_11,  # Final pass cross-coupling
             "gain_db_22": gains_bwd_22,  # Final pass cross-coupling
             "gains_all_passes": gains_all_passes,  # Gains for all passes
+            "qe_ideal": qe_ideal,
             "passes": passes,
             "mode_info": {
                 "mode_array": mode_array_config,
@@ -802,7 +829,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         idler_mode: str,
         x: FloatArray,
         model: GainModel,
-        initial_amplitudes: Optional[Union[List[float], np.ndarray]] = None,
+        initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         Is0: float = 1e-6,
         second_order=False,
     ) -> dict[str, Any]:
@@ -813,7 +840,7 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         # Setup initial conditions
         y0 = self._setup_initial_conditions(
-            mode_array, signal_mode, pump_mode, Is0, initial_amplitudes
+            mode_array, signal_mode, pump_mode, Is0, initial_amplitudes_fwd
         )
 
         # Prepare mode parameters
@@ -827,29 +854,32 @@ class TWPAnalysis(Analyzer, Frequencies):
         # Get RWA terms
         terms_3wm = mode_array.get_rwa_terms(power=2)
         terms_4wm = mode_array.get_rwa_terms(power=3)
-        relations_coefficients = prepare_relations_coefficients(
-            terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
+        relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm = (
+            prepare_relations_coefficients(
+                terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
+            )
         )
 
-        # Build CME data arrays based on model type
-        cme_data_array = []
-
-        gammas = []
+        gammas = np.empty((n_freq, n_modes), dtype=np.complex128)
         for i in range(n_freq):
             kappas = np.array([mode_params[mode]["k"][i] for mode in mode_labels])
             alphas = np.array([mode_params[mode]["alpha"][i] for mode in mode_labels])
-            cme_data_array.append([kappas, alphas])
-            gammas.append(-alphas + 1j * kappas)
-        gammas = np.array(gammas)
+            gammas[i] = 1j * kappas - alphas
 
-        # Solve the CMEs
+        # Broadcast initial conditions to (n_freq, n_modes)
+        if y0.ndim == 1:
+            y0_broadcast = np.repeat(y0, n_freq).reshape((-1, n_freq)).T.copy()
+        else:
+            y0_broadcast = np.ascontiguousarray(y0)
+
         I_tuples_array = no_reflections_cmes_solve(
             x,
-            y0,
-            cme_data_array,
-            relations_coefficients,
-            thin=1,
-            second_order=second_order,
+            y0_broadcast,
+            gammas,
+            relations_3wm,
+            relations_4wm,
+            coeffs_3wm,
+            coeffs_4wm,
         )
 
         I_tuples_array = I_tuples_array * np.exp(np.einsum("ij,k->ijk", gammas, x))
@@ -865,6 +895,13 @@ class TWPAnalysis(Analyzer, Frequencies):
             np.abs(I_tuples_array[:, signal_idx, -1] / initial_signal) ** 2
         )
 
+        qe_ideal = compute_quantum_efficiency_ideal(
+            mode_array,
+            initial_signal,
+            I_tuples_array[:, :, -1],
+            target_mode=signal_mode,
+        )
+
         # Create mode maps
         mode_map = {label: idx for idx, label in enumerate(mode_labels)}
         reverse_mode_map = {idx: label for label, idx in mode_map.items()}
@@ -876,6 +913,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             "x": x,
             "I_tuples": I_tuples_array,
             "gain_db": gain_db,
+            "qe_ideal": qe_ideal,
             "mode_info": {
                 "mode_array": mode_array_config,
                 "mode_map": mode_map,
@@ -884,52 +922,6 @@ class TWPAnalysis(Analyzer, Frequencies):
                 "pump_mode": pump_mode,
                 "idler_mode": idler_mode,
             },
-        }
-
-    def _compute_minimal_3wm_gain(
-        self,
-        signal_freqs: FloatArray,
-        pump: float,
-        Is0: float,
-        x: FloatArray,
-        initial_amplitudes: Optional[Union[List[float], np.ndarray]] = None,
-    ) -> dict[str, Any]:
-        """Compute gain using the standard 3WM model."""
-        freqs = self.data["freqs"]
-        ks = self.data["k"]
-
-        # Calculate frequencies and wavenumbers
-        idler_freqs = pump - signal_freqs
-        pump_k = np.interp(pump, freqs, ks)
-        signal_k = np.interp(signal_freqs, freqs, ks)
-        idler_k = np.interp(idler_freqs, freqs, ks)
-
-        # Setup initial conditions
-        if initial_amplitudes is None:
-            y0 = np.array([self.twpa.Ip0, Is0, 1e-14], dtype=np.complex128)
-        else:
-            y0 = np.array(initial_amplitudes, dtype=np.complex128)
-
-        # Solve coupled mode equations
-        I_tuples = basic_3wm_cmes_solve(
-            signal_k, idler_k, x, y0, pump_k, self.twpa.xi, self.twpa.epsilon
-        )
-
-        # Calculate gain
-        if y0.ndim == 1:
-            initial_signal = y0[1]  # Signal is at index 1
-        else:
-            initial_signal = y0[:, 1]
-
-        gain_db = 10 * np.log10(np.abs(I_tuples[:, 1, -1] / initial_signal) ** 2)
-
-        return {
-            "model": GainModel.MINIMAL_3WM.value,
-            "pump_freq": pump,
-            "signal_freqs": signal_freqs,
-            "x": x,
-            "I_tuples": I_tuples,
-            "gain_db": gain_db,
         }
 
     @analysis_function
