@@ -25,6 +25,7 @@ from twpasolver.plotting import (
     plot_mode_currents,
     plot_phase_matching,
     plot_response,
+    plot_quantum_efficiency
 )
 from twpasolver.twoport import TwoPortCell
 
@@ -983,7 +984,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         mode_params = mode_array.process_frequency_array(signal_mode, signal_freqs)
 
         # kappas_array[i, m] = k_m at signal-frequency index i, shape (n_freq, n_modes)
-        # alphas_array[i, m] = alpha_m (amplitude loss rate) — used for loss correction
+        # alphas_array[i, m] = alpha_m (amplitude loss rate) - used for loss correction
         kappas_array = np.array(
             [[mode_params[m]["k"][i] for m in mode_labels] for i in range(n_freq)]
         )
@@ -1010,7 +1011,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             )
             return I * np.exp(np.einsum("ij,k->ijk", 1j * kappas_array, x))
 
-        # ---- signal gain run — keep full trajectory ----
+        # ---- signal gain run - keep full trajectory ----
         y0_s = np.zeros((n_freq, n_modes), dtype=np.complex128)
         y0_s[:, pump_idx] = self.twpa.Ip0
         y0_s[:, signal_idx] = Is0
@@ -1035,18 +1036,21 @@ class TWPAnalysis(Analyzer, Frequencies):
         # alpha_s per frequency, shape (n_freq,)
         alpha_s = alphas_array[:, signal_idx]
 
-        # Integrand: 2*alpha_s / |I_s(x)|^2, shape (n_freq, n_x)
-        # Guard against zero signal at x=0 (Is0 is small but non-zero)
+        # The loss integrand requires the true physical amplitude |A_s(x)|^2.
+        # _run_cme returns output_s(x) = A_s(x) * exp(+alpha_s*x), so:
+        #   |A_s(x)|^2 = |output_s(x)|^2 * exp(-2*alpha_s*x)
+        attenuation_s = np.exp(-2.0 * alpha_s[:, np.newaxis] * x[np.newaxis, :])
+        As_traj_sq = Is_traj_sq * attenuation_s   # true physical |A_s(x)|^2, (n_freq, n_x)
+
         integrand = (
             2.0
             * alpha_s[:, np.newaxis]
             / np.where(
-                Is_traj_sq > 0, Is_traj_sq, Is_traj_sq.max(axis=1, keepdims=True)
+                As_traj_sq > 0, As_traj_sq, As_traj_sq.max(axis=1, keepdims=True)
             )
         )
         # N_add_loss: input-referred vacuum noise from distributed signal-path loss
-        # shape (n_freq,)
-        N_add_loss = U_sq * np.abs(Is0) ** 2 * np.trapezoid(integrand, x, axis=1)
+        N_add_loss = U_sq * np.abs(Is0) ** 2 * np.trapz(integrand, x, axis=1)
 
         # ---- noise channels + per-channel distributed loss ----
         dependent_modes = mode_array.get_dependent_modes(signal_mode)
@@ -1071,9 +1075,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             y0_k[:, pump_idx] = self.twpa.Ip0
             y0_k[:, noise_idx] = Is0
 
-            # Keep full trajectory for the distributed loss integral
-            I_traj_k = _run_cme(y0_k)  # (n_freq, n_modes, n_x)
-            I_out_k = I_traj_k[:, :, -1]
+            I_out_k = _run_cme(y0_k)[:, :, -1]
             V_k_current_sq = np.abs(I_out_k[:, signal_idx] / Is0) ** 2
 
             # Photon-basis noise: (k_k/k_s) * |V_k_current|^2
@@ -1086,29 +1088,31 @@ class TWPAnalysis(Analyzer, Frequencies):
             bogoliubov_per_mode[noise_mode] = sign * v_k_sq
 
             # Distributed loss noise from channel k, photon-basis, input-referred.
-            # Vacuum injected into mode k at position x is converted to signal
-            # photons by the remaining parametric gain G_{s<-k}(x->L).  Using
-
-            I_s_from_k_sq = np.abs(I_traj_k[:, noise_idx, :]) ** 2  # (n_freq, n_x)
-            safe_denom = np.where(
-                I_s_from_k_sq > 0,
-                I_s_from_k_sq,
-                I_s_from_k_sq.max(axis=1, keepdims=True),
-            )
-            integrand_k = 2.0 * alpha_k[:, np.newaxis] / safe_denom
-            N_add_k = v_k_sq * np.abs(Is0) ** 2 * np.trapezoid(integrand_k, x, axis=1)
-            N_add_loss_channels += N_add_k
+            # A noise photon lost from mode k at position x has probability of
+            # reaching the signal output proportional to the remaining parametric
+            # gain G_{s<-k}(x->L). 
+            #
+            # At the moment, only the added loss noise from signal and idler is computed,
+            # Assuming that the current trajectectory is the same for the two
+            # This avoids the singularity that arises from using the signal output
+            # trajectory from the noise-seeded run (which starts at zero at x=0),
+            # and avoids the 1/|A_k|^2 amplification that occurs when mode k is
+            # weakly excited (e.g. far-detuned sidebands 20 dB below the signal).
+            if noise_mode==idler_mode:
+                integrand_k = 2.0 * alpha_k[:, np.newaxis] / np.where(
+                    As_traj_sq > 0, As_traj_sq, As_traj_sq.max(axis=1, keepdims=True)
+                )
+                N_add_k = v_k_sq * np.abs(Is0) ** 2 * np.trapz(integrand_k, x, axis=1)
+                N_add_loss_channels += N_add_k
             gain_db_per_mode[noise_mode] = 10 * np.log10(v_k_sq * signal_transmission)
         # Total Bogoliubov residual: G_s - sum_k sign*(kk/ks)*|V_k_row|^2 - 1 = 0
         bogoliubov_residual = U_sq - sum(bogoliubov_per_mode.values()) - 1.0
 
-        # ---- QE ----
-        # Total input-referred noise: parametric channels + signal-path loss
-        # + loss noise from all noise-channel paths
         total_noise_with_loss = total_noise + N_add_loss + N_add_loss_channels
 
         qe = U_sq / (U_sq + total_noise_with_loss)
         added_noise = total_noise_with_loss / U_sq
+        noise_channels_out = noise_channels  # already in the same frame
 
         qe_ideal = U_sq / (2.0 * U_sq - 1.0)
         qe_normalized = np.where(qe_ideal > 0, qe / qe_ideal, 0.0)
@@ -1121,7 +1125,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             "qe_normalized": qe_normalized,
             "qe_ideal": qe_ideal,
             "added_noise": added_noise,
-            "noise_channels": noise_channels,
+            "noise_channels": noise_channels_out,
             "gain_db_per_mode": gain_db_per_mode,
             "bogoliubov_per_mode": bogoliubov_per_mode,
             "bogoliubov_residual": bogoliubov_residual,
@@ -1226,6 +1230,15 @@ class TWPAnalysis(Analyzer, Frequencies):
             phase_matching_data["pump_freqs"],
             phase_matching_data["signal_freqs"],
             phase_matching_data["delta"],
+            freqs_unit=self.unit,
+            **kwargs,
+        )
+
+    def plot_quantum_efficiency(self, **kwargs) -> np.ndarray:
+        if "quantum_efficiency" not in self.data:
+            raise RuntimeError("Run quantum_efficiency() first.")
+        return plot_quantum_efficiency(
+            self.data["quantum_efficiency"],
             freqs_unit=self.unit,
             **kwargs,
         )
