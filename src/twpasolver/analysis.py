@@ -24,8 +24,8 @@ from twpasolver.plotting import (
     plot_gain,
     plot_mode_currents,
     plot_phase_matching,
+    plot_quantum_efficiency,
     plot_response,
-    plot_quantum_efficiency
 )
 from twpasolver.twoport import TwoPortCell
 
@@ -36,10 +36,6 @@ class GainModel(str, enum.Enum):
 
     Args
     ----
-    MINIMAL_3WM : str
-        Basic pump-signal-idler model. Fastest computation but limited accuracy.
-        Suitable for quick design estimates and parameter space exploration.
-
     GENERAL_NO_REFLECTIONS : str
         Extended mode system without reflections. Moderate computation
         time with improved accuracy over basic model.
@@ -50,7 +46,6 @@ class GainModel(str, enum.Enum):
         Use phase mismatch kappa_cutoff limit to greatly increase computation speed.
     """
 
-    MINIMAL_3WM = "minimal_3wm"
     GENERAL_NO_REFLECTIONS = "general_no_reflections"
     GENERAL = "general"
 
@@ -507,7 +502,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         pump: Optional[float] = None,
         Is0: float = 1e-6,
         Ip0: Optional[float] = None,
-        model: Union[str, GainModel] = GainModel.MINIMAL_3WM,
+        model: Union[str, GainModel] = GainModel.GENERAL_NO_REFLECTIONS,
         mode_array_config: str = "basic_3wm",
         signal_mode: str = "s",
         pump_mode: str = "p",
@@ -535,9 +530,9 @@ class TWPAnalysis(Analyzer, Frequencies):
             Initial signal current amplitude (A) for standard models
         Ip0 : float, optional
             Initial pump current amplitude (A). If None, uses TWPA's Ip0 parameter
-        model : GainModel or str, default 'minimal_3wm'
+        model : GainModel or str, default 'GENERAL_NO_REFLECTIONS'
             CME model complexity:
-            * 'minimal_3wm': Basic pump-signal-idler only (fastest)
+            * 'GENERAL_NO_REFLECTIONS': Basic pump-signal-idler only (fastest)
             * 'no_reflections': Extended modes, no losses/reflections
             * 'general': Full model with losses and reflections, uses iterative solving
         mode_array_config : str, default 'basic_3wm'
@@ -910,10 +905,14 @@ class TWPAnalysis(Analyzer, Frequencies):
         Is0: float = 1e-6,
         Ip0: Optional[float] = None,
         mode_array_config: str = "basic_3wm",
+        model: Union[str, GainModel] = GainModel.GENERAL_NO_REFLECTIONS,
         signal_mode: str = "s",
         pump_mode: str = "p",
         idler_mode: str = "i",
+        initial_pump_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
+        initial_pump_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         thin: int = 100,
+        **forward_backward_kwargs,
     ) -> dict[str, Any]:
         """
         Compute the quantum efficiency (QE) of the TWPA in the lossless approximation.
@@ -991,6 +990,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         alphas_array = np.array(
             [[mode_params[m]["alpha"][i] for m in mode_labels] for i in range(n_freq)]
         )
+        reflections = np.array(
+            [[mode_params[m]["gamma"][i] for m in mode_labels] for i in range(n_freq)]
+        )
         gammas = -alphas_array + 1j * kappas_array
 
         terms_3wm = mode_array.get_rwa_terms(power=2)
@@ -1006,17 +1008,37 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         def _run_cme(y0: np.ndarray) -> np.ndarray:
             """Return full physical amplitude trajectory, shape (n_freq, n_modes, n_x)."""
-            I = no_reflections_cmes_solve(
-                x, y0, gammas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm
-            )
+            if model == GainModel.GENERAL_NO_REFLECTIONS:
+                I = no_reflections_cmes_solve(
+                    x, y0, gammas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm
+                )
+            else:
+                y0_bwd = np.full(y0[0].shape, 1e-14, dtype=np.complex128)
+                I_tuples = general_cmes_solve_fb_cutoff(
+                    x,
+                    y0[0],
+                    y0_bwd,
+                    gammas,
+                    reflections,
+                    relations_3wm,
+                    relations_4wm,
+                    coeffs_3wm,
+                    coeffs_4wm,
+                    save_all_passes=False,
+                    **forward_backward_kwargs,
+                )
+                I = I_tuples[:n_freq]
+                I[:, :, -1] = I[:, :, -1] * (1 + reflections)
+
             return I * np.exp(np.einsum("ij,k->ijk", 1j * kappas_array, x))
 
         # ---- signal gain run - keep full trajectory ----
-        y0_s = np.zeros((n_freq, n_modes), dtype=np.complex128)
+        y0_s = np.full((n_freq, n_modes), 1e-14, dtype=np.complex128)
         y0_s[:, pump_idx] = self.twpa.Ip0
         y0_s[:, signal_idx] = Is0
 
         # I_traj_s: shape (n_freq, n_modes, n_x)
+        log.info("Running for mode %s", signal_mode)
         I_traj_s = _run_cme(y0_s)
         I_out_s = I_traj_s[:, :, -1]
 
@@ -1040,7 +1062,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         # _run_cme returns output_s(x) = A_s(x) * exp(+alpha_s*x), so:
         #   |A_s(x)|^2 = |output_s(x)|^2 * exp(-2*alpha_s*x)
         attenuation_s = np.exp(-2.0 * alpha_s[:, np.newaxis] * x[np.newaxis, :])
-        As_traj_sq = Is_traj_sq * attenuation_s   # true physical |A_s(x)|^2, (n_freq, n_x)
+        As_traj_sq = (
+            Is_traj_sq * attenuation_s
+        )  # true physical |A_s(x)|^2, (n_freq, n_x)
 
         integrand = (
             2.0
@@ -1066,16 +1090,17 @@ class TWPAnalysis(Analyzer, Frequencies):
         N_add_loss_channels = np.zeros(n_freq)  # loss noise from all noise channels
 
         for noise_mode in noise_mode_labels:
+            log.info("Running for mode %s", noise_mode)
             noise_idx = mode_to_idx[noise_mode]
             kk = kappas_array[:, noise_idx]
             kk_over_ks = np.where(ks != 0, kk / ks, 1.0)
-            alpha_k = alphas_array[:, noise_idx]
 
-            y0_k = np.zeros((n_freq, n_modes), dtype=np.complex128)
+            y0_k = np.full((n_freq, n_modes), 1e-14, dtype=np.complex128)
             y0_k[:, pump_idx] = self.twpa.Ip0
             y0_k[:, noise_idx] = Is0
 
-            I_out_k = _run_cme(y0_k)[:, :, -1]
+            I_traj_k = _run_cme(y0_k)
+            I_out_k = I_traj_k[:, :, -1]
             V_k_current_sq = np.abs(I_out_k[:, signal_idx] / Is0) ** 2
 
             # Photon-basis noise: (k_k/k_s) * |V_k_current|^2
@@ -1090,7 +1115,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             # Distributed loss noise from channel k, photon-basis, input-referred.
             # A noise photon lost from mode k at position x has probability of
             # reaching the signal output proportional to the remaining parametric
-            # gain G_{s<-k}(x->L). 
+            # gain G_{s<-k}(x->L).
             #
             # At the moment, only the added loss noise from signal and idler is computed,
             # Assuming that the current trajectectory is the same for the two
@@ -1098,9 +1123,21 @@ class TWPAnalysis(Analyzer, Frequencies):
             # trajectory from the noise-seeded run (which starts at zero at x=0),
             # and avoids the 1/|A_k|^2 amplification that occurs when mode k is
             # weakly excited (e.g. far-detuned sidebands 20 dB below the signal).
-            if noise_mode==idler_mode:
-                integrand_k = 2.0 * alpha_k[:, np.newaxis] / np.where(
-                    As_traj_sq > 0, As_traj_sq, As_traj_sq.max(axis=1, keepdims=True)
+            if noise_mode == idler_mode:
+                alpha_k = alphas_array[:, noise_idx]
+                # attenuation_db = 20*np.log10(np.exp(-alpha_k*x[-1]))
+                # att_threshold = -100 # for numerical stability
+                # alpha_k = np.where(attenuation_db>att_threshold, alpha_k, -np.log(10**(att_threshold/20)))
+                attenuation_k = np.exp(-2.0 * alpha_k[:, np.newaxis] * x[np.newaxis, :])
+                Ik_traj_sq = np.abs(I_traj_k[:, noise_idx, :]) ** 2 * attenuation_k
+                integrand_k = (
+                    2.0
+                    * alpha_k[:, np.newaxis]
+                    / np.where(
+                        Ik_traj_sq > 0,
+                        Ik_traj_sq,
+                        Ik_traj_sq.max(axis=1, keepdims=True),
+                    )
                 )
                 N_add_k = v_k_sq * np.abs(Is0) ** 2 * np.trapz(integrand_k, x, axis=1)
                 N_add_loss_channels += N_add_k
@@ -1111,7 +1148,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         total_noise_with_loss = total_noise + N_add_loss + N_add_loss_channels
 
         qe = U_sq / (U_sq + total_noise_with_loss)
-        added_noise = total_noise_with_loss / U_sq
+        added_noise = total_noise_with_loss / U_sq / 2
         noise_channels_out = noise_channels  # already in the same frame
 
         qe_ideal = U_sq / (2.0 * U_sq - 1.0)
@@ -1129,8 +1166,8 @@ class TWPAnalysis(Analyzer, Frequencies):
             "gain_db_per_mode": gain_db_per_mode,
             "bogoliubov_per_mode": bogoliubov_per_mode,
             "bogoliubov_residual": bogoliubov_residual,
-            "loss_noise_signal": N_add_loss / U_sq,
-            "loss_noise_channels": N_add_loss_channels / U_sq,
+            "loss_noise_signal": N_add_loss / U_sq / 2,
+            "loss_noise_channels": N_add_loss_channels / U_sq / 2,
             "mode_info": {
                 "mode_array": mode_array_config,
                 "signal_mode": signal_mode,

@@ -234,6 +234,7 @@ def plot_phase_matching(
     c.set_label(z_label)
     return ax
 
+
 def plot_quantum_efficiency(
     qe_result: Dict[str, Any],
     freqs_unit: str = "GHz",
@@ -246,7 +247,6 @@ def plot_quantum_efficiency(
       1. Gain per mode [dB]  — signal and all noise channels.
       2. Quantum efficiency and ideal QE limit [0–1].
       3. Input-referred added photon noise.
-      4. Bogoliubov residual (should be ~0 for a lossless run).
 
     Args:
         qe_result: Dictionary returned by TWPAnalysis.quantum_efficiency().
@@ -259,13 +259,12 @@ def plot_quantum_efficiency(
     """
     freqs = qe_result["signal_freqs"]
     pump_freq = qe_result["pump_freq"]
-    gain_db_per_mode = qe_result["gain_db_per_mode"]   # dict {mode_label: array}
-    noise_channels = qe_result["noise_channels"]        # dict {mode_label: v_k_sq}
+    gain_db_per_mode = qe_result["gain_db_per_mode"]  # dict {mode_label: array}
+    noise_channels = qe_result["noise_channels"]  # dict {mode_label: v_k_sq}
     qe = qe_result["qe"]
     qe_ideal = qe_result["qe_ideal"]
     qe_norm = qe_result["qe_normalized"]
     added_noise = qe_result["added_noise"]
-    bogoliubov_residual = qe_result["bogoliubov_residual"]
 
     # Optional per-loss breakdown (present when loss is non-zero)
     loss_noise_signal = qe_result.get("loss_noise_signal")
@@ -279,7 +278,7 @@ def plot_quantum_efficiency(
     colors = plt.cm.tab10(np.linspace(0, 1, max(n_modes, 2)))
     ls_cycle = ["-", "--", "-.", ":"] * 4
 
-    fig, axes = plt.subplots(4, 1, sharex=True, figsize=figsize)
+    fig, axes = plt.subplots(3, 1, sharex=True, figsize=figsize)
     fig.subplots_adjust(hspace=0.08)
 
     ax = axes[0]
@@ -292,10 +291,9 @@ def plot_quantum_efficiency(
 
     ax = axes[1]
     ax.plot(freqs, qe, label=r"$\eta$", color="C0", lw=lw)
-    ax.plot(freqs, qe_ideal, label=r"$\eta_\mathrm{ideal}$",
-            color="C1", ls="--", lw=lw)
-    ax.plot(freqs, qe_norm, label=r"$\eta/\eta_\mathrm{ideal}$",
-            color="C2", lw=lw)
+    ax.plot(freqs, qe_ideal, label=r"$\eta_\mathrm{ideal}$", color="C1", ls="--", lw=lw)
+    ax.plot(freqs, qe_norm, label=r"$\eta/\eta_\mathrm{ideal}$", color="C2", lw=lw)
+    ax.axhline(0.5, color="grey", ls=":", lw=1.2)
     ax.set_ylabel("Quantum efficiency")
     ax.set_ylim(0, 1.05)
     ax.legend(loc="best", fontsize=9)
@@ -304,24 +302,24 @@ def plot_quantum_efficiency(
     ax = axes[2]
     ax.plot(freqs, added_noise, label="Total added noise", color="C2", lw=lw)
     if loss_noise_signal is not None:
-        ax.plot(freqs, loss_noise_signal, label="Loss (signal path)",
-                color="C3", ls="--", lw=lw)
+        ax.plot(
+            freqs,
+            loss_noise_signal,
+            label="Loss (signal path)",
+            color="C3",
+            ls="--",
+            lw=lw,
+        )
     if loss_noise_channels is not None:
-        ax.plot(freqs, loss_noise_channels, label="Loss (idler)",
-                color="C4", ls="-.", lw=lw)
-    if min(added_noise)<3:
-        ax.set_ylim(0, 3)
-    
+        ax.plot(
+            freqs, loss_noise_channels, label="Loss (idler)", color="C4", ls="-.", lw=lw
+        )
+
+    ax.set_ylim(0, max(np.mean(added_noise) + 0.1, 1))
+
     ax.axhline(0.5, color="grey", ls=":", lw=1.2, label="0.5 photon (SQL)")
     ax.set_ylabel("Added noise [photons]")
     ax.legend(loc="best", fontsize=9)
-    ax.grid(True, alpha=0.3)
-
-    ax = axes[3]
-    ax.plot(freqs, bogoliubov_residual, color="C5", lw=lw)
-    ax.axhline(0, color="grey", ls="--", lw=1)
-    ax.set_ylabel(r"Bogoliubov residual")
-    ax.set_xlabel(f"Frequency [{freqs_unit}]")
     ax.grid(True, alpha=0.3)
 
     return axes
