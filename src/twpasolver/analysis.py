@@ -276,6 +276,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 self.data["k"] = k_full
                 self.data["k_star"] = k_full
 
+            self.data["vg"] = np.nan_to_num(np.gradient(k_full, freqs, axis=0), nan=0)
             self.data["optimal_pump_freq"] = self._estimate_optimal_pump()
             self._previous_state = current_state
 
@@ -304,6 +305,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 self.data["gamma_bloch"].imag,  # kappa
                 self.data["reflection_coeff"],  # gamma (reflection)
                 self.data["gamma_bloch"].real,  # alpha
+                self.data["vg"],
             )
         else:
             interpolator = ParameterInterpolator(
@@ -311,6 +313,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 self.data["k"],  # kappa
                 self.data["reflection_coeff"],  # gamma (reflection)
                 self.data["alpha"],  # alpha
+                self.data["vg"],
             )
 
         # Update all mode arrays
@@ -686,7 +689,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             coeffs_4wm,
             passes,
             kappa_cutoff,
-            conv_threshold=convergence_threshold,
+            convergence_threshold=convergence_threshold,
             save_all_passes=save_all_passes,
         )
 
@@ -917,31 +920,31 @@ class TWPAnalysis(Analyzer, Frequencies):
         """
         Compute the quantum efficiency (QE) of the TWPA in the lossless approximation.
 
-        Basis convention
-        ----------------
-        The CME propagates current amplitudes I_m. The correct photon-flux
-        amplitude in this formulation is
+        Photon-flux normalization
+        -------------------------
+        The CME propagates current envelope amplitudes I_m (with the fast
+        oscillation exp(i k_m x) factored out). The conserved Manley-Rowe
+        invariant obtained numerically is
 
-            a_m = I_m / sqrt(k_m)
+            |I_s|^2 / k_s - |I_i|^2 / k_i = const,
 
-        because the conserved Manley-Rowe quantity verified numerically from
-        the CME is  |I_s|^2/k_s - |I_k|^2/k_k = const  (not omega-weighted).
-        This is consistent with circuit QED where power ~ |I|^2 * Z_0 and
-        the group velocity v_g = domega/dk enters the photon-flux density.
+        consistent with photon-flux conservation where the flux in mode m is
+        proportional to |I_m|^2 / k_m.
 
-        Converting the current-basis transfer amplitudes to the photon basis:
-            G_s            = |I_s_out/I_s_in|^2          (k_s cancels, same mode)
-            |v_k|^2        = (k_k/k_s) * |I_s_out/I_k_in|^2   (noise channel k)
-            Bogoliubov:    G_s - (k_s/k_k) * |I_k_out_col/I_s_in|^2 = 1
+        Quantum efficiency definition
+        -----------------------------
+        Given the photon-basis transfer amplitudes:
 
-        where |I_k_out_col|^2 is the output of mode k from the signal-seeded run.
+            G_s  = (norm_k_s / norm_k_s) * |I_s_out / Is0|^2   (= |I_s_out/Is0|^2)
+            v_k  = sqrt(norm_k_k / norm_k_s) * |I_s_out(k-seed) / Is0|
 
-        QE:
-            eta        = G_s / (G_s + sum_k |v_k|^2)
-            eta_ideal  = G_s / (2*G_s - 1)               (Caves 1982 quantum limit,
-                         exact for 2-mode amplifier, from signal run only)
-            qe_norm    = eta / eta_ideal                  (1.0 = quantum limited)
-            eta_MR     = k_s / k_p                       (high-gain asymptote)
+        where the second line is the noise contribution from vacuum entering in
+        mode k, the QE is:
+
+            eta        = G_s / (G_s + sum_k |v_k|^2 + N_loss)
+            eta_ideal  = G_s / (2 G_s - 1)     (Caves 1982 two-mode quantum limit)
+            qe_norm    = eta / eta_ideal         (1.0 = quantum limited)
+            eta_MR     = norm_k_s / norm_k_p    (high-gain Manley-Rowe asymptote)
 
         Parameters
         ----------
@@ -950,17 +953,17 @@ class TWPAnalysis(Analyzer, Frequencies):
         Is0 : float, default 1e-6
         Ip0 : float, optional
         mode_array_config : str, default 'basic_3wm'
-        signal_mode : str, default 's'
-        pump_mode : str, default 'p'
-        idler_mode : str, default 'i'
+        model : GainModel, default GainModel.GENERAL_NO_REFLECTIONS
+        signal_mode, pump_mode, idler_mode : str
         thin : int, default 100
 
         Returns
         -------
         dict with keys: signal_freqs, pump_freq, gain_db, qe, qe_normalized,
-        eta_ideal, eta_manley_rowe, added_noise, noise_channels,
-        bogoliubov_residual, mode_info.
+        qe_ideal, added_noise, noise_channels, bogoliubov_residual, mode_info,
+        loss_noise.
         """
+        # 0. Setup
         if Ip0 is not None:
             self.twpa.Ip0 = Ip0
         if pump is None:
@@ -982,19 +985,24 @@ class TWPAnalysis(Analyzer, Frequencies):
         mode_array.update_frequencies({pump_mode: pump})
         mode_params = mode_array.process_frequency_array(signal_mode, signal_freqs)
 
-        # kappas_array[i, m] = k_m at signal-frequency index i, shape (n_freq, n_modes)
-        # alphas_array[i, m] = alpha_m (amplitude loss rate) - used for loss correction
-        kappas_array = np.array(
-            [[mode_params[m]["k"][i] for m in mode_labels] for i in range(n_freq)]
-        )
-        alphas_array = np.array(
-            [[mode_params[m]["alpha"][i] for m in mode_labels] for i in range(n_freq)]
-        )
-        reflections = np.array(
-            [[mode_params[m]["gamma"][i] for m in mode_labels] for i in range(n_freq)]
-        )
-        gammas = -alphas_array + 1j * kappas_array
+        # 1. Recover parameters
+        def _param(key: str) -> np.ndarray:
+            return np.array(
+                [[mode_params[m][key][i] for m in mode_labels] for i in range(n_freq)]
+            )
 
+        kappas_array = _param("k")
+        alphas_array = _param("alpha")
+        reflections = _param("gamma")
+        f_array = _param("freqs")
+
+        # Bloch impedance from reflection coefficient: Z_B = Z0 * (1 + gamma) / (1 - gamma)
+        Zb_array = (1.0 + reflections) / (1.0 - reflections) * self.twpa.Z0_ref
+        norm_k_array = kappas_array
+
+        gammas = -alphas_array + 1j * kappas_array  # complex propagation constants
+
+        # 2. CME nonlinear coupling coefficients
         terms_3wm = mode_array.get_rwa_terms(power=2)
         terms_4wm = mode_array.get_rwa_terms(power=3)
         (
@@ -1006,8 +1014,8 @@ class TWPAnalysis(Analyzer, Frequencies):
             terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
         )
 
+        # 3. CME solver wrapper
         def _run_cme(y0: np.ndarray) -> np.ndarray:
-            """Return full physical amplitude trajectory, shape (n_freq, n_modes, n_x)."""
             if model == GainModel.GENERAL_NO_REFLECTIONS:
                 I = no_reflections_cmes_solve(
                     x, y0, gammas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm
@@ -1028,131 +1036,133 @@ class TWPAnalysis(Analyzer, Frequencies):
                     **forward_backward_kwargs,
                 )
                 I = I_tuples[:n_freq]
-                I[:, :, -1] = I[:, :, -1] * (1 + reflections)
-
+                I[:, :, -1] = I[:, :, -1] * (1.0 + reflections)
             return I * np.exp(np.einsum("ij,k->ijk", 1j * kappas_array, x))
 
-        # ---- signal gain run - keep full trajectory ----
-        y0_s = np.full((n_freq, n_modes), 1e-14, dtype=np.complex128)
-        y0_s[:, pump_idx] = self.twpa.Ip0
-        y0_s[:, signal_idx] = Is0
+        # 4. Helper: distributed-loss added noise for one mode trajectory
+        def _loss_noise(
+            I_traj: np.ndarray,
+            mode_col_idx: int,
+            alpha_m: np.ndarray,
+            G_m_total: np.ndarray,
+        ) -> np.ndarray:
+            Im_sq = np.abs(I_traj[:, mode_col_idx, :]) ** 2
+            attn = np.exp(-2.0 * alpha_m[:, np.newaxis] * x[np.newaxis, :])
+            Am_sq = Im_sq * attn  # true physical |A_m(x)|^2
 
-        # I_traj_s: shape (n_freq, n_modes, n_x)
-        log.info("Running for mode %s", signal_mode)
-        I_traj_s = _run_cme(y0_s)
-        I_out_s = I_traj_s[:, :, -1]
+            Am_sq_safe = np.where(Am_sq > 0, Am_sq, Am_sq.max(axis=1, keepdims=True))
+            integrand = 2.0 * alpha_m[:, np.newaxis] / Am_sq_safe
+            return G_m_total * np.abs(Is0) ** 2 * np.trapz(integrand, x, axis=1)
 
-        # current-basis squared transfers from signal seed, shape (n_freq, n_modes)
-        T_s = np.abs(I_out_s / Is0) ** 2
-        U_sq = T_s[:, signal_idx]  # G_s, shape (n_freq,)
-
-        ks = kappas_array[:, signal_idx]  # k_s, shape (n_freq,)
-        kp = kappas_array[:, pump_idx]  # k_p, shape (n_freq,)
-
-        # Vacuum injected at position x into the signal mode is amplified by the
-        # gain of the remaining section [x, L]:
-        #   G_s(x -> L) = |I_s(L)|^2 / |I_s(x)|^2
-
-        Is_traj_sq = np.abs(I_traj_s[:, signal_idx, :]) ** 2  # (n_freq, n_x)
-
-        # alpha_s per frequency, shape (n_freq,)
-        alpha_s = alphas_array[:, signal_idx]
-
-        # The loss integrand requires the true physical amplitude |A_s(x)|^2.
-        # _run_cme returns output_s(x) = A_s(x) * exp(+alpha_s*x), so:
-        #   |A_s(x)|^2 = |output_s(x)|^2 * exp(-2*alpha_s*x)
-        attenuation_s = np.exp(-2.0 * alpha_s[:, np.newaxis] * x[np.newaxis, :])
-        As_traj_sq = (
-            Is_traj_sq * attenuation_s
-        )  # true physical |A_s(x)|^2, (n_freq, n_x)
-
-        integrand = (
-            2.0
-            * alpha_s[:, np.newaxis]
-            / np.where(
-                As_traj_sq > 0, As_traj_sq, As_traj_sq.max(axis=1, keepdims=True)
-            )
-        )
-        # N_add_loss: input-referred vacuum noise from distributed signal-path loss
-        N_add_loss = U_sq * np.abs(Is0) ** 2 * np.trapz(integrand, x, axis=1)
-
-        # ---- noise channels + per-channel distributed loss ----
+        # 5. Main loop over seeded modes (signal + all noise modes)
+        #
+        #    Each iteration seeds mode `seed_mode` with amplitude Is0 and
+        #    propagates through the CME.  The output column of the transfer
+        #    matrix is:
+        #        col_outputs_sq[seed_mode][:, row_idx] = |I_row_out / Is0|^2
         dependent_modes = mode_array.get_dependent_modes(signal_mode)
         noise_mode_labels = [
             m for m in dependent_modes if m != pump_mode and m != signal_mode
         ]
-        signal_transmission = np.exp(-2 * alphas_array[:, signal_idx] * self.twpa.N_tot)
-        noise_channels: dict[str, np.ndarray] = {}
-        bogoliubov_per_mode: dict[str, np.ndarray] = {}
-        gain_db = 10 * np.log10(U_sq * signal_transmission)
-        gain_db_per_mode = {signal_mode: gain_db}
-        total_noise = np.zeros(n_freq)
-        N_add_loss_channels = np.zeros(n_freq)  # loss noise from all noise channels
+        seeded_modes = [signal_mode] + noise_mode_labels
 
-        for noise_mode in noise_mode_labels:
-            log.info("Running for mode %s", noise_mode)
-            noise_idx = mode_to_idx[noise_mode]
-            kk = kappas_array[:, noise_idx]
-            kk_over_ks = np.where(ks != 0, kk / ks, 1.0)
+        # Storage for quantities accumulated in the loop.
+        col_outputs_sq: dict[str, np.ndarray] = {}  # (n_freq, n_modes)
+        noise_channels: dict[str, np.ndarray] = {}  # photon-basis |v_k|^2, (n_freq,)
+        gain_db_per_mode: dict[str, np.ndarray] = {}
+        N_add_loss_channels = np.zeros(n_freq)
 
-            y0_k = np.full((n_freq, n_modes), 1e-14, dtype=np.complex128)
-            y0_k[:, pump_idx] = self.twpa.Ip0
-            y0_k[:, noise_idx] = Is0
+        signal_transmission = np.exp(
+            -2.0 * alphas_array[:, signal_idx] * self.twpa.N_tot
+        )
 
-            I_traj_k = _run_cme(y0_k)
-            I_out_k = I_traj_k[:, :, -1]
-            V_k_current_sq = np.abs(I_out_k[:, signal_idx] / Is0) ** 2
+        ks = norm_k_array[:, signal_idx]
 
-            # Photon-basis noise: (k_k/k_s) * |V_k_current|^2
-            v_k_sq = kk_over_ks * V_k_current_sq
-            noise_channels[noise_mode] = v_k_sq
-            total_noise += v_k_sq
+        I_traj_signal: Optional[np.ndarray] = None
 
-            # Per-mode Bogoliubov contribution (lossless, signed):
-            sign = -np.sign(mode_array.symbolic_expressions[noise_mode][signal_mode])
-            bogoliubov_per_mode[noise_mode] = sign * v_k_sq
+        for seed_mode in seeded_modes:
+            log.info("Running CME seeded in mode %s", seed_mode)
+            seed_idx = mode_to_idx[seed_mode]
 
-            # Distributed loss noise from channel k, photon-basis, input-referred.
-            # A noise photon lost from mode k at position x has probability of
-            # reaching the signal output proportional to the remaining parametric
-            # gain G_{s<-k}(x->L).
-            #
-            # At the moment, only the added loss noise from signal and idler is computed,
-            # Assuming that the current trajectectory is the same for the two
-            # This avoids the singularity that arises from using the signal output
-            # trajectory from the noise-seeded run (which starts at zero at x=0),
-            # and avoids the 1/|A_k|^2 amplification that occurs when mode k is
-            # weakly excited (e.g. far-detuned sidebands 20 dB below the signal).
-            if noise_mode == idler_mode:
-                alpha_k = alphas_array[:, noise_idx]
-                # attenuation_db = 20*np.log10(np.exp(-alpha_k*x[-1]))
-                # att_threshold = -100 # for numerical stability
-                # alpha_k = np.where(attenuation_db>att_threshold, alpha_k, -np.log(10**(att_threshold/20)))
-                attenuation_k = np.exp(-2.0 * alpha_k[:, np.newaxis] * x[np.newaxis, :])
-                Ik_traj_sq = np.abs(I_traj_k[:, noise_idx, :]) ** 2 * attenuation_k
-                integrand_k = (
-                    2.0
-                    * alpha_k[:, np.newaxis]
-                    / np.where(
-                        Ik_traj_sq > 0,
-                        Ik_traj_sq,
-                        Ik_traj_sq.max(axis=1, keepdims=True),
-                    )
+            y0 = np.full((n_freq, n_modes), 1e-14, dtype=np.complex128)
+            y0[:, pump_idx] = self.twpa.Ip0
+            y0[:, seed_idx] = Is0
+
+            I_traj = _run_cme(y0)
+            I_out = I_traj[:, :, -1]
+
+            # Full column of the transfer matrix (squared), all rows.
+            col_outputs_sq[seed_mode] = np.abs(I_out / Is0) ** 2  # (n_freq, n_modes)
+
+            # Mode-specific quantities.
+            kk = norm_k_array[:, seed_idx]
+            alpha_k = alphas_array[:, seed_idx]
+
+            if seed_mode == signal_mode:
+                I_traj_signal = I_traj
+                U_sq = col_outputs_sq[signal_mode][:, signal_idx]
+                gain_db = 10.0 * np.log10(U_sq * signal_transmission)
+                gain_db_per_mode[signal_mode] = gain_db
+                kk_over_ks = np.where(ks != 0, kk / ks, 1.0)
+                N_add_loss = _loss_noise(
+                    I_traj, signal_idx, alphas_array[:, signal_idx], U_sq
                 )
-                N_add_k = v_k_sq * np.abs(Is0) ** 2 * np.trapz(integrand_k, x, axis=1)
-                N_add_loss_channels += N_add_k
-            gain_db_per_mode[noise_mode] = 10 * np.log10(v_k_sq * signal_transmission)
-        # Total Bogoliubov residual: G_s - sum_k sign*(kk/ks)*|V_k_row|^2 - 1 = 0
-        bogoliubov_residual = U_sq - sum(bogoliubov_per_mode.values()) - 1.0
 
+            else:
+                # Photon-basis noise power: (k_k / k_s) * |I_s_out(k-seed) / Is0|^2
+                kk_over_ks = np.where(ks != 0, kk / ks, 1.0)
+                V_k_current_sq = col_outputs_sq[seed_mode][:, signal_idx]
+                v_k_sq = np.abs(kk_over_ks * V_k_current_sq)
+                noise_channels[seed_mode] = v_k_sq
+
+                gain_db_per_mode[seed_mode] = 10.0 * np.log10(
+                    v_k_sq * signal_transmission
+                )
+
+        # 6. Bogoliubov / commutator check
+        #
+        #    The commutator for output mode r is:
+        #        [a_r^out, a_r^dag^out]
+        #            = sum_{col} sigma_col * (k_col / k_r) * |M_{r,col}|^2  =!= 1
+        #
+        #    sigma_col = +1 for U-type (sum-frequency) modes, -1 for V-type
+        #    (difference-frequency / idler-type) modes.
+        sigma_col: dict[str, float] = {signal_mode: 1.0}
+        for nm in noise_mode_labels:
+            sigma_col[nm] = float(
+                np.sign(mode_array.symbolic_expressions[nm][signal_mode])
+            )
+
+        commutator: dict[str, np.ndarray] = {}
+        for row_mode in seeded_modes:
+            row_idx = mode_to_idx[row_mode]
+            kr = norm_k_array[:, row_idx]
+            total = np.zeros(n_freq, dtype=np.complex128)
+            for col_mode in seeded_modes:
+                col_idx = mode_to_idx[col_mode]
+                kc = norm_k_array[:, col_idx]
+                kc_over_kr = np.where(kr != 0, kc / kr, 1.0)
+                M_rc_sq = col_outputs_sq[col_mode][:, row_idx]
+                total += sigma_col[col_mode] * kc_over_kr * M_rc_sq
+            # Guard against numerical blow-up in evanescent regions.
+            commutator[row_mode] = np.where(
+                np.abs(total) < 1e14,
+                np.abs(sigma_col[row_mode] * total),
+                1.0,
+            )
+
+        bogoliubov_residual = {m: commutator[m] - 1.0 for m in seeded_modes}
+
+        # 7. Quantum efficiency
+        total_noise = sum(noise_channels.values(), np.zeros(n_freq))
         total_noise_with_loss = total_noise + N_add_loss + N_add_loss_channels
 
         qe = U_sq / (U_sq + total_noise_with_loss)
-        added_noise = total_noise_with_loss / U_sq / 2
-        noise_channels_out = noise_channels  # already in the same frame
+        added_noise = total_noise_with_loss / U_sq / 2.0
 
         qe_ideal = U_sq / (2.0 * U_sq - 1.0)
         qe_normalized = np.where(qe_ideal > 0, qe / qe_ideal, 0.0)
+        eta_MR = norm_k_array[:, signal_idx] / norm_k_array[:, pump_idx]
 
         return {
             "signal_freqs": signal_freqs,
@@ -1162,12 +1172,12 @@ class TWPAnalysis(Analyzer, Frequencies):
             "qe_normalized": qe_normalized,
             "qe_ideal": qe_ideal,
             "added_noise": added_noise,
-            "noise_channels": noise_channels_out,
+            "noise_channels": noise_channels,
             "gain_db_per_mode": gain_db_per_mode,
-            "bogoliubov_per_mode": bogoliubov_per_mode,
+            "commutator": commutator,
             "bogoliubov_residual": bogoliubov_residual,
-            "loss_noise_signal": N_add_loss / U_sq / 2,
-            "loss_noise_channels": N_add_loss_channels / U_sq / 2,
+            "loss_noise": N_add_loss / U_sq / 2.0,
+            "eta_manley_rowe": eta_MR,
             "mode_info": {
                 "mode_array": mode_array_config,
                 "signal_mode": signal_mode,

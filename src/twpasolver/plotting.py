@@ -238,15 +238,16 @@ def plot_phase_matching(
 def plot_quantum_efficiency(
     qe_result: Dict[str, Any],
     freqs_unit: str = "GHz",
-    figsize: tuple[float, float] = (7.0, 10.0),
+    figsize: tuple[float, float] = (7.0, 13.0),
     lw: float = 2.0,
 ) -> np.ndarray:
     """Plot the results of the quantum_efficiency analysis function.
 
     Four stacked panels sharing the x-axis:
-      1. Gain per mode [dB]  — signal and all noise channels.
+      1. Gain per mode [dB]  - signal and all noise channels.
       2. Quantum efficiency and ideal QE limit [0–1].
       3. Input-referred added photon noise.
+      4. Commutator [a_m^out, a_m^dag_out] per tracked mode (should be 1).
 
     Args:
         qe_result: Dictionary returned by TWPAnalysis.quantum_efficiency().
@@ -265,10 +266,11 @@ def plot_quantum_efficiency(
     qe_ideal = qe_result["qe_ideal"]
     qe_norm = qe_result["qe_normalized"]
     added_noise = qe_result["added_noise"]
+    commutator = qe_result.get("bogoliubov_residual", {})
+    bogoliubov_residual = qe_result.get("bogoliubov_residual", {})
 
     # Optional per-loss breakdown (present when loss is non-zero)
-    loss_noise_signal = qe_result.get("loss_noise_signal")
-    loss_noise_channels = qe_result.get("loss_noise_channels")
+    loss_noise = qe_result.get("loss_noise")
 
     mode_info = qe_result.get("mode_info", {})
     signal_mode = mode_info.get("signal_mode", "s")
@@ -278,7 +280,7 @@ def plot_quantum_efficiency(
     colors = plt.cm.tab10(np.linspace(0, 1, max(n_modes, 2)))
     ls_cycle = ["-", "--", "-.", ":"] * 4
 
-    fig, axes = plt.subplots(3, 1, sharex=True, figsize=figsize)
+    fig, axes = plt.subplots(4, 1, sharex=True, figsize=figsize)
     fig.subplots_adjust(hspace=0.08)
 
     ax = axes[0]
@@ -301,18 +303,14 @@ def plot_quantum_efficiency(
 
     ax = axes[2]
     ax.plot(freqs, added_noise, label="Total added noise", color="C2", lw=lw)
-    if loss_noise_signal is not None:
+    if loss_noise is not None:
         ax.plot(
             freqs,
-            loss_noise_signal,
-            label="Loss (signal path)",
+            loss_noise,
+            label="Loss",
             color="C3",
             ls="--",
             lw=lw,
-        )
-    if loss_noise_channels is not None:
-        ax.plot(
-            freqs, loss_noise_channels, label="Loss (idler)", color="C4", ls="-.", lw=lw
         )
 
     ax.set_ylim(0, max(np.mean(added_noise) + 0.1, 1))
@@ -321,5 +319,29 @@ def plot_quantum_efficiency(
     ax.set_ylabel("Added noise [photons]")
     ax.legend(loc="best", fontsize=9)
     ax.grid(True, alpha=0.3)
+
+    # Panel 4: commutators
+    ax = axes[3]
+    tracked_modes = list(commutator.keys()) if commutator else []
+    comm_colors = plt.cm.tab10(np.linspace(0, 1, max(len(tracked_modes), 2)))
+    for i, mode in enumerate(tracked_modes):
+        comm_vals = commutator[mode]
+        lw_i = lw * 1.4 if mode == signal_mode else lw
+        ax.plot(
+            freqs,
+            comm_vals,
+            label=rf"$[a_{{{mode}}}, a^\dagger_{{{mode}}}]$",
+            color=comm_colors[i],
+            ls=ls_cycle[i],
+            lw=lw_i,
+        )
+    ax.axhline(0, color="grey", ls=":", lw=1.5, label="Ideal")
+    ax.set_ylabel(r"Commutator $[a_m, a_m^\dagger] error$")
+    ax.set_xlabel(f"Signal frequency [{freqs_unit}]")
+    ax.legend(loc="best", fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    axes[-1].set_xlabel(f"Signal frequency [{freqs_unit}]")
+    axes[2].set_xlabel("")
 
     return axes

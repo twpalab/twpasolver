@@ -241,6 +241,7 @@ def general_cme_with_backward_cutoff(
 
     return derivs
 
+
 @nb.njit(parallel=True)
 def general_cmes_solve_fb_cutoff(
     x_array: FloatArray,
@@ -252,11 +253,11 @@ def general_cmes_solve_fb_cutoff(
     relations_4wm,
     coeffs_3wm,
     coeffs_4wm,
-    n_passes: int = 3,
+    passes: int = 3,
     kappa_cutoff: float = 0.1,
     update_rate: float = 0.8,
-    conv_threshold: float = 0.05,
-    save_all_passes: bool = False
+    convergence_threshold: float = 0.05,
+    save_all_passes: bool = False,
 ) -> ComplexArray:
     """Solve full general CMEs (with reflections) for multiple frequency points using numba prange."""
     n_freq = gammas_array.shape[0]
@@ -267,12 +268,10 @@ def general_cmes_solve_fb_cutoff(
     x_end = x_array[-1]
     if save_all_passes:
         I_tuples = np.empty(
-            (2 * n_freq * n_passes, n_modes, len(x_array)), dtype=np.complex128
+            (2 * n_freq * passes, n_modes, len(x_array)), dtype=np.complex128
         )
     else:
-        I_tuples = np.empty(
-            (2 * n_freq, n_modes, len(x_array)), dtype=np.complex128
-        )
+        I_tuples = np.empty((2 * n_freq, n_modes, len(x_array)), dtype=np.complex128)
     Z0 = 50
     Zb = Z0 * (1 + reflections_array) / (1 - reflections_array)
 
@@ -293,7 +292,7 @@ def general_cmes_solve_fb_cutoff(
         relations_3wm_optimized, relations_4wm_optimized = _filter_wm_terms(
             gammas_array[i].imag, relations_3wm, relations_4wm, kappa_cutoff
         )
-        for k in range(n_passes):
+        for k in range(passes):
             if not converged:
                 if k == 0:
                     result = nbsolve_ivp(
@@ -460,15 +459,18 @@ def general_cmes_solve_fb_cutoff(
                         np.abs(curr_bwd_end - prev_bwd_end)
                         / (np.abs(curr_bwd_end) + 1e-30)
                     )
-                    if norm_fwd < conv_threshold and norm_bwd < conv_threshold:
+                    if (
+                        norm_fwd < convergence_threshold
+                        and norm_bwd < convergence_threshold
+                    ):
                         stable_count += 1
                     else:
                         stable_count = 0
-                    if stable_count >= 3:
+                    if stable_count >= 6:
                         converged = True
             if save_all_passes:
                 I_tuples[i + k * n_freq] = A_fwd[:n_modes, :]
-                I_tuples[i + k * n_freq + n_freq * n_passes] = A_bwd[:n_modes, :]
+                I_tuples[i + k * n_freq + n_freq * passes] = A_bwd[:n_modes, :]
             else:
                 I_tuples[i] = A_fwd[:n_modes, :]
                 I_tuples[i + n_freq] = A_bwd[:n_modes, :]

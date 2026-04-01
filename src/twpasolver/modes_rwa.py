@@ -98,6 +98,7 @@ class ParameterInterpolator:
         kappas: np.ndarray,
         gammas: np.ndarray,
         alphas: np.ndarray,
+        vgs: np.ndarray,
         kind: str = "cubic",
     ):
         """
@@ -108,6 +109,7 @@ class ParameterInterpolator:
             kappas: Array of coupling coefficients (real)
             gammas: Array of reflection coefficients (complex)
             alphas: Array of attenuation coefficients (real)
+            vgs: Array of group velocities (real)
             kind: Interpolation method ('linear', 'cubic', etc.)
         """
         # Validate input arrays
@@ -169,6 +171,14 @@ class ParameterInterpolator:
             fill_value=(np.real(alphas[0]), np.real(alphas[-1])),
         )
 
+        self.vg_interp = interp1d(
+            frequencies,
+            np.real(vgs),
+            kind=kind,
+            bounds_error=False,
+            fill_value=(np.real(vgs[0]), np.real(vgs[-1])),
+        )
+
     def get_parameters(
         self, frequency: Union[float, np.ndarray]
     ) -> Tuple[
@@ -214,8 +224,9 @@ class ParameterInterpolator:
 
         # Interpolate alpha (real only)
         alpha = self.alpha_interp(frequency)
+        vg = self.vg_interp(frequency)
 
-        return kappa, gamma, alpha
+        return kappa, gamma, alpha, vg
 
 
 @dataclass
@@ -238,6 +249,7 @@ class Mode:
     k: Optional[float] = None
     gamma: Optional[Union[float, complex]] = 0.0
     alpha: Optional[float] = 0.0
+    vg: Optional[float] = 0.0
 
     def __post_init__(self):
         """Initialize derived quantities and validate inputs."""
@@ -257,6 +269,7 @@ class Mode:
             and self.gamma == other.gamma
             and self.k == other.k
             and self.alpha == other.alpha
+            and self.vg == other.vg
         )
 
     def __hash__(self):
@@ -272,7 +285,7 @@ class Mode:
         """Get representation of class."""
         return (
             f'Mode("{self.label}", freq={self.frequency}, '
-            f"dir={self.direction}, gamma={self.gamma}, k={self.k}, alpha={self.alpha})"
+            f"dir={self.direction}, gamma={self.gamma}, k={self.k}, alpha={self.alpha}, vg={self.vg})"
         )
 
 
@@ -661,10 +674,11 @@ class ModeArray:
                 mode = self.modes[label]
                 mode.frequency = freq
                 # Get interpolated parameters (always returns kappa, gamma, alpha)
-                kappa, gamma, alpha = self.interpolator.get_parameters(abs(freq))
+                kappa, gamma, alpha, vg = self.interpolator.get_parameters(abs(freq))
                 mode.alpha = alpha  # type: ignore
                 mode.gamma = gamma  # type: ignore
                 mode.k = kappa * mode.direction  # type: ignore
+                mode.vg = vg  # type: ignore
 
     def update_base_data(self, interpolator: ParameterInterpolator) -> None:
         """
@@ -715,6 +729,7 @@ class ModeArray:
                     "k": np.full(len(frequencies), indep_mode.k),
                     "gamma": np.full(len(frequencies), indep_mode.gamma),
                     "alpha": np.full(len(frequencies), indep_mode.alpha),
+                    "vg": np.full(len(frequencies), indep_mode.vg),
                 }
                 continue
 
@@ -733,7 +748,7 @@ class ModeArray:
             direction = self.modes[mode].direction
 
             # Get parameters for all frequencies of this mode (always returns kappa, gamma, alpha)
-            kappas, gammas, alphas = self.interpolator.get_parameters(
+            kappas, gammas, alphas, vgs = self.interpolator.get_parameters(
                 np.abs(mode_freqs)
             )
 
@@ -749,6 +764,7 @@ class ModeArray:
                 "k": kappas,
                 "gamma": gammas,  # type: ignore
                 "alpha": alphas,  # type: ignore
+                "vg": vgs,  # type: ignore
             }
 
         return mode_params
@@ -1031,6 +1047,7 @@ class ModeArray:
             print(f"  k: {mode.k}")
             print(f"  gamma: {mode.gamma}")
             print(f"  alpha: {mode.alpha}")
+            print(f"  vg: {mode.vg}")
             print()
 
     def print_symbolic_expressions(self):
@@ -1057,9 +1074,7 @@ class ModeArrayFactory:
 
     @staticmethod
     def create_basic(
-        base_data: Dict[str, Any],
-        forward_modes: bool = True,
-        three_wave: bool = True
+        base_data: Dict[str, Any], forward_modes: bool = True, three_wave: bool = True
     ) -> ModeArray:
         """
         Create a basic 3WM ModeArray with pump, signal, and idler modes.
@@ -1077,9 +1092,10 @@ class ModeArrayFactory:
         kappas = base_data["k"]
         gammas = base_data["reflection_coeff"]
         alphas = base_data["alpha"]
+        vgs = base_data["vg"]
 
         # Create interpolator
-        interpolator = ParameterInterpolator(freqs, kappas, gammas, alphas)
+        interpolator = ParameterInterpolator(freqs, kappas, gammas, alphas, vgs)
 
         direction = 1 if forward_modes else -1
         modes = [
@@ -1092,7 +1108,6 @@ class ModeArrayFactory:
         else:
             relations = [["i", "p+p-s"]]
         return ModeArray(modes, relations, interpolator)
-
 
     @staticmethod
     def create_extended_3wm(
@@ -1121,9 +1136,10 @@ class ModeArrayFactory:
         kappas = base_data["k"]
         gammas = base_data["reflection_coeff"]
         alphas = base_data["alpha"]
+        vgs = base_data["vg"]
 
         # Create interpolator
-        interpolator = ParameterInterpolator(freqs, kappas, gammas, alphas)
+        interpolator = ParameterInterpolator(freqs, kappas, gammas, alphas, vgs)
 
         direction = 1 if forward_modes else -1
 
@@ -1190,9 +1206,10 @@ class ModeArrayFactory:
         kappas = base_data["k"]
         gammas = base_data["reflection_coeff"]
         alphas = base_data["alpha"]
+        vgs = base_data["vg"]
 
         # Create interpolator
-        interpolator = ParameterInterpolator(freqs, kappas, gammas, alphas)
+        interpolator = ParameterInterpolator(freqs, kappas, gammas, alphas, vgs)
 
         modes = [
             Mode(label=label, direction=direction)
