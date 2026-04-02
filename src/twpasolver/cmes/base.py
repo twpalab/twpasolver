@@ -4,14 +4,16 @@ import numba as nb
 import numpy as np
 from CyRK import nbsolve_ivp
 
-from twpasolver.bonus_types import ComplexArray, FloatArray, nb_complex1d, nb_int2d
+from twpasolver.bonus_types import ComplexArray, FloatArray, nb_complex1d, nb_int2d, nb_float1d
 from twpasolver.cmes.solver_config import *
+
 
 @nb.njit(
     nb_complex1d(
         nb.float64,
         nb_complex1d,
-        nb_complex1d,
+        nb_float1d,
+        nb_float1d,
         nb_int2d,
         nb_int2d,
         nb_complex1d,
@@ -22,7 +24,8 @@ from twpasolver.cmes.solver_config import *
 def no_reflections_cmes(
     x,
     currents,
-    gammas,
+    alphas,
+    kappas,
     relations_3wm,
     relations_4wm,
     coeffs_3wm,
@@ -31,7 +34,7 @@ def no_reflections_cmes(
     """Return derivatives of Coupled Mode Equations system including arbitrary 3WM and 4WM relations."""
     num_modes = len(currents)
     derivs = np.zeros(num_modes, nb.complex128)
-    exp_pos = np.exp(gammas * x)
+    exp_pos = np.exp(1j * kappas * x)
 
     alphas_rhs = np.zeros(2 * num_modes, dtype=np.complex128)
     for i in range(num_modes):
@@ -44,7 +47,7 @@ def no_reflections_cmes(
         derivs[idx] += (
             coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
         )
-    derivs[:num_modes] = gammas * derivs[:num_modes] / exp_pos
+    derivs = (alphas + 1j*kappas) * derivs / exp_pos + alphas * currents
     return derivs
 
 
@@ -88,7 +91,8 @@ def no_reflections_cmes_solve(
             x_span,
             y0_broadcast[i],
             args=(
-                gammas_array[i],
+                gammas_array[i].real,
+                gammas_array[i].imag,
                 relations_3wm,
                 relations_4wm,
                 coeffs_3wm,

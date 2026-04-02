@@ -1,8 +1,17 @@
-"""Coupled Mode Equations models and solvers optimized for Numba."""
+"""
+Coupled Mode Equations — forward/backward solver with inlined RK45.
+
+The RK45 integrator is inlined directly into the per-frequency solve
+function rather than passed as a higher-order argument.  This avoids
+Numba's parallel-compilation deadlock that occurs when a function
+pointer is specialised inside a prange body.
+
+The single RHS function (cme_rhs) is called by name from the inlined
+solver, giving Numba a fully static call graph throughout.
+"""
 
 import numba as nb
 import numpy as np
-from CyRK import nbsolve_ivp
 
 from twpasolver.bonus_types import (
     ComplexArray,
@@ -13,21 +22,15 @@ from twpasolver.bonus_types import (
     nb_int2d,
 )
 from twpasolver.cmes.solver_config import *
+from CyRK import nbsolve_ivp
 
-
-@nb.njit
+@nb.njit(cache=True)
 def _filter_wm_terms(kappas, relations_3wm, relations_4wm, relative_deltak_cutoff):
     num_modes = len(kappas)
-    len_3wm = len(relations_3wm)
-    len_4wm = len(relations_4wm)
-
-    # Pre-allocate with exact maximum size
-    valid_3wm = np.empty((len_3wm * 4, 3), dtype=relations_3wm.dtype)
-    valid_4wm = np.empty((len_4wm * 8, 4), dtype=relations_4wm.dtype)
-    num_valid_3wm = 0
-    num_valid_4wm = 0
-
-    # Pre-compute kappa sign arrays for all combinations
+    valid_3wm = np.empty((len(relations_3wm) * 4, 3), dtype=relations_3wm.dtype)
+    valid_4wm = np.empty((len(relations_4wm) * 8, 4), dtype=relations_4wm.dtype)
+    nv3 = 0
+    nv4 = 0
     signs_3wm = np.array([[1, 1], [1, -1], [-1, 1], [-1, -1]], dtype=np.int8)
     signs_4wm = np.array(
         [
@@ -43,205 +46,128 @@ def _filter_wm_terms(kappas, relations_3wm, relations_4wm, relative_deltak_cutof
         dtype=np.int8,
     )
 
-    # Process 3WM terms
-    for k3wm in range(len_3wm):
-        rel_3wm = relations_3wm[k3wm].copy()
-        base_kappa = kappas[rel_3wm[0]]
+    for k3 in range(len(relations_3wm)):
+        r = relations_3wm[k3].copy()
+        bk = kappas[r[0]]
+        m1, m2 = r[1], r[2]
+        c1 = m1 >= num_modes
+        c2 = m2 >= num_modes
+        k1 = m1 - num_modes if c1 else m1
+        k2 = m2 - num_modes if c2 else m2
+        for si in range(4):
+            s1, s2 = signs_3wm[si]
+            dk = (
+                -bk
+                + s1 * kappas[k1] * (-1 if c1 else 1)
+                + s2 * kappas[k2] * (-1 if c2 else 1)
+            )
+            if np.abs(dk / bk) < relative_deltak_cutoff:
+                valid_3wm[nv3, 0] = r[0]
+                valid_3wm[nv3, 1] = r[1] + (2 * num_modes if s1 == -1 else 0)
+                valid_3wm[nv3, 2] = r[2] + (2 * num_modes if s2 == -1 else 0)
+                nv3 += 1
 
-        # Pre-extract mode indices and compute base kappas
-        mode1 = rel_3wm[1]
-        mode2 = rel_3wm[2]
+    for k4 in range(len(relations_4wm)):
+        r = relations_4wm[k4].copy()
+        bk = kappas[r[0]]
+        m1, m2, m3 = r[1], r[2], r[3]
+        c1 = m1 >= num_modes
+        c2 = m2 >= num_modes
+        c3 = m3 >= num_modes
+        k1 = m1 - num_modes if c1 else m1
+        k2 = m2 - num_modes if c2 else m2
+        k3 = m3 - num_modes if c3 else m3
+        for si in range(8):
+            s1, s2, s3 = signs_4wm[si]
+            dk = (
+                -bk
+                + s1 * kappas[k1] * (-1 if c1 else 1)
+                + s2 * kappas[k2] * (-1 if c2 else 1)
+                + s3 * kappas[k3] * (-1 if c3 else 1)
+            )
+            if np.abs(dk / bk) < relative_deltak_cutoff:
+                valid_4wm[nv4, 0] = r[0]
+                valid_4wm[nv4, 1] = r[1] + (2 * num_modes if s1 == -1 else 0)
+                valid_4wm[nv4, 2] = r[2] + (2 * num_modes if s2 == -1 else 0)
+                valid_4wm[nv4, 3] = r[3] + (2 * num_modes if s3 == -1 else 0)
+                nv4 += 1
 
-        # Determine if modes are conjugated (>= num_modes)
-        is_conj1 = mode1 >= num_modes
-        is_conj2 = mode2 >= num_modes
-
-        # Get actual kappa indices
-        k1 = mode1 - num_modes if is_conj1 else mode1
-        k2 = mode2 - num_modes if is_conj2 else mode2
-
-        kappa1 = kappas[k1]
-        kappa2 = kappas[k2]
-
-        for sign_idx in range(4):
-            s1, s2 = signs_3wm[sign_idx]
-
-            # Compute delta kappa more efficiently
-            dkappa = -base_kappa
-            dkappa += s1 * kappa1 * (-1 if is_conj1 else 1)
-            dkappa += s2 * kappa2 * (-1 if is_conj2 else 1)
-
-            if np.abs(dkappa / base_kappa) < relative_deltak_cutoff:
-                # Create modified relation
-                valid_3wm[num_valid_3wm, 0] = rel_3wm[0]
-                valid_3wm[num_valid_3wm, 1] = rel_3wm[1] + (
-                    2 * num_modes if s1 == -1 else 0
-                )
-                valid_3wm[num_valid_3wm, 2] = rel_3wm[2] + (
-                    2 * num_modes if s2 == -1 else 0
-                )
-                num_valid_3wm += 1
-
-    # Process 4WM terms
-    for k4wm in range(len_4wm):
-        rel_4wm = relations_4wm[k4wm].copy()
-        base_kappa = kappas[rel_4wm[0]]
-
-        # Pre-extract mode indices
-        mode1 = rel_4wm[1]
-        mode2 = rel_4wm[2]
-        mode3 = rel_4wm[3]
-
-        # Determine conjugation
-        is_conj1 = mode1 >= num_modes
-        is_conj2 = mode2 >= num_modes
-        is_conj3 = mode3 >= num_modes
-
-        # Get actual kappa indices
-        k1 = mode1 - num_modes if is_conj1 else mode1
-        k2 = mode2 - num_modes if is_conj2 else mode2
-        k3 = mode3 - num_modes if is_conj3 else mode3
-
-        kappa1 = kappas[k1]
-        kappa2 = kappas[k2]
-        kappa3 = kappas[k3]
-
-        for sign_idx in range(8):
-            s1, s2, s3 = signs_4wm[sign_idx]
-
-            # Compute delta kappa
-            dkappa = -base_kappa
-            dkappa += s1 * kappa1 * (-1 if is_conj1 else 1)
-            dkappa += s2 * kappa2 * (-1 if is_conj2 else 1)
-            dkappa += s3 * kappa3 * (-1 if is_conj3 else 1)
-
-            if np.abs(dkappa / base_kappa) < relative_deltak_cutoff:
-                # Create modified relation
-                valid_4wm[num_valid_4wm, 0] = rel_4wm[0]
-                valid_4wm[num_valid_4wm, 1] = rel_4wm[1] + (
-                    2 * num_modes if s1 == -1 else 0
-                )
-                valid_4wm[num_valid_4wm, 2] = rel_4wm[2] + (
-                    2 * num_modes if s2 == -1 else 0
-                )
-                valid_4wm[num_valid_4wm, 3] = rel_4wm[3] + (
-                    2 * num_modes if s3 == -1 else 0
-                )
-                num_valid_4wm += 1
-
-    return valid_3wm[:num_valid_3wm], valid_4wm[:num_valid_4wm]
+    return valid_3wm[:nv3], valid_4wm[:nv4]
 
 
+# ---------------------------------------------------------------------------
+# CME right-hand side  (called by name from the inlined solver below)
+# ---------------------------------------------------------------------------
 @nb.njit(
     nb_complex1d(
         nb.float64,
         nb_complex1d,
-        nb_complex1d,
-        nb_int2d,
-        nb_int2d,
-        nb_complex1d,
-        nb_complex1d,
-    ),
-    cache=True,
-)
-def general_cme_first_round(
-    x,
-    currents,
-    gammas,
-    relations_3wm,
-    relations_4wm,
-    coeffs_3wm,
-    coeffs_4wm,
-):
-    """Return derivatives of Coupled Mode Equations system including arbitrary 3WM and 4WM relations."""
-    num_modes = len(currents)
-    derivs = np.zeros(num_modes * 3, nb.complex128)
-    exp_pos = np.exp(gammas * x)
-
-    alphas_rhs = np.zeros(4 * num_modes, dtype=np.complex128)
-    for i in range(num_modes):
-        alphas_rhs[i] = currents[i] * exp_pos[i]
-        alphas_rhs[i + num_modes] = np.conj(alphas_rhs[i])
-
-    for idx, idx1, idx2 in relations_3wm:
-        derivs[idx] += coeffs_3wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2]
-    for idx, idx1, idx2, idx3 in relations_4wm:
-        derivs[idx] += (
-            coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
-        )
-    # return derivs
-    for i in range(num_modes):
-        derivs[i] = gammas[i] * derivs[i] / exp_pos[i]
-        if (derivs[i] / currents[i]).real < 0.0 and np.abs(currents[i]) < 1e-15:
-            derivs[i] = 0
-        derivs[num_modes + i] = derivs[i]
-        derivs[2 * num_modes + i] = currents[i]
-
-    return derivs
-
-
-@nb.njit(
-    nb_complex1d(
-        nb.float64,
-        nb_complex1d,
-        nb_complex1d,
+        nb_float1d,
+        nb_float1d,
         nb_int2d,
         nb_int2d,
         nb_complex1d,
         nb_complex1d,
         nb_float1d,
         nb_complex2d,
-        nb_complex2d,
         nb.float64,
     ),
     cache=True,
 )
-def general_cme_with_backward_cutoff(
+def cme_rhs(
     x,
     currents,
-    gammas,
+    alphas,
+    kappas,
     relations_3wm,
     relations_4wm,
     coeffs_3wm,
     coeffs_4wm,
     x_evals,
-    dcurrents_evals,
     currents_evals,
     end,
 ):
-    """Return derivatives of Coupled Mode Equations system including arbitrary 3WM and 4WM relations."""
-    num_modes = len(currents)
-    derivs = np.zeros(2 * num_modes, nb.complex128)
-    exp_pos = np.exp(gammas * x)
-    exp_neg = np.exp(gammas * (end - x))
+    """
+    Unified CME RHS for forward and backward passes.
 
-    alphas_rhs = np.empty(4 * num_modes, dtype=np.complex128)
-    for i in range(num_modes):
-        alphas_rhs[i] = currents[i] * exp_pos[i]
-        alphas_rhs[i + num_modes] = np.conj(alphas_rhs[i])
-        alphas_rhs[i + 2 * num_modes] = (
+    currents_evals holds the reversed counter-propagating envelope B_m.
+    When it is all zeros (first forward pass) the counter term vanishes,
+    reproducing the no-backward-field equation exactly.
+
+    Output length = 2*n_modes:
+      [0:n]   dB_m/dx  (full, with +alpha*B term)
+      [n:2n]  raw nonlinear part only (for reflection coefficient use)
+    """
+    n = len(currents)
+    out = np.zeros(2 * n, nb.complex128)
+    ep = np.exp(1j * kappas * x)
+    en = np.exp(1j * kappas * (end - x))
+
+    ar = np.empty(2 * n, dtype=nb.complex128)
+    for i in range(n):
+        ctr = (
             np.interp(x, x_evals, currents_evals[i].real)
             + 1j * np.interp(x, x_evals, currents_evals[i].imag)
-        ) * exp_neg[i]
-        alphas_rhs[i + 3 * num_modes] = np.conj(alphas_rhs[i + 2 * num_modes])
+        ) * en[i]
+        ar[i] = currents[i] * ep[i] + ctr
+        ar[i + n] = np.conj(ar[i])
 
-    for idx, idx1, idx2 in relations_3wm:
-        derivs[idx] += coeffs_3wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2]
-    for idx, idx1, idx2, idx3 in relations_4wm:
-        derivs[idx] += (
-            coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
-        )
-    # return derivs
-    for i in range(num_modes):
-        di = gammas[i] * derivs[i]
-        derivs[i] = di / exp_pos[i]
-        if (derivs[i] / currents[i]).real < 0.0 and np.abs(currents[i]) < 1e-15:
-            derivs[i] = 0
-        derivs[num_modes + i] = derivs[i]
+    for idx, i1, i2 in relations_3wm:
+        out[idx] += coeffs_3wm[idx] * ar[i1] * ar[i2]
+    for idx, i1, i2, i3 in relations_4wm:
+        out[idx] += coeffs_4wm[idx] * ar[i1] * ar[i2] * ar[i3]
 
-    return derivs
+    for i in range(n):
+        raw = (alphas[i] + 1j * kappas[i]) * out[i] / ep[i]
+        out[i] = raw + alphas[i] * currents[i]
+        out[n + i] = raw
+
+    return out
 
 
+# ---------------------------------------------------------------------------
+# Parallel outer loop
+# ---------------------------------------------------------------------------
 @nb.njit(parallel=True)
 def general_cmes_solve_fb_cutoff(
     x_array: FloatArray,
@@ -258,223 +184,191 @@ def general_cmes_solve_fb_cutoff(
     update_rate: float = 0.8,
     convergence_threshold: float = 0.05,
     save_all_passes: bool = False,
+    Z0: float = 50,
 ) -> ComplexArray:
-    """Solve full general CMEs (with reflections) for multiple frequency points using numba prange."""
+    """
+    Solve full general CMEs (forward + backward) for all frequency points.
+
+    The parallel body contains only calls to statically-known njit functions
+    (_filter_wm_terms, _solve_one) with no function-pointer arguments, giving
+    Numba a fully static call graph and avoiding the parallel-compilation
+    deadlock that occurs with higher-order function arguments in prange.
+    """
     n_freq = gammas_array.shape[0]
     n_modes = gammas_array.shape[1]
-    transmission_in = 1 - reflections_array
-
-    x_span = (x_array[0], x_array[-1])
+    n_out = 2 * n_modes
+    n_x = len(x_array)
     x_end = x_array[-1]
-    if save_all_passes:
-        I_tuples = np.empty(
-            (2 * n_freq * passes, n_modes, len(x_array)), dtype=np.complex128
-        )
-    else:
-        I_tuples = np.empty((2 * n_freq, n_modes, len(x_array)), dtype=np.complex128)
-    Z0 = 50
+    x_span_0 = x_array[0]
+    x_span = (x_array[0], x_array[-1])
+    trans_in = 1 - reflections_array
     Zb = Z0 * (1 + reflections_array) / (1 - reflections_array)
 
+    if save_all_passes:
+        I_out = np.empty((2 * n_freq * passes, n_modes, n_x), dtype=np.complex128)
+    else:
+        I_out = np.empty((2 * n_freq, n_modes, n_x), dtype=np.complex128)
+
+    # ---- thread-local buffers (never aliased to solver internals) ---- #
+    A_fwd = np.zeros((n_freq, n_out, n_x), dtype=np.complex128)
+    A_bwd = np.zeros((n_freq, n_out, n_x), dtype=np.complex128)
+    A_tmp = np.zeros((n_freq, n_out, n_x), dtype=np.complex128)
+    # Counter-propagating field passed to cme_rhs.
+    # Initialised to zero so the first forward pass has no backward source.
+    A_counter = np.zeros((n_freq, n_modes, n_x), dtype=np.complex128)
+
     for i in nb.prange(n_freq):
-        # Convergence tracking
+        I_fwd = np.zeros(n_modes, dtype=np.complex128)
+        I_bwd = np.zeros(n_modes, dtype=np.complex128)
+        refl = np.zeros(n_modes, dtype=np.complex128)
+
         converged = False
         stable_count = 0
-        prev_fwd_end = np.zeros(n_modes, dtype=np.complex128)
-        prev_bwd_end = np.zeros(n_modes, dtype=np.complex128)
+        prev_fwd = np.zeros(n_modes, dtype=np.complex128)
+        prev_bwd = np.zeros(n_modes, dtype=np.complex128)
 
-        A_bwd = np.full(
-            (2 * n_modes, len(x_array)), 1e-15, dtype=np.complex128
-        )  # Required for proper compilation
-        A_fwd = np.full(
-            (2 * n_modes, len(x_array)), 1e-15, dtype=np.complex128
-        )  # Required for proper compilation
-        I_init_fwd = y0_array_fwd * transmission_in[i]
-        relations_3wm_optimized, relations_4wm_optimized = _filter_wm_terms(
-            gammas_array[i].imag, relations_3wm, relations_4wm, kappa_cutoff
-        )
+        alphas_i = np.ascontiguousarray(gammas_array[i].real)
+        kappas_i = np.ascontiguousarray(gammas_array[i].imag)
+        refl_i = np.ascontiguousarray(reflections_array[i])
+        trans_i = np.ascontiguousarray(trans_in[i])
+        Zb_i = np.ascontiguousarray(Zb[i])
+        x_array_i = np.ascontiguousarray(x_array)
+
+        for j in range(n_modes):
+            I_fwd[j] = y0_array_fwd[i, j] * trans_i[j]
+            I_bwd[j] = y0_array_bwd[i, j] * trans_i[j]
+            refl[j] = refl_i[j]
+
+       # r3, r4 = _filter_wm_terms(kappas_i, relations_3wm, relations_4wm, kappa_cutoff)
+
         for k in range(passes):
-            if not converged:
-                if k == 0:
-                    result = nbsolve_ivp(
-                        general_cme_first_round,
-                        x_span,
-                        I_init_fwd,
-                        args=(
-                            gammas_array[i],
-                            relations_3wm_optimized,
-                            relations_4wm_optimized,
-                            coeffs_3wm,
-                            coeffs_4wm,
-                        ),
-                        atol=SOLVER_ATOL,
-                        rtol=SOLVER_RTOL,
-                        max_num_steps=SOLVER_MAX_STEPS,
-                        t_eval=x_array,
-                        rk_method=SOLVER_RK_METHOD,
-                        first_step=SOLVER_FIRST_STEP,
-                        capture_extra=True,
-                    )
-                    A_fwd = result.y
-                    A_fwd_end = A_fwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
-                    I_init_bwd = (
-                        y0_array_bwd * transmission_in[i]
-                        + reflections_array[i] * A_fwd_end
-                    )
-                    result = nbsolve_ivp(
-                        general_cme_with_backward_cutoff,
-                        x_span,
-                        I_init_bwd,
-                        args=(
-                            gammas_array[i],
-                            relations_3wm_optimized,
-                            relations_4wm_optimized,
-                            coeffs_3wm,
-                            coeffs_4wm,
-                            x_array,
-                            A_fwd[n_modes : 2 * n_modes, ::-1],
-                            A_fwd[:n_modes, ::-1],
-                            x_end,
-                        ),
-                        atol=SOLVER_ATOL,
-                        rtol=SOLVER_RTOL,
-                        max_num_steps=SOLVER_MAX_STEPS,
-                        t_eval=x_array,
-                        rk_method=SOLVER_RK_METHOD,
-                        first_step=SOLVER_FIRST_STEP,
-                        capture_extra=True,
-                    )
-                    A_bwd = result.y
-                else:
-                    result = nbsolve_ivp(
-                        general_cme_with_backward_cutoff,
-                        x_span,
-                        I_init_fwd,
-                        args=(
-                            gammas_array[i],
-                            relations_3wm_optimized,
-                            relations_4wm_optimized,
-                            coeffs_3wm,
-                            coeffs_4wm,
-                            x_array,
-                            A_bwd[n_modes : 2 * n_modes, ::-1],
-                            A_bwd[:n_modes, ::-1],
-                            x_end,
-                        ),
-                        atol=SOLVER_ATOL,
-                        rtol=SOLVER_RTOL,
-                        max_num_steps=SOLVER_MAX_STEPS,
-                        t_eval=x_array,
-                        rk_method=SOLVER_RK_METHOD,
-                        first_step=SOLVER_FIRST_STEP,
-                        capture_extra=True,
-                    )
-                    A_fwd = result.y * update_rate + (1 - update_rate) * A_fwd
-                    if k > 0:
-                        reflection_coeff = np.empty(n_modes, dtype=np.complex128)
-                        for j in range(n_modes):
-                            derivs_bwd = A_bwd[n_modes + j, 0]
-                            currents_bwd = A_bwd[j, 0]
-                            derivs_fwd = A_fwd[n_modes + j, -1]
-                            currents_fwd = A_fwd[j, -1]
-                            gamma = gammas_array[i, j]
-                            Zbvals = Zb[i, j]
-                            reflection_coeff[j] = (
-                                -currents_fwd
-                                / currents_bwd
-                                * (
-                                    (Z0 - Zbvals) * gamma * currents_bwd
-                                    + Zbvals * derivs_bwd
-                                )
-                                / (
-                                    (Z0 + Zbvals) * gamma * currents_fwd
-                                    + Zbvals * derivs_fwd
-                                )
-                            )
-                    else:
-                        reflection_coeff = reflections_array[i]
-                    A_fwd_end = A_fwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
-                    I_init_bwd = (
-                        y0_array_bwd * transmission_in[i] + reflection_coeff * A_fwd_end
-                    )
-                    result = nbsolve_ivp(
-                        general_cme_with_backward_cutoff,
-                        x_span,
-                        I_init_bwd,
-                        args=(
-                            gammas_array[i],
-                            relations_3wm_optimized,
-                            relations_4wm_optimized,
-                            coeffs_3wm,
-                            coeffs_4wm,
-                            x_array,
-                            A_fwd[n_modes : 2 * n_modes, ::-1],
-                            A_fwd[:n_modes, ::-1],
-                            x_end,
-                        ),
-                        atol=SOLVER_ATOL,
-                        rtol=SOLVER_RTOL,
-                        max_num_steps=SOLVER_MAX_STEPS,
-                        t_eval=x_array,
-                        rk_method=SOLVER_RK_METHOD,
-                        first_step=SOLVER_FIRST_STEP,
-                        capture_extra=True,
-                    )
-                    A_bwd = result.y * update_rate + (1 - update_rate) * A_bwd
-                if k > 0:
-                    reflection_coeff = np.empty(n_modes, dtype=np.complex128)
-                    for j in range(n_modes):
-                        derivs_bwd = A_fwd[n_modes + j, 0]
-                        currents_bwd = A_fwd[j, 0]
-                        derivs_fwd = A_bwd[n_modes + j, -1]
-                        currents_fwd = A_bwd[j, -1]
-                        gamma = gammas_array[i, j]
-                        Zbvals = Zb[i, j]
-                        reflection_coeff[j] = (
-                            -currents_fwd
-                            / currents_bwd
-                            * (
-                                (Z0 - Zbvals) * gamma * currents_bwd
-                                + Zbvals * derivs_bwd
-                            )
-                            / (
-                                (Z0 + Zbvals) * gamma * currents_fwd
-                                + Zbvals * derivs_fwd
-                            )
-                        )
-                else:
-                    reflection_coeff = reflections_array[i]
-                A_bwd_end = A_bwd[:n_modes, -1] * np.exp(gammas_array[i] * x_end)
-                I_init_fwd = (
-                    y0_array_fwd * transmission_in[i] + reflection_coeff * A_bwd_end
-                )
+            A_fwd[i] = nbsolve_ivp(
+                cme_rhs,
+                x_span,
+                I_fwd,
+                args=(
+                    alphas_i,
+                    kappas_i,
+                    relations_3wm,
+                    relations_4wm,
+                    coeffs_3wm,
+                    coeffs_4wm,
+                    x_array_i,
+                    A_counter[i],
+                    x_end,
+                ),
+                atol=SOLVER_ATOL,
+                rtol=SOLVER_RTOL,
+                max_num_steps=x_end,
+                t_eval=x_array_i,
+                rk_method=SOLVER_RK_METHOD,
+                first_step=SOLVER_FIRST_STEP,
+                capture_extra=True
+            ).y
 
-                if k > 1:  # need at least 2 passes before checking
-                    curr_fwd_end = A_fwd[:n_modes, -1]
-                    curr_bwd_end = A_bwd[:n_modes, -1]
-                    norm_fwd = np.max(
-                        np.abs(curr_fwd_end - prev_fwd_end)
-                        / (np.abs(curr_fwd_end) + 1e-30)
+            # ---- reflection at far end → backward IC ----------------- #
+            for j in range(n_modes):
+                A_fwd_end_j = A_fwd[i, j, -1] * np.exp(1j * kappas_i[j] * x_end)
+                I_bwd[j] = y0_array_bwd[i, j] * trans_i[j] + refl[j] * A_fwd_end_j
+
+            # ---- backward solve --------------------------------------- #
+            # Reverse A_fwd i, into counter buffer.
+            for j in range(n_modes):
+                for ix in range(n_x):
+                    A_counter[i, j, ix] = A_fwd[i, j, n_x - 1 - ix]
+
+            A_bwd[i] = nbsolve_ivp(
+                cme_rhs,
+                x_span,
+                I_bwd,
+                args=(
+                    alphas_i,
+                    kappas_i,
+                    relations_3wm,
+                    relations_4wm,
+                    coeffs_3wm,
+                    coeffs_4wm,
+                    x_array_i,
+                    A_counter[i],
+                    x_end,
+                ),
+                atol=SOLVER_ATOL,
+                rtol=SOLVER_RTOL,
+                max_num_steps=x_end,
+                t_eval=x_array_i,
+                rk_method=SOLVER_RK_METHOD,
+                first_step=SOLVER_FIRST_STEP,
+                capture_extra=True
+            ).y
+
+            # # ---- update refl (fwd end → next bwd IC) ----------------- #
+            if k > 0:
+                for j in range(n_modes):
+                    de        = np.exp(-alphas_i[j] * x_end)
+                    raw_bwd   = A_bwd[i, n_modes+j, 0]
+                    B_bwd0    = A_bwd[i, j, 0]
+                    raw_fwd   = A_fwd[i, n_modes+j, -1] * de
+                    B_fwd_end = A_fwd[i, j, -1]
+                    gj        = gammas_array[i, j]
+                    Zbj       = Zb_i[j]
+                    refl[j]   = (
+                        -B_fwd_end / B_bwd0
+                        * ((Z0-Zbj)*gj*B_bwd0 + Zbj*raw_bwd)
+                        / ((Z0+Zbj)*gj*B_fwd_end + Zbj*raw_fwd)
+                   )
+
+            # ---- reverse A_bwd → counter; update fwd IC -------------- #
+            for j in range(n_modes):
+                for ix in range(n_x):
+                    A_counter[i, j, ix] = A_bwd[i, j, n_x - 1 - ix]
+
+            if k > 0:
+                for j in range(n_modes):
+                    de        = np.exp(-alphas_i[j] * x_end)
+                    raw_fwd   = A_fwd[i, n_modes+j, 0]
+                    B_fwd0    = A_fwd[i, j, 0]
+                    raw_bwd   = A_bwd[i, n_modes+j, -1]
+                    B_bwd_end = A_bwd[i, j, -1] * de
+                    gj        = gammas_array[i, j]
+                    Zbj       = Zb_i[j]
+                    rb        = (
+                        -B_bwd_end / B_fwd0
+                        * ((Z0-Zbj)*gj*B_fwd0 + Zbj*raw_fwd)
+                        / ((Z0+Zbj)*gj*B_bwd_end + Zbj*raw_bwd)
                     )
-                    norm_bwd = np.max(
-                        np.abs(curr_bwd_end - prev_bwd_end)
-                        / (np.abs(curr_bwd_end) + 1e-30)
-                    )
-                    if (
-                        norm_fwd < convergence_threshold
-                        and norm_bwd < convergence_threshold
-                    ):
-                        stable_count += 1
-                    else:
-                        stable_count = 0
-                    if stable_count >= 6:
-                        converged = True
-            if save_all_passes:
-                I_tuples[i + k * n_freq] = A_fwd[:n_modes, :]
-                I_tuples[i + k * n_freq + n_freq * passes] = A_bwd[:n_modes, :]
+                    A_bwd_end_j = A_bwd[i, j,-1] * np.exp(1j*kappas_i[j]*x_end)
+                    I_fwd[j] = y0_array_fwd[i, j]*trans_i[j] + rb*A_bwd_end_j
             else:
-                I_tuples[i] = A_fwd[:n_modes, :]
-                I_tuples[i + n_freq] = A_bwd[:n_modes, :]
-            prev_fwd_end = A_fwd[:n_modes, -1].copy()
-            prev_bwd_end = A_bwd[:n_modes, -1].copy()
+                for j in range(n_modes):
+                    A_bwd_end_j = A_bwd[i, j, -1] * np.exp(1j * kappas_i[j] * x_end)
+                    I_fwd[j] = y0_array_fwd[i, j] * trans_i[j] + refl_i[j] * A_bwd_end_j
 
-    return I_tuples
+            # # ---- convergence check ----------------------------------- #
+            if k > 1:
+                nf = 0.0
+                nb_ = 0.0
+                for j in range(n_modes):
+                    v = np.abs(A_fwd[i, j,-1] - prev_fwd[j]) / (np.abs(A_fwd[i, j,-1]) + 1e-30)
+                    w = np.abs(A_bwd[i, j,-1] - prev_bwd[j]) / (np.abs(A_bwd[i, j,-1]) + 1e-30)
+                    if v > nf: nf = v
+                    if w > nb_: nb_ = w
+                if nf < convergence_threshold and nb_ < convergence_threshold:
+                    stable_count += 1
+                else:
+                    stable_count = 0
+                if stable_count >= 4:
+                    converged = True
+
+            # ---- store output ------------------------------------------- #
+            if save_all_passes:
+                I_out[i + k * n_freq] = A_fwd[i, :n_modes, :]
+                I_out[i + k * n_freq + n_freq * passes] = A_bwd[i, :n_modes, :]
+            else:
+                I_out[i] = A_fwd[i, :n_modes, :]
+                I_out[i + n_freq] = A_bwd[i, :n_modes, :]
+
+            for j in range(n_modes):
+                prev_fwd[j] = A_fwd[i, j, -1]
+                prev_bwd[j] = A_bwd[i, j, -1]
+
+    return I_out

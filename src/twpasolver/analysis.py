@@ -677,10 +677,12 @@ class TWPAnalysis(Analyzer, Frequencies):
             )
             gammas[i] = -alphas + 1j * kappas
 
+        y0_fwd_broadcast = np.repeat(y0_fwd, n_freq).reshape((-1, n_freq)).T.copy()
+        y0_bwd_broadcast = np.repeat(y0_bwd, n_freq).reshape((-1, n_freq)).T.copy()
         I_tuples = general_cmes_solve_fb_cutoff(
             x,
-            y0_fwd,
-            y0_bwd,
+            y0_fwd_broadcast,
+            y0_bwd_broadcast,
             gammas,
             reflections,
             relations_3wm,
@@ -691,6 +693,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             kappa_cutoff,
             convergence_threshold=convergence_threshold,
             save_all_passes=save_all_passes,
+            Z0=self.twpa.Z0_ref
         )
 
         # Extract results for all passes
@@ -713,10 +716,10 @@ class TWPAnalysis(Analyzer, Frequencies):
 
             # # Apply propagation phase correction
             I_tuples_fwd_pass = I_tuples_fwd_pass * np.exp(
-                np.einsum("ij,k->ijk", gammas, x)
+                np.einsum("ij,k->ijk", 1j*gammas.imag, x)
             )
             I_tuples_bwd_pass = I_tuples_bwd_pass * np.exp(
-                np.einsum("ij,k->ijk", gammas, x)
+                np.einsum("ij,k->ijk", 1j*gammas.imag, x)
             )
 
             I_tuples_all_passes[pass_idx] = {
@@ -866,7 +869,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             coeffs_4wm,
         )
 
-        I_tuples_array = I_tuples_array * np.exp(np.einsum("ij,k->ijk", gammas, x))
+        I_tuples_array = I_tuples_array * np.exp(np.einsum("ij,k->ijk", 1j*gammas.imag, x))
 
         # Calculate gain
         signal_idx = mode_labels.index(signal_mode)
@@ -1037,7 +1040,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 )
                 I = I_tuples[:n_freq]
                 I[:, :, -1] = I[:, :, -1] * (1.0 + reflections)
-            return I * np.exp(np.einsum("ij,k->ijk", 1j * kappas_array, x))
+            return I * np.exp(np.einsum("ij,k->ijk", 1j * kappas_array+alphas_array, x))
 
         # 4. Helper: distributed-loss added noise for one mode trajectory
         def _loss_noise(
