@@ -1282,10 +1282,9 @@
 <div class="viewcode-block" id="ModeArrayFactory"><a class="viewcode-back" href="../../api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">ModeArrayFactory</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory for creating standard ModeArray configurations.&quot;&quot;&quot;</span>
 
-<div class="viewcode-block" id="ModeArrayFactory.create_basic_3wm"><a class="viewcode-back" href="../../api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory.create_basic_3wm">[docs]</a>    <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">create_basic_3wm</span><span class="p">(</span>
-        <span class="n">base_data</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-        <span class="n">forward_modes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<div class="viewcode-block" id="ModeArrayFactory.create_basic"><a class="viewcode-back" href="../../api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory.create_basic">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_basic</span><span class="p">(</span>
+        <span class="n">base_data</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">forward_modes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">three_wave</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ModeArray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Create a basic 3WM ModeArray with pump, signal, and idler modes.</span>
@@ -1293,6 +1292,7 @@
 <span class="sd">        Args:</span>
 <span class="sd">            base_data: Dictionary containing &#39;freqs&#39;, &#39;k&#39;, &#39;gammas&#39;, and &#39;alpha&#39; arrays</span>
 <span class="sd">            forward_modes: Whether to create forward (True) or backward (False) propagating modes</span>
+<span class="sd">            Three wave: Whether to include 3WM or 4WM mode relations</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            ModeArray: Configured for basic 3WM operation</span>
@@ -1313,8 +1313,10 @@
             <span class="n">Mode</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="s2">&quot;i&quot;</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="n">direction</span><span class="p">),</span>
         <span class="p">]</span>
 
-        <span class="n">relations</span> <span class="o">=</span> <span class="p">[[</span><span class="s2">&quot;i&quot;</span><span class="p">,</span> <span class="s2">&quot;p-s&quot;</span><span class="p">]]</span>  <span class="c1"># Idler is pump minus signal</span>
-
+        <span class="k">if</span> <span class="n">three_wave</span><span class="p">:</span>
+            <span class="n">relations</span> <span class="o">=</span> <span class="p">[[</span><span class="s2">&quot;i&quot;</span><span class="p">,</span> <span class="s2">&quot;p-s&quot;</span><span class="p">]]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">relations</span> <span class="o">=</span> <span class="p">[[</span><span class="s2">&quot;i&quot;</span><span class="p">,</span> <span class="s2">&quot;p+p-s&quot;</span><span class="p">]]</span>
         <span class="k">return</span> <span class="n">ModeArray</span><span class="p">(</span><span class="n">modes</span><span class="p">,</span> <span class="n">relations</span><span class="p">,</span> <span class="n">interpolator</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="ModeArrayFactory.create_extended_3wm"><a class="viewcode-back" href="../../api-reference/twpasolver.modes_rwa.html#twpasolver.modes_rwa.ModeArrayFactory.create_extended_3wm">[docs]</a>    <span class="nd">@staticmethod</span>
@@ -1441,7 +1443,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2025, twpalab
+                Copyright &#169; 2026, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             

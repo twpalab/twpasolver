@@ -379,15 +379,20 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">calculate_coefficients</span><span class="p">(</span><span class="n">terms</span><span class="p">,</span> <span class="n">scaling_factor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">term</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">scaling_factor</span> <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">])</span>
 
-    <span class="n">relations_3wm</span> <span class="o">=</span> <span class="n">extract_indices</span><span class="p">(</span><span class="n">terms_3wm</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_3wm</span> <span class="k">else</span> <span class="p">[]</span>
-    <span class="n">relations_4wm</span> <span class="o">=</span> <span class="n">extract_indices</span><span class="p">(</span><span class="n">terms_4wm</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_4wm</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="n">relations_3wm</span> <span class="o">=</span> <span class="n">extract_indices</span><span class="p">(</span><span class="n">terms_3wm</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_3wm</span> <span class="k">else</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]]</span>
+    <span class="n">relations_4wm</span> <span class="o">=</span> <span class="n">extract_indices</span><span class="p">(</span><span class="n">terms_4wm</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_4wm</span> <span class="k">else</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]]</span>
 
     <span class="n">coeffs_3wm</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="n">calculate_coefficients</span><span class="p">(</span><span class="n">terms_3wm</span><span class="p">,</span> <span class="n">epsilon</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_3wm</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="n">calculate_coefficients</span><span class="p">(</span><span class="n">terms_3wm</span><span class="p">,</span> <span class="n">epsilon</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_3wm</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>
     <span class="p">)</span>
     <span class="n">coeffs_4wm</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="n">calculate_coefficients</span><span class="p">(</span><span class="n">terms_4wm</span><span class="p">,</span> <span class="n">xi</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_4wm</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="n">calculate_coefficients</span><span class="p">(</span><span class="n">terms_4wm</span><span class="p">,</span> <span class="n">xi</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)</span> <span class="k">if</span> <span class="n">terms_4wm</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>
     <span class="p">)</span>
+
+    <span class="n">relations_3wm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">relations_3wm</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+    <span class="n">relations_4wm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">relations_4wm</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+    <span class="n">coeffs_3wm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">coeffs_3wm</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+    <span class="n">coeffs_4wm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">coeffs_4wm</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">relations_3wm</span><span class="p">,</span> <span class="n">relations_4wm</span><span class="p">,</span> <span class="n">coeffs_3wm</span><span class="p">,</span> <span class="n">coeffs_4wm</span></div>
 
@@ -645,7 +650,10 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_initialize_standard_mode_arrays</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize standard mode arrays using the computed base data.&quot;&quot;&quot;</span>
         <span class="c1"># Create basic 3WM mode array</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_mode_arrays</span><span class="p">[</span><span class="s2">&quot;basic_3wm&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ModeArrayFactory</span><span class="o">.</span><span class="n">create_basic_3wm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mode_arrays</span><span class="p">[</span><span class="s2">&quot;basic_3wm&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ModeArrayFactory</span><span class="o">.</span><span class="n">create_basic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mode_arrays</span><span class="p">[</span><span class="s2">&quot;basic_4wm&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ModeArrayFactory</span><span class="o">.</span><span class="n">create_basic</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">three_wave</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_update_all_mode_arrays</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Update all registered mode arrays with current base data.&quot;&quot;&quot;</span>
@@ -1313,7 +1321,7 @@
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2025, twpalab
+                Copyright &#169; 2026, twpalab
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             
