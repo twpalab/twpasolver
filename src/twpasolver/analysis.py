@@ -409,7 +409,7 @@ class TWPAnalysis(Analyzer, Frequencies):
     def _initialize_standard_mode_arrays(self) -> None:
         """Initialize standard mode arrays using the computed base data."""
         # Create basic 3WM mode array
-        self._mode_arrays["basic_3wm"] = ModeArrayFactory.create_basic_3wm(self.data)
+        self._mode_arrays["basic_3wm"] = ModeArrayFactory.create_basic(self.data)
         self._mode_arrays["basic_4wm"] = ModeArrayFactory.create_basic(
             self.data, three_wave=False
         )

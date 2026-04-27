@@ -1042,9 +1042,8 @@ class ModeArrayFactory:
     """Factory for creating standard ModeArray configurations."""
 
     @staticmethod
-    def create_basic_3wm(
-        base_data: Dict[str, Any],
-        forward_modes: bool = True,
+    def create_basic(
+        base_data: Dict[str, Any], forward_modes: bool = True, three_wave: bool = True
     ) -> ModeArray:
         """
         Create a basic 3WM ModeArray with pump, signal, and idler modes.
@@ -1052,6 +1051,7 @@ class ModeArrayFactory:
         Args:
             base_data: Dictionary containing 'freqs', 'k', 'gammas', and 'alpha' arrays
             forward_modes: Whether to create forward (True) or backward (False) propagating modes
+            Three wave: Whether to include 3WM or 4WM mode relations
 
         Returns:
             ModeArray: Configured for basic 3WM operation
@@ -1072,8 +1072,10 @@ class ModeArrayFactory:
             Mode(label="i", direction=direction),
         ]
 
-        relations = [["i", "p-s"]]  # Idler is pump minus signal
-
+        if three_wave:
+            relations = [["i", "p-s"]]
+        else:
+            relations = [["i", "p+p-s"]]
         return ModeArray(modes, relations, interpolator)
 
     @staticmethod
