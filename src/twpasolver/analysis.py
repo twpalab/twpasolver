@@ -138,15 +138,20 @@ def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
     def calculate_coefficients(terms, scaling_factor):
         return np.array([term[-1] * scaling_factor for term in terms])
 
-    relations_3wm = extract_indices(terms_3wm) if terms_3wm else []
-    relations_4wm = extract_indices(terms_4wm) if terms_4wm else []
+    relations_3wm = extract_indices(terms_3wm) if terms_3wm else [[0, 0, 0]]
+    relations_4wm = extract_indices(terms_4wm) if terms_4wm else [[0, 0, 0, 0]]
 
     coeffs_3wm = (
-        calculate_coefficients(terms_3wm, epsilon / 4) if terms_3wm else np.array([])
+        calculate_coefficients(terms_3wm, epsilon / 4) if terms_3wm else np.array([0])
     )
     coeffs_4wm = (
-        calculate_coefficients(terms_4wm, xi / 4) if terms_4wm else np.array([])
+        calculate_coefficients(terms_4wm, xi / 4) if terms_4wm else np.array([0])
     )
+
+    relations_3wm = np.array(relations_3wm, dtype=np.int64)
+    relations_4wm = np.array(relations_4wm, dtype=np.int64)
+    coeffs_3wm = np.array(coeffs_3wm, dtype=np.complex128)
+    coeffs_4wm = np.array(coeffs_4wm, dtype=np.complex128)
 
     return relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm
 
@@ -404,7 +409,10 @@ class TWPAnalysis(Analyzer, Frequencies):
     def _initialize_standard_mode_arrays(self) -> None:
         """Initialize standard mode arrays using the computed base data."""
         # Create basic 3WM mode array
-        self._mode_arrays["basic_3wm"] = ModeArrayFactory.create_basic_3wm(self.data)
+        self._mode_arrays["basic_3wm"] = ModeArrayFactory.create_basic(self.data)
+        self._mode_arrays["basic_4wm"] = ModeArrayFactory.create_basic(
+            self.data, three_wave=False
+        )
 
     def _update_all_mode_arrays(self) -> None:
         """Update all registered mode arrays with current base data."""
