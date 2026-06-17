@@ -266,6 +266,44 @@ class TWPAnalysis(Analyzer, Frequencies):
                 k_full = -np.unwrap(np.angle(self.data["S21"])) / self.twpa.N_tot
                 self.data["alpha"] = alpha
 
+            # Dissipative attenuation: separates genuine material loss from evanescent
+            # decay due to Bragg reflection in the stopband.
+            #
+            # Strategy: compute the Bloch propagation constant of a lossless copy of
+            # the unit cell (delta=0 everywhere) and subtract:
+            #     α_diss = α_total − α_lossless
+            #
+            # In the passband both are nearly zero so α_diss captures the material loss.
+            # In the stopband α_lossless dominates (evanescent decay), so α_diss → 0.
+            # This is a single-cell eigenvalue computation, independent of N_tot, and
+            # avoids the dynamic-range issues of the S-parameter approach.
+            twpa_dump = self.twpa.model_dump()
+
+            def recursive_zero_delta(cells_list):
+                for cell in cells_list:
+                    if "cells" in cell:
+                        cell["cells"] = recursive_zero_delta(cell["cells"])
+                    if "delta" in cell:
+                        cell["delta"] = 0
+                return cells_list
+
+            twpa_dump["cells"] = recursive_zero_delta(twpa_dump["cells"])
+            twpa_lossless = TWPA(**twpa_dump)
+            print(twpa_lossless)
+            abcd_single_ll = twpa_lossless.single_abcd(self.f)
+            A, B, C, D = (
+                abcd_single_ll.A,
+                abcd_single_ll.B,
+                abcd_single_ll.C,
+                abcd_single_ll.D,
+            )
+
+            ad_ll = abcd_single_ll.A + abcd_single_ll.D
+            gamma_bloch_ll = np.log((ad_ll + np.sqrt(ad_ll**2 - 4)) / 2)
+            alpha_lossless = np.abs(gamma_bloch_ll.real) / self.twpa.N_tot * self.twpa.N
+            alpha_diss = self.data["alpha"] - alpha_lossless
+            self.data["alpha_diss"] = alpha_diss
+
             # Wavenumber processing
             freqs_mask = freqs < freqs[stopband_start_idx] / 10
             if len(freqs_mask) > 2:
@@ -276,7 +314,9 @@ class TWPAnalysis(Analyzer, Frequencies):
                 self.data["k"] = k_full
                 self.data["k_star"] = k_full
 
-            self.data["vg"] = np.nan_to_num(np.gradient(k_full, freqs, axis=0), nan=0)
+            self.data[
+                "vg"
+            ] = alpha_diss  # np.nan_to_num(np.gradient(k_full, freqs, axis=0), nan=0)
             self.data["optimal_pump_freq"] = self._estimate_optimal_pump()
             self._previous_state = current_state
 
@@ -517,6 +557,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         kappa_cutoff: float = 0.2,
         update_rate: float = 0.9,
         convergence_threshold: float = 0.05,
+        floquet=False,
     ) -> dict[str, Any]:
         """
         Compute the TWPA gain using coupled mode equation models.
@@ -606,6 +647,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 model,
                 initial_amplitudes_fwd,
                 Is0,
+                floquet,
             )
 
     def _compute_forward_backward_gain(
@@ -679,6 +721,7 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         y0_fwd_broadcast = np.repeat(y0_fwd, n_freq).reshape((-1, n_freq)).T.copy()
         y0_bwd_broadcast = np.repeat(y0_bwd, n_freq).reshape((-1, n_freq)).T.copy()
+        print(reflections)
         I_tuples = general_cmes_solve_fb_cutoff(
             x,
             y0_fwd_broadcast,
@@ -693,7 +736,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             kappa_cutoff,
             convergence_threshold=convergence_threshold,
             save_all_passes=save_all_passes,
-            Z0=self.twpa.Z0_ref
+            Z0=self.twpa.Z0_ref,
         )
 
         # Extract results for all passes
@@ -716,10 +759,10 @@ class TWPAnalysis(Analyzer, Frequencies):
 
             # # Apply propagation phase correction
             I_tuples_fwd_pass = I_tuples_fwd_pass * np.exp(
-                np.einsum("ij,k->ijk", 1j*gammas.imag, x)
+                np.einsum("ij,k->ijk", 1j * gammas.imag, x)
             )
             I_tuples_bwd_pass = I_tuples_bwd_pass * np.exp(
-                np.einsum("ij,k->ijk", 1j*gammas.imag, x)
+                np.einsum("ij,k->ijk", 1j * gammas.imag, x)
             )
 
             I_tuples_all_passes[pass_idx] = {
@@ -735,8 +778,14 @@ class TWPAnalysis(Analyzer, Frequencies):
         transmission_coeffs = 1 + reflections
         signal_idx = mode_labels.index(signal_mode)
 
-        I_out_fwd = I_tuples_fwd[:, signal_idx, -1] * transmission_coeffs[:, signal_idx]
-        I_out_bwd = I_tuples_bwd[:, signal_idx, -1] * transmission_coeffs[:, signal_idx]
+        I_out_fwd = (
+            I_tuples_fwd[:, signal_idx, -1] * transmission_coeffs[:, signal_idx]
+            - y0_bwd_broadcast[:, signal_idx] * reflections[:, signal_idx]
+        )
+        I_out_bwd = (
+            I_tuples_bwd[:, signal_idx, -1] * transmission_coeffs[:, signal_idx]
+            - y0_fwd_broadcast[:, signal_idx] * reflections[:, signal_idx]
+        )
 
         # Calculate gains for final pass
         gains_fwd = to_dB(np.abs(I_out_fwd / np.repeat(y0_fwd[signal_idx], n_freq)))
@@ -867,9 +916,12 @@ class TWPAnalysis(Analyzer, Frequencies):
             relations_4wm,
             coeffs_3wm,
             coeffs_4wm,
+            floquet=second_order,
         )
 
-        I_tuples_array = I_tuples_array * np.exp(np.einsum("ij,k->ijk", 1j*gammas.imag, x))
+        I_tuples_array = I_tuples_array * np.exp(
+            np.einsum("ij,k->ijk", 1j * gammas.imag, x)
+        )
 
         # Calculate gain
         signal_idx = mode_labels.index(signal_mode)
@@ -999,6 +1051,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         reflections = _param("gamma")
         f_array = _param("freqs")
 
+        alphas_diss_array = _param("vg")
+        alphas_refl_array = alphas_array - alphas_diss_array
+
         # Bloch impedance from reflection coefficient: Z_B = Z0 * (1 + gamma) / (1 - gamma)
         Zb_array = (1.0 + reflections) / (1.0 - reflections) * self.twpa.Z0_ref
         norm_k_array = kappas_array
@@ -1021,13 +1076,20 @@ class TWPAnalysis(Analyzer, Frequencies):
         def _run_cme(y0: np.ndarray) -> np.ndarray:
             if model == GainModel.GENERAL_NO_REFLECTIONS:
                 I = no_reflections_cmes_solve(
-                    x, y0, gammas, relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm
+                    x,
+                    y0,
+                    gammas,
+                    relations_3wm,
+                    relations_4wm,
+                    coeffs_3wm,
+                    coeffs_4wm,
+                    **forward_backward_kwargs,
                 )
             else:
-                y0_bwd = np.full(y0[0].shape, 1e-14, dtype=np.complex128)
+                y0_bwd = np.full(y0.shape, 1e-14, dtype=np.complex128)
                 I_tuples = general_cmes_solve_fb_cutoff(
                     x,
-                    y0[0],
+                    y0,
                     y0_bwd,
                     gammas,
                     reflections,
@@ -1040,132 +1102,209 @@ class TWPAnalysis(Analyzer, Frequencies):
                 )
                 I = I_tuples[:n_freq]
                 I[:, :, -1] = I[:, :, -1] * (1.0 + reflections)
-            return I * np.exp(np.einsum("ij,k->ijk", 1j * kappas_array+alphas_array, x))
+            # Strip the oscillatory phase only: solver returns Ã_m = A_m * exp(-α_m x)
+            # (slowly-varying envelope with attenuation).  We remove exp(i κ_m x) via
+            # the same cancellation used elsewhere, keeping attenuation in the output.
+            # Result: I[f, m, x] = Ã_m(x) = A_m(x) * exp(-α_m x).
+            return I  # * np.exp(alphas_refl_array[:, :, np.newaxis]*x[np.newaxis, np.newaxis, :])
 
-        # 4. Helper: distributed-loss added noise for one mode trajectory
-        def _loss_noise(
-            I_traj: np.ndarray,
-            mode_col_idx: int,
-            alpha_m: np.ndarray,
-            G_m_total: np.ndarray,
-        ) -> np.ndarray:
-            Im_sq = np.abs(I_traj[:, mode_col_idx, :]) ** 2
-            attn = np.exp(-2.0 * alpha_m[:, np.newaxis] * x[np.newaxis, :])
-            Am_sq = Im_sq * attn  # true physical |A_m(x)|^2
-
-            Am_sq_safe = np.where(Am_sq > 0, Am_sq, Am_sq.max(axis=1, keepdims=True))
-            integrand = 2.0 * alpha_m[:, np.newaxis] / Am_sq_safe
-            return G_m_total * np.abs(Is0) ** 2 * np.trapz(integrand, x, axis=1)
-
-        # 5. Main loop over seeded modes (signal + all noise modes)
-        #
-        #    Each iteration seeds mode `seed_mode` with amplitude Is0 and
-        #    propagates through the CME.  The output column of the transfer
-        #    matrix is:
-        #        col_outputs_sq[seed_mode][:, row_idx] = |I_row_out / Is0|^2
+        # 4. Seeded modes (signal + all noise modes reachable from signal)
         dependent_modes = mode_array.get_dependent_modes(signal_mode)
         noise_mode_labels = [
             m for m in dependent_modes if m != pump_mode and m != signal_mode
         ]
         seeded_modes = [signal_mode] + noise_mode_labels
+        n_seeded = len(seeded_modes)
+        n_x = len(x)
+        seeded_idx = np.array([mode_to_idx[m] for m in seeded_modes])
+        signal_row = seeded_modes.index(signal_mode)
 
-        # Storage for quantities accumulated in the loop.
-        col_outputs_sq: dict[str, np.ndarray] = {}  # (n_freq, n_modes)
-        noise_channels: dict[str, np.ndarray] = {}  # photon-basis |v_k|^2, (n_freq,)
-        gain_db_per_mode: dict[str, np.ndarray] = {}
-        N_add_loss_channels = np.zeros(n_freq)
+        # Per-seeded-mode parameters (n_freq, n_seeded)
+        kappas_s = kappas_array[:, seeded_idx]  # κ_m
+        alphas_s = alphas_array[:, seeded_idx]  # α_m total (governs CMEs)
+        alphas_diss_s = alphas_diss_array[
+            :, seeded_idx
+        ]  # α_m dissipative (sources noise)
+        alphas_refl_s = alphas_refl_array[
+            :, seeded_idx
+        ]  # α_m dissipative (sources noise)
+        ks = kappas_array[:, signal_idx]  # κ_signal
 
-        signal_transmission = np.exp(
-            -2.0 * alphas_array[:, signal_idx] * self.twpa.N_tot
-        )
+        # Signs for the Bogoliubov commutator: +1 for U-type, -1 for V-type.
+        sigma_arr = np.ones(n_seeded)
+        for i, m in enumerate(seeded_modes):
+            if m != signal_mode:
+                sigma_arr[i] = float(
+                    np.sign(mode_array.symbolic_expressions[m][signal_mode])
+                )
 
-        ks = norm_k_array[:, signal_idx]
-
-        I_traj_signal: Optional[np.ndarray] = None
-
-        for seed_mode in seeded_modes:
+        # 5. Build the photon-basis transfer matrix with attenuation built in.
+        #
+        #    M̂_{r,k}(0, x) = sqrt(κ_k/κ_r) · Ã_r(x; seed=k) / Is0
+        #
+        #    where Ã_r(x) = A_r(x) · exp(-α_r x) is the attenuation-decayed envelope
+        #    that the solver returns directly (before any _run_cme phase restoration).
+        #
+        #    Properties of this matrix:
+        #    (a) Bogoliubov at output: Σ_k σ_k |M̂_{r,k}(0,L)|² + (loss baths) = 1
+        #    (b) Semigroup: M̂(x, L) = M̂(0, L) · M̂(0, x)^{-1}
+        #    (c) Loss noise: N_loss^(k) → r = ∫ 2 α_k |M̂(x,L)_{r,k}|² dx
+        #        (κ and attenuation factors are all already absorbed).
+        M_hat = np.zeros((n_freq, n_seeded, n_seeded, n_x), dtype=np.complex128)
+        for col_idx, seed_mode in enumerate(seeded_modes):
             log.info("Running CME seeded in mode %s", seed_mode)
             seed_idx = mode_to_idx[seed_mode]
-
             y0 = np.full((n_freq, n_modes), 1e-14, dtype=np.complex128)
             y0[:, pump_idx] = self.twpa.Ip0
             y0[:, seed_idx] = Is0
-
-            I_traj = _run_cme(y0)
-            I_out = I_traj[:, :, -1]
-
-            # Full column of the transfer matrix (squared), all rows.
-            col_outputs_sq[seed_mode] = np.abs(I_out / Is0) ** 2  # (n_freq, n_modes)
-
-            # Mode-specific quantities.
-            kk = norm_k_array[:, seed_idx]
-            alpha_k = alphas_array[:, seed_idx]
-
-            if seed_mode == signal_mode:
-                I_traj_signal = I_traj
-                U_sq = col_outputs_sq[signal_mode][:, signal_idx]
-                gain_db = 10.0 * np.log10(U_sq * signal_transmission)
-                gain_db_per_mode[signal_mode] = gain_db
-                kk_over_ks = np.where(ks != 0, kk / ks, 1.0)
-                N_add_loss = _loss_noise(
-                    I_traj, signal_idx, alphas_array[:, signal_idx], U_sq
-                )
-
-            else:
-                # Photon-basis noise power: (k_k / k_s) * |I_s_out(k-seed) / Is0|^2
-                kk_over_ks = np.where(ks != 0, kk / ks, 1.0)
-                V_k_current_sq = col_outputs_sq[seed_mode][:, signal_idx]
-                v_k_sq = np.abs(kk_over_ks * V_k_current_sq)
-                noise_channels[seed_mode] = v_k_sq
-
-                gain_db_per_mode[seed_mode] = 10.0 * np.log10(
-                    v_k_sq * signal_transmission
-                )
-
-        # 6. Bogoliubov / commutator check
-        #
-        #    The commutator for output mode r is:
-        #        [a_r^out, a_r^dag^out]
-        #            = sum_{col} sigma_col * (k_col / k_r) * |M_{r,col}|^2  =!= 1
-        #
-        #    sigma_col = +1 for U-type (sum-frequency) modes, -1 for V-type
-        #    (difference-frequency / idler-type) modes.
-        sigma_col: dict[str, float] = {signal_mode: 1.0}
-        for nm in noise_mode_labels:
-            sigma_col[nm] = float(
-                np.sign(mode_array.symbolic_expressions[nm][signal_mode])
+            # Solver returns Ã_m (envelope with attenuation, no carrier phase).
+            A_tilde = _run_cme(y0)  # (n_freq, n_modes, n_x)
+            # Photon-basis normalisation: √(κ_seed / κ_row).
+            kappa_seed = kappas_array[:, seed_idx]  # (n_freq,)
+            norm = np.sqrt(kappa_seed[:, np.newaxis] / kappas_s)  # (n_freq, n_seeded)
+            M_hat[:, :, col_idx, :] = (
+                A_tilde[:, seeded_idx, :] / Is0 * norm[:, :, np.newaxis]
             )
 
-        commutator: dict[str, np.ndarray] = {}
-        for row_mode in seeded_modes:
-            row_idx = mode_to_idx[row_mode]
-            kr = norm_k_array[:, row_idx]
-            total = np.zeros(n_freq, dtype=np.complex128)
-            for col_mode in seeded_modes:
-                col_idx = mode_to_idx[col_mode]
-                kc = norm_k_array[:, col_idx]
-                kc_over_kr = np.where(kr != 0, kc / kr, 1.0)
-                M_rc_sq = col_outputs_sq[col_mode][:, row_idx]
-                total += sigma_col[col_mode] * kc_over_kr * M_rc_sq
-            # Guard against numerical blow-up in evanescent regions.
-            commutator[row_mode] = np.where(
-                np.abs(total) < 1e14,
-                np.abs(sigma_col[row_mode] * total),
-                1.0,
-            )
+        # 6. Output matrix M̂(0, L) and its attenuation-stripped counterpart
+        M_out = M_hat[:, :, :, -1]  # (n_freq, n_seeded, n_seeded)
+        # Stripping output attenuation for each row: divide row r by exp(-α_r L).
+        row_attn_L = np.exp(-alphas_s * N_tot)  # (n_freq, n_seeded)
+        M_out_stripped = (
+            M_out  # / row_attn_L[:, :, np.newaxis]  # (n_freq, n_seeded, n_seeded)
+        )
 
+        # 7. Discrete-mode noise channels and gain (attenuation-stripped: refer
+        #    quantities to "just before output attenuation", consistent with how
+        #    the existing code reports gain_db and v_k^2).
+        U_sq = np.abs(M_out_stripped[:, signal_row, signal_row]) ** 2  # = G_signal
+        signal_transmission = np.exp(-2.0 * alphas_s[:, signal_row] * N_tot)
+        gain_db = 10.0 * np.log10(U_sq)  # * signal_transmission)
+
+        gain_db_per_mode: dict[str, np.ndarray] = {signal_mode: gain_db}
+        noise_channels: dict[str, np.ndarray] = {}
+        loss_noise_channels: dict[str, np.ndarray] = {}
+        for col_idx, noise_mode in enumerate(seeded_modes):
+            if noise_mode == signal_mode:
+                continue
+            v_k_sq = np.abs(M_out_stripped[:, signal_row, col_idx]) ** 2
+            noise_channels[noise_mode] = v_k_sq
+            gain_db_per_mode[noise_mode] = 10.0 * np.log10(
+                v_k_sq
+            )  # * signal_transmission)
+
+        print("Inverting Gain matrix")
+        # 8. Green's function via semigroup inversion.
+        #
+        #    G(x, L) = M̂(0, L) · M̂(0, x)^{-1}
+        #
+        #    Solved as:  G^T = pinv(M̂(0,x)^T) · M̂(0,L)^T
+        #
+        #    Pseudo-inverse via batched SVD: M̂(0,x)^T = U S V^T  →  pinv = V S⁺ U^T
+        #    Singular values below rcond × σ_max are zeroed, which automatically
+        #    suppresses evanescent columns (small σ) without a per-system Python loop.
+        #    rcond is computed adaptively per (f, x) from the column-norm ratio.
+        M_hat_T = np.transpose(
+            M_hat, (0, 3, 2, 1)
+        )  # (n_freq, n_x, col, row) = M(0,x)^T
+        M_out_T = np.transpose(M_out, (0, 2, 1))  # (n_freq, col, row)
+
+        # Adaptive rcond: ratio of min to max column norm of M̂(0,x), per (f,x).
+        col_norms = np.linalg.norm(M_hat_T, axis=-1)  # (n_freq, n_x, n_seeded)
+        col_norm_ratio = col_norms.min(axis=-1) / np.maximum(
+            col_norms.max(axis=-1), 1e-300
+        )  # (n_freq, n_x)
+        rcond_arr = np.clip(col_norm_ratio, 1e-12, 1e-2)  # (n_freq, n_x)
+
+        # Batched SVD of all (n_freq × n_x) systems at once.
+        A_batch = M_hat_T.reshape(-1, n_seeded, n_seeded)  # (n_freq*n_x, col, row)
+        U, s, Vh = np.linalg.svd(A_batch, full_matrices=False)
+        # s: (n_freq*n_x, n_seeded);  U, Vh: (n_freq*n_x, n_seeded, n_seeded)
+
+        # Apply adaptive truncation: zero singular values below rcond * σ_max.
+        s_max = s[:, :1]  # (n_freq*n_x, 1)
+        threshold = rcond_arr.reshape(-1, 1) * s_max  # (n_freq*n_x, 1)
+        s_inv = np.where(s > threshold, 1.0 / np.maximum(s, 1e-300), 0.0)
+
+        # Pseudo-inverse: pinv(A) = V · diag(s⁺) · U^H
+        # Vh has shape (n_freq*n_x, n_seeded, n_seeded); V = Vh^H
+        pinv_A = (
+            Vh.conj().swapaxes(-1, -2) * s_inv[:, np.newaxis, :]
+        ) @ U.conj().swapaxes(-1, -2)
+        # pinv_A: (n_freq*n_x, row, col)  [= pinv of M̂(0,x)^T]
+
+        # Apply to RHS: G^T = pinv(M̂(0,x)^T) · M̂(0,L)^T
+        # pinv_A:   (nfx, n_seeded, n_seeded)  maps col-space → row-space
+        # rhs_batch:(nfx, n_seeded, n_seeded)  = M̂(0,L)^T, indexing [col, row]
+        # product:  (nfx, n_seeded, n_seeded)  = G^T, indexing [row_x, row_L]
+        rhs_batch = np.broadcast_to(
+            M_out_T[:, np.newaxis, :, :], (n_freq, n_x, n_seeded, n_seeded)
+        ).reshape(
+            -1, n_seeded, n_seeded
+        )  # (nfx, col, row_L)
+        G_T = pinv_A @ rhs_batch  # (nfx, row_x, row_L)
+
+        # Transpose last two axes to get G[f, x, row_L, col] = M̂(x,L)_{row_L, col}
+        # where the semigroup identity G·M(0,x) = M(0,L) is satisfied.
+        G = G_T.reshape(n_freq, n_x, n_seeded, n_seeded).swapaxes(-1, -2)
+
+        print("Done")
+        # 9. Loss-bath added noise: ∫ 2 α_k^diss(x) |G_{r,k}(x)|² dx
+        #
+        #    Only genuine dissipation couples to a Langevin vacuum bath.  Reflection-
+        #    driven evanescent decay (the part of α_total that comes from the
+        #    stopband) is elastic scattering, not a noise source.
+        #
+        #    Shape: N_loss_raw[f, r, k] — loss noise from bath of mode k reaching
+        #    output row r, WITH output attenuation still baked in.
+        alpha_k_broadcast = alphas_diss_s[:, np.newaxis, np.newaxis, :]  # (f, 1, 1, k)
+        alpha_refl_k_broadcast = alphas_refl_s[
+            :, np.newaxis, np.newaxis, :
+        ]  # (f, 1, 1, k)
+        integrand = 2.0 * alpha_k_broadcast * np.abs(G) ** 2  # (f, x, r, k)
+        N_loss_raw = np.trapz(integrand, x, axis=1)  # (f, r, k)
+
+        # 10. Commutator check.
+        #
+        #     If α_diss = α_total (pure dissipation, no stopband reflection),
+        #     Σ_k σ_k |M̂_{r,k}|² + Σ_k ∫ 2 α_k^diss |G_{r,k}|² dx = 1 exactly.
+        #
+        #     When α_total > α_diss (stopband evanescent decay), the identity no
+        #     longer holds at 1: the deficit equals the probability scattered
+        #     elastically into reflection channels that are not tracked as modes.
+        #     This provides a diagnostic for how much untracked reflection affects
+        #     the mode system.
+        discrete_cont = (sigma_arr[np.newaxis, np.newaxis, :] * np.abs(M_out) ** 2).sum(
+            axis=2
+        )
+        loss_bath_cont = N_loss_raw.sum(axis=2)  # (f, r)
+        commutator_arr = np.abs(
+            sigma_arr[np.newaxis, :] * (discrete_cont + loss_bath_cont)
+        )
+        commutator = {m: commutator_arr[:, r] for r, m in enumerate(seeded_modes)}
         bogoliubov_residual = {m: commutator[m] - 1.0 for m in seeded_modes}
 
-        # 7. Quantum efficiency
-        total_noise = sum(noise_channels.values(), np.zeros(n_freq))
-        total_noise_with_loss = total_noise + N_add_loss + N_add_loss_channels
+        # 11. Signal-output loss noise: strip output attenuation (refer to just
+        #     before output coupling, consistent with U_sq and noise_channels).
+        N_loss_per_k = N_loss_raw[
+            :, signal_row, :
+        ]  # / (row_attn_L[:, signal_row, np.newaxis] ** 2)
+        for col_idx, noise_mode in enumerate(seeded_modes):
+            loss_noise_channels[noise_mode] = N_loss_per_k[:, col_idx]
+        N_add_loss_channels = N_loss_per_k.sum(axis=1)
+        # Signal-mode-only loss term, reported separately for diagnostic purposes.
+        N_add_loss = N_loss_per_k[:, signal_row]
+        total_noise_with_loss = (
+            sum(noise_channels.values(), np.zeros(n_freq)) + N_add_loss_channels
+        )
 
+        # 12. Quantum efficiency
         qe = U_sq / (U_sq + total_noise_with_loss)
         added_noise = total_noise_with_loss / U_sq / 2.0
-
-        qe_ideal = U_sq / (2.0 * U_sq - 1.0)
+        signal_transmission = np.exp(-2.0 * alphas_diss_s[:, signal_row] * N_tot)
+        qe_ideal = U_sq / signal_transmission / (2.0 * U_sq / signal_transmission - 1.0)
         qe_normalized = np.where(qe_ideal > 0, qe / qe_ideal, 0.0)
-        eta_MR = norm_k_array[:, signal_idx] / norm_k_array[:, pump_idx]
+        eta_MR = kappas_array[:, signal_idx] / kappas_array[:, pump_idx]
 
         return {
             "signal_freqs": signal_freqs,
@@ -1176,6 +1315,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             "qe_ideal": qe_ideal,
             "added_noise": added_noise,
             "noise_channels": noise_channels,
+            "loss_noise_channels": loss_noise_channels,
             "gain_db_per_mode": gain_db_per_mode,
             "commutator": commutator,
             "bogoliubov_residual": bogoliubov_residual,

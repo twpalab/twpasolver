@@ -342,6 +342,5 @@ def plot_quantum_efficiency(
     ax.grid(True, alpha=0.3)
 
     axes[-1].set_xlabel(f"Signal frequency [{freqs_unit}]")
-    axes[2].set_xlabel("")
 
     return axes

@@ -69,6 +69,9 @@ class TWPA(TwoPortArray):
     Istar: NonNegativeFloat = Field(
         default=6.5e-3, description="Nonlinearity scale current parameter."
     )
+    Istar2: NonNegativeFloat = Field(
+        default=1e12, description="Second order scaling current parameter."
+    )
     Idc: NonNegativeFloat = Field(default=1e-3, description="Bias dc current.")
     Ip0: NonNegativeFloat = Field(default=2e-4, description="Rf pump amplitude.")
 
@@ -81,7 +84,7 @@ class TWPA(TwoPortArray):
         Returns:
             NonNegativeFloat: The epsilon value.
         """
-        return 2 * self.Idc / (self.Idc**2 + self.Istar**2)
+        return 2 * self.Idc * self.xi
 
     @computed_field
     @property
@@ -92,7 +95,11 @@ class TWPA(TwoPortArray):
         Returns:
             NonNegativeFloat: The xi value.
         """
-        return 1 / (self.Idc**2 + self.Istar**2)
+        return (2 * (self.Istar * self.Idc) ** 2 + self.Istar2**4) / (
+            (self.Istar * self.Istar2**2) ** 2
+            + (self.Istar * self.Idc**2) ** 2
+            + (self.Idc * self.Istar2**2) ** 2
+        )
 
     @computed_field
     @property
