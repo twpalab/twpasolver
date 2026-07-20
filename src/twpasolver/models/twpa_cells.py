@@ -9,8 +9,13 @@ import numpy as np
 from pydantic import Field, NonNegativeFloat
 
 from twpasolver.matrices_arrays import ABCDArray
-from twpasolver.models.oneport import Inductance
-from twpasolver.models.rf_functions import LCLf_abcd, get_stub_cell, lossless_line_abcd
+from twpasolver.models.rf_functions import (
+    LCLf_abcd,
+    get_stub_cell,
+    inductance,
+    lossless_line_abcd,
+    series_impedance_abcd,
+)
 from twpasolver.twoport import TwoPortModel
 
 required = partial(Field, ...)
@@ -62,6 +67,7 @@ class LCLfBaseCell(TwoPortModel):
     C: NonNegativeFloat = required(description="Capacitance of the stub finger.")
     Lf: NonNegativeFloat = required(description="Inductance of the stub finger.")
     delta: NonNegativeFloat = Field(0, description="Loss Tangent")
+    qp_loss: NonNegativeFloat = Field(0, description=("Quasiparticle-loss coefficient"))
     centered: bool = False
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
@@ -70,8 +76,16 @@ class LCLfBaseCell(TwoPortModel):
             fingers = ABCDArray(
                 LCLf_abcd(freqs, self.C * (1 - 1j * self.delta), 0, self.Lf)
             )
-            half_inductance = Inductance(L=self.L / 2).get_abcd(freqs)
+            half_Z = inductance(freqs, self.L / 2) * (1 - 1j * self.qp_loss * freqs)
+            half_inductance = ABCDArray(series_impedance_abcd(half_Z))
             return half_inductance @ fingers @ half_inductance
+
         return ABCDArray(
-            LCLf_abcd(freqs, self.C * (1 - 1j * self.delta), self.L, self.Lf)
+            LCLf_abcd(
+                freqs,
+                self.C * (1 - 1j * self.delta),
+                self.L,
+                self.Lf,
+                self.qp_loss,
+            )
         )

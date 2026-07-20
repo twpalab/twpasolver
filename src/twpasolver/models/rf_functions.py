@@ -127,7 +127,9 @@ def lossless_line_abcd(freqs: FloatArray, C: float, L: float, l: float) -> Compl
 
 
 @njit
-def LCLf_abcd(freqs: FloatArray, C: float, L: float, Lf: float) -> ComplexArray:
+def LCLf_abcd(
+    freqs: FloatArray, C: float, L: float, Lf: float, qp_loss: float = 0.0
+) -> ComplexArray:
     """
     Calculate the ABCD matrix of an LCLf cell model.
 
@@ -136,6 +138,7 @@ def LCLf_abcd(freqs: FloatArray, C: float, L: float, Lf: float) -> ComplexArray:
         C (float): Capacitance value.
         L (float): Inductance value.
         Lf (float): Additional inductance value.
+        qp_loss (float): Quasiparticle-loss coefficient (units 1/Hz).
 
     Returns:
         np.ndarray: ABCD matrix of the LCLf cell model.
@@ -147,11 +150,12 @@ def LCLf_abcd(freqs: FloatArray, C: float, L: float, Lf: float) -> ComplexArray:
     abcd = np.empty((n_mat, 2, 2), dtype=np.complex128)
     for i in range(n_mat):
         w = 2 * np.pi * freqs[i]
+        L_eff = L * (1 - 1j * qp_loss * freqs[i])
         den = 2 - Lf * C * w**2
         abcd[i, 0, 0] = 1
-        abcd[i, 0, 1] = 1j * L * w
+        abcd[i, 0, 1] = 1j * L_eff * w
         abcd[i, 1, 0] = 1j * 2 * C * w / den
-        abcd[i, 1, 1] = 1 - 2 * L * C * w**2 / den
+        abcd[i, 1, 1] = 1 - 2 * L_eff * C * w**2 / den
     return abcd
 
 

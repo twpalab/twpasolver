@@ -1,14 +1,4 @@
-"""
-Coupled Mode Equations — forward/backward solver with inlined RK45.
-
-The RK45 integrator is inlined directly into the per-frequency solve
-function rather than passed as a higher-order argument.  This avoids
-Numba's parallel-compilation deadlock that occurs when a function
-pointer is specialised inside a prange body.
-
-The single RHS function (cme_rhs) is called by name from the inlined
-solver, giving Numba a fully static call graph throughout.
-"""
+"""Coupled Mode Equations forward/backward solver."""
 
 import numba as nb
 import numpy as np
@@ -20,10 +10,51 @@ from twpasolver.bonus_types import (
     nb_complex1d,
     nb_complex2d,
     nb_float1d,
+    nb_float2d,
     nb_int2d,
 )
 from twpasolver.cmes.solver_config import *
+from twpasolver.cmes.base import _sorted_interp_bracket
 
+
+
+
+@nb.njit(cache=True)
+def _compute_atol_vec(solution, n_modes, base_atol, scale=1e-2):
+    """
+    Compute a per-mode absolute tolerance vector from a completed pass.
+
+    Parameters
+    ----------
+    solution  : (2*n_modes, n_x) complex128
+        Raw solver output — rows 0..n_modes-1 are the slow envelopes.
+    n_modes   : int
+    base_atol : float
+        Global floor (SOLVER_ATOL).
+    scale     : float
+        1e-2 → atol = 1% of minimum observed amplitude (~2 digits of headroom).
+ 
+    Returns
+    -------
+    atol_vec : (n_modes,) float64
+    """
+    atol_vec = np.empty(n_modes, dtype=nb.float64)
+    for m in range(n_modes):
+        min_abs = np.inf
+        for ix in range(solution.shape[1]):
+            v = np.abs(solution[m, ix])
+            if v < min_abs:
+                min_abs = v
+        if min_abs == 0.0 or min_abs == np.inf:
+            atol_vec[m] = base_atol
+        else:
+            candidate = scale * min_abs
+            atol_vec[m] = candidate if candidate > base_atol else base_atol
+    return atol_vec
+
+# ---------------------------------------------------------------------------
+# Wave-mixing term filter
+# ---------------------------------------------------------------------------
 
 @nb.njit(cache=True)
 def _filter_wm_terms(kappas, relations_3wm, relations_4wm, relative_deltak_cutoff):
@@ -97,8 +128,9 @@ def _filter_wm_terms(kappas, relations_3wm, relations_4wm, relative_deltak_cutof
 
 
 # ---------------------------------------------------------------------------
-# CME right-hand side  (called by name from the inlined solver below)
+# Uniform RHS
 # ---------------------------------------------------------------------------
+
 @nb.njit(
     nb_complex1d(
         nb.float64,
@@ -129,15 +161,19 @@ def cme_rhs(
     end,
 ):
     """
-    Unified CME RHS for forward and backward passes.
+    Unified CME RHS for uniform-device forward and backward passes.
 
-    currents_evals holds the reversed counter-propagating envelope B_m.
+    currents_evals holds the reversed counter-propagating slow envelope B_m.
     When it is all zeros (first forward pass) the counter term vanishes,
     reproducing the no-backward-field equation exactly.
 
+    Phase carriers:
+      forward  carrier: ep[m] = exp(i * kappas[m] * x)
+      backward carrier: en[m] = exp(i * kappas[m] * (end - x))
+
     Output length = 2*n_modes:
       [0:n]   dB_m/dx  (full, with +alpha*B term)
-      [n:2n]  raw nonlinear part only (for reflection coefficient use)
+      [n:2n]  raw nonlinear part only (for reflection-coefficient update)
     """
     n = len(currents)
     out = np.zeros(2 * n, nb.complex128)
@@ -145,11 +181,13 @@ def cme_rhs(
     en = np.exp(1j * kappas * (end - x))
 
     ar = np.empty(4 * n, dtype=nb.complex128)
+    # x_evals is sorted: one binary search gives the bracket for all modes.
+    lo_e, hi_e = _sorted_interp_bracket(x_evals, x)
+    frac_e = 0.0 if lo_e == hi_e else (x - x_evals[lo_e]) / (x_evals[hi_e] - x_evals[lo_e])
     for i in range(n):
-        ctr = (
-            np.interp(x, x_evals, currents_evals[i].real)
-            + 1j * np.interp(x, x_evals, currents_evals[i].imag)
-        ) * en[i]
+        ctr_re = currents_evals[i, lo_e].real + frac_e * (currents_evals[i, hi_e].real - currents_evals[i, lo_e].real)
+        ctr_im = currents_evals[i, lo_e].imag + frac_e * (currents_evals[i, hi_e].imag - currents_evals[i, lo_e].imag)
+        ctr = (ctr_re + 1j * ctr_im) * en[i]
         ar[i] = currents[i] * ep[i]
         ar[i + n] = np.conj(ar[i])
         ar[i + 2 * n] = ctr
@@ -169,15 +207,833 @@ def cme_rhs(
 
 
 # ---------------------------------------------------------------------------
-# Parallel outer loop
+# Segmented RHS  (position-dependent parameters, exact cumulative phase)
 # ---------------------------------------------------------------------------
+
+@nb.njit(
+    nb_complex1d(
+        nb.float64,
+        nb_complex1d,
+        nb_float2d,
+        nb_float2d,
+        nb_int2d,
+        nb_int2d,
+        nb_complex2d,
+        nb_complex2d,
+        nb_float1d,
+        nb_float1d,
+        nb_float2d,
+        nb_complex2d,
+     #   nb_complex2d,
+    ),
+    cache=True,
+)
+def cme_rhs_segmented(
+    x,
+    currents,
+    alphas_table,
+    kappas_table,
+    relations_3wm,
+    relations_4wm,
+    coeffs_3wm_table,
+    coeffs_4wm_table,
+    segment_midpoints,
+    x_evals,
+    phi_table,
+    currents_evals,
+  #  Zb_table,
+):
+    """
+    Unified CME RHS for segmented-device forward and backward passes.
+
+    Parameters
+    ----------
+    alphas_table, kappas_table : (n_modes, n_segments)
+        Piecewise-linear attenuation and wavenumber; interpolated at x via
+        segment_midpoints.
+    coeffs_3wm_table, coeffs_4wm_table : (n_relations, n_segments)
+        Position-dependent nonlinear coupling coefficients.
+    segment_midpoints : (n_segments,)
+        Sorted grid for the parameter tables.
+    x_evals : (n_x,)
+        Sorted output grid on which phi_table and currents_evals are defined.
+    phi_table : (n_modes, n_x)
+        Forward cumulative phase  Phi_m(x[k]) = integral_0^{x[k]} kappa_m(x') dx',
+        precomputed on x_evals.  The value at the last point, phi_table[m, -1],
+        is the total accumulated phase Phi_m(x_end).
+
+    Phase carriers derived inside the RHS (no extra argument needed):
+      forward  carrier: ep[m] = exp(i * Phi_m(x))
+      backward carrier: en[m] = exp(i * (Phi_m(x_end) - Phi_m(x)))
+                               = exp(i * phi_total[m]) / ep[m]
+
+    currents_evals : (n_modes, n_x)
+        Reversed slow envelope of the counter-propagating wave, stored on
+        x_evals.  Zero on the first forward pass so the counter term vanishes.
+    Zb_table : (n_modes, n_segments)
+        Local Bloch impedance along the device.  Used to compute the
+        distributed reflection gradient  r(x) = (1/2) d ln Zb / dx
+        which couples forward and backward slow envelopes continuously
+        (WKB correction for slowly-varying impedance).  Pass in physical
+        order for the forward solve; pass the reversed copy for the backward
+        solve so that the gradient sign flips correctly without any branching.
+
+    Output length = 2*n_modes:
+      [0:n]   dB_m/dx  (full, with +alpha*B term)
+      [n:2n]  raw nonlinear part only (for reflection-coefficient update)
+    """
+    n = len(currents)
+    out = np.zeros(2 * n, nb.complex128)
+
+    # ---- locate x in both sorted grids (one binary search each) --------- #
+    lo_s, hi_s = _sorted_interp_bracket(segment_midpoints, x)
+    lo_x, hi_x = _sorted_interp_bracket(x_evals, x)
+
+    frac_s = 0.0 if lo_s == hi_s else (x - segment_midpoints[lo_s]) / (segment_midpoints[hi_s] - segment_midpoints[lo_s])
+    frac_x = 0.0 if lo_x == hi_x else (x - x_evals[lo_x]) / (x_evals[hi_x] - x_evals[lo_x])
+
+    # ---- local alphas, kappas, phase carriers ---------------------------- #
+    # ep[m]  = exp(i * Phi_m(x))               forward carrier
+    # en[m]  = exp(i * (Phi_m(x_end) - Phi_m(x)))  backward carrier
+    #        = exp(i * phi_total[m]) / ep[m]
+    # phi_total[m] = phi_table[m, -1]  (last column, computed once per call)
+    alphas  = np.empty(n, dtype=nb.float64)
+    kappas  = np.empty(n, dtype=nb.float64)
+    ep      = np.empty(n, dtype=nb.complex128)
+    en      = np.empty(n, dtype=nb.complex128)
+    n_x_tab = phi_table.shape[1]
+    for m in range(n):
+        alphas[m] = alphas_table[m, lo_s] + frac_s * (alphas_table[m, hi_s] - alphas_table[m, lo_s])
+        kappas[m] = kappas_table[m, lo_s] + frac_s * (kappas_table[m, hi_s] - kappas_table[m, lo_s])
+        phi_x = phi_table[m, lo_x] + frac_x * (phi_table[m, hi_x] - phi_table[m, lo_x])
+        phi_total = phi_table[m, n_x_tab - 1]          # Phi_m(x_end)
+        ep[m] = np.exp(1j * phi_x)
+        en[m] = np.exp(1j * (phi_total - phi_x))       # no extra allocation
+
+    # ---- local nonlinear coefficients ------------------------------------ #
+    n_rel3 = coeffs_3wm_table.shape[0]
+    coeffs_3wm = np.empty(n_rel3, dtype=nb.complex128)
+    for r in range(n_rel3):
+        coeffs_3wm[r] = coeffs_3wm_table[r, lo_s] + frac_s * (
+            coeffs_3wm_table[r, hi_s] - coeffs_3wm_table[r, lo_s]
+        )
+
+    n_rel4 = coeffs_4wm_table.shape[0]
+    coeffs_4wm = np.empty(n_rel4, dtype=nb.complex128)
+    for r in range(n_rel4):
+        coeffs_4wm[r] = coeffs_4wm_table[r, lo_s] + frac_s * (
+            coeffs_4wm_table[r, hi_s] - coeffs_4wm_table[r, lo_s]
+        )
+
+    # ---- assemble field amplitudes --------------------------------------- #
+    # ar layout (same as uniform RHS):
+    #   [0 :  n]  A_m(x)  = B_m * ep[m]         (co-propagating, full phase)
+    #   [n : 2n]  conj(A_m)
+    #   [2n: 3n]  C_m(x)  = D_m * en[m]         (counter-propagating, full phase)
+    #   [3n: 4n]  conj(C_m)
+    ar = np.empty(4 * n, dtype=nb.complex128)
+    for i in range(n):
+        ctr_re = currents_evals[i, lo_x].real + frac_x * (currents_evals[i, hi_x].real - currents_evals[i, lo_x].real)
+        ctr_im = currents_evals[i, lo_x].imag + frac_x * (currents_evals[i, hi_x].imag - currents_evals[i, lo_x].imag)
+        ctr = (ctr_re + 1j * ctr_im) * en[i]
+        ar[i] = currents[i] * ep[i]
+        ar[i + n] = np.conj(ar[i])
+        ar[i + 2 * n] = ctr
+        ar[i + 3 * n] = np.conj(ctr)
+
+    # ---- nonlinear coupling ---------------------------------------------- #
+    for idx, i1, i2 in relations_3wm:
+        out[idx] += coeffs_3wm[idx] * ar[i1] * ar[i2]
+    for idx, i1, i2, i3 in relations_4wm:
+        out[idx] += coeffs_4wm[idx] * ar[i1] * ar[i2] * ar[i3]
+
+    # ---- remove fast carrier; add loss term ------------------------------ #
+    for i in range(n):
+        raw = (alphas[i] + 1j * kappas[i]) * out[i] / ep[i]
+        out[i] = raw + alphas[i] * currents[i]
+        out[n + i] = raw
+
+    # ---- distributed reflection from slowly-varying Zb(x) --------------- #
+    # WKB correction: r(x) = (1/2) d ln Zb / dx ≈ (Zb[hi] - Zb[lo]) / (seg_len * Zb(x))
+    # In current normalisation the equations are:
+    #   dI⁺/dx += -r(x) * I⁺  +  r(x) * I⁻ * (en / ep)    [fwd slow envelope]
+    #   dI⁻/dx += +r(x) * I⁺ * (ep / en)  -  r(x) * I⁻    [bwd slow envelope]
+   # if lo_s != hi_s:
+   #     seg_len = segment_midpoints[hi_s] - segment_midpoints[lo_s]
+   #     for m in range(n):
+   #         Zb_lo = Zb_table[m, lo_s]
+   #         Zb_hi = Zb_table[m, hi_s]
+   #         Zb_x  = Zb_lo + frac_s * (Zb_hi - Zb_lo)
+   #         r_m   = 0.5 * (Zb_lo - Zb_hi) / (seg_len * Zb_x)
+   #         refl_correction = r_m * (ar[m + 2 * n] / ep[m] - currents[m])
+   #         out[m]     += refl_correction
+   #         #out[m + n] += refl_correction
+
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Parallel outer loop — uniform device
+# ---------------------------------------------------------------------------
+
 @nb.njit(parallel=True)
+def _general_cmes_solve_fb_cutoff_uniform(
+    x_array,
+    y0_array_fwd,
+    y0_array_bwd,
+    gammas_array,
+    reflections_array,
+    relations_3wm,
+    relations_4wm,
+    coeffs_3wm,
+    coeffs_4wm,
+    passes,
+    kappa_cutoff,
+    update_rate,
+    convergence_threshold,
+    save_all_passes,
+    Z0_table,
+):
+    """
+    Solve full general CMEs (forward + backward) for all frequency points.
+
+    The parallel body contains only calls to statically-known njit functions
+    (_filter_wm_terms, cme_rhs) with no function-pointer arguments, giving
+    Numba a fully static call graph and avoiding the parallel-compilation
+    deadlock that occurs with higher-order function arguments in prange.
+    """
+    n_freq  = gammas_array.shape[0]
+    n_modes = gammas_array.shape[1]
+    n_out   = 2 * n_modes
+    n_x     = len(x_array)
+    x_end   = x_array[-1]
+    x_span  = (x_array[0], x_array[-1])
+
+    if save_all_passes:
+        I_out = np.empty((2 * n_freq * passes, n_modes, n_x), dtype=np.complex128)
+    else:
+        I_out = np.empty((2 * n_freq, n_modes, n_x), dtype=np.complex128)
+
+    A_fwd     = np.zeros((n_freq, n_out, n_x), dtype=np.complex128)
+    A_bwd     = np.zeros((n_freq, n_out, n_x), dtype=np.complex128)
+    A_counter = np.zeros((n_freq, n_modes, n_x), dtype=np.complex128)
+
+    for i in nb.prange(n_freq):
+        I_fwd = np.zeros(n_modes, dtype=np.complex128)
+        I_bwd = np.zeros(n_modes, dtype=np.complex128)
+        refl_end_out = np.zeros(n_modes, dtype=np.complex128)
+
+        converged   = False
+        stable_count = 0
+        prev_fwd = np.zeros(n_modes, dtype=np.complex128)
+        prev_bwd = np.zeros(n_modes, dtype=np.complex128)
+
+        alphas_i   = np.ascontiguousarray(gammas_array[i].real)
+        kappas_i   = np.ascontiguousarray(gammas_array[i].imag)
+        refl_0_in  = np.ascontiguousarray(reflections_array[i])
+        Z0_i       = Z0_table[i]
+        trans_0_in = 1.0 - refl_0_in
+        Zb_i       = np.empty(n_modes, dtype=nb.complex128)
+        for jj in range(n_modes):
+            Zb_i[jj] = Z0_i[jj] * (1.0 + refl_0_in[jj]) / (1.0 - refl_0_in[jj])
+        x_array_i = np.ascontiguousarray(x_array)
+
+        refl_0_out = np.empty(n_modes, dtype=nb.complex128)
+        for j in range(n_modes):
+            I_fwd[j]        = y0_array_fwd[i, j] * trans_0_in[j]
+            I_bwd[j]        = y0_array_bwd[i, j] * trans_0_in[j]
+            refl_end_out[j] = refl_0_in[j]
+            refl_0_out[j]   = refl_0_in[j]
+
+        r3, r4 = _filter_wm_terms(kappas_i, relations_3wm, relations_4wm, kappa_cutoff)
+
+        for k in range(passes):
+            # ---- forward solve ------------------------------------------ #
+            A_fwd[i] = nbsolve_ivp(
+                cme_rhs,
+                x_span,
+                I_fwd,
+                args=(
+                    alphas_i, kappas_i, r3, r4,
+                    coeffs_3wm, coeffs_4wm,
+                    x_array_i, A_counter[i], x_end,
+                ),
+                atol=SOLVER_ATOL, rtol=SOLVER_RTOL,
+                max_num_steps=x_end, t_eval=x_array_i,
+                rk_method=SOLVER_RK_METHOD, first_step=SOLVER_FIRST_STEP,
+                capture_extra=True,
+            ).y
+
+            # ---- reflection at far end → backward IC -------------------- #
+            for j in range(n_modes):
+                A_fwd_end_j = A_fwd[i, j, -1] * np.exp(1j * kappas_i[j] * x_end)
+                I_bwd[j] = y0_array_bwd[i, j] * trans_0_in[j] - refl_end_out[j] * A_fwd_end_j
+
+            # Reverse A_fwd into counter buffer for the backward solve.
+            for j in range(n_modes):
+                for ix in range(n_x):
+                    A_counter[i, j, ix] = A_fwd[i, j, n_x - 1 - ix]
+
+            # ---- backward solve ----------------------------------------- #
+            A_bwd[i] = nbsolve_ivp(
+                cme_rhs,
+                x_span,
+                I_bwd,
+                args=(
+                    alphas_i, kappas_i, r3, r4,
+                    coeffs_3wm, coeffs_4wm,
+                    x_array_i, A_counter[i], x_end,
+                ),
+                atol=SOLVER_ATOL, rtol=SOLVER_RTOL,
+                max_num_steps=x_end, t_eval=x_array_i,
+                rk_method=SOLVER_RK_METHOD, first_step=SOLVER_FIRST_STEP,
+                capture_extra=True,
+            ).y
+
+            # ---- self-consistent reflection update (output end → bwd IC) #
+            if k > 2:
+                for j in range(n_modes):
+                    de         = np.exp(-alphas_i[j] * x_end)
+                    raw_bwd    = A_bwd[i, n_modes + j, 0]
+                    B_bwd0     = A_bwd[i, j, 0]
+                    raw_fwd    = A_fwd[i, n_modes + j, -1] * de
+                    B_fwd_end  = A_fwd[i, j, -1]
+                    gj  = gammas_array[i, j]
+                    Zbj = Zb_i[j]
+                    Z0_ij = Z0_i[j]
+                    refl_end_out[j] = (
+                        -B_fwd_end / B_bwd0
+                        * ((Z0_ij - Zbj) * gj * B_bwd0 + Zbj * raw_bwd)
+                        / ((Z0_ij + Zbj) * gj * B_fwd_end + Zbj * raw_fwd)
+                    )
+
+            # Reverse A_bwd into counter buffer for the next forward solve.
+            for j in range(n_modes):
+                for ix in range(n_x):
+                    A_counter[i, j, ix] = A_bwd[i, j, n_x - 1 - ix]
+
+            # ---- self-consistent reflection update (input end → fwd IC) -#
+            if k > 2:
+                for j in range(n_modes):
+                    de        = np.exp(-alphas_i[j] * x_end)
+                    raw_fwd   = A_fwd[i, n_modes + j, 0]
+                    B_fwd0    = A_fwd[i, j, 0]
+                    raw_bwd   = A_bwd[i, n_modes + j, -1]
+                    B_bwd_end = A_bwd[i, j, -1] * de
+                    gj  = gammas_array[i, j]
+                    Zbj = Zb_i[j]
+                    Z0_ij = Z0_i[j]
+                    rb = (
+                        -B_bwd_end / B_fwd0
+                        * ((Z0_ij - Zbj) * gj * B_fwd0 + Zbj * raw_fwd)
+                        / ((Z0_ij + Zbj) * gj * B_bwd_end + Zbj * raw_bwd)
+                    )
+                    refl_0_out[j] = rb
+                    A_bwd_end_j = A_bwd[i, j, -1] * np.exp(1j * kappas_i[j] * x_end)
+                    I_fwd[j] = y0_array_fwd[i, j] * trans_0_in[j] - rb * A_bwd_end_j
+            else:
+                for j in range(n_modes):
+                    A_bwd_end_j = A_bwd[i, j, -1] * np.exp(1j * kappas_i[j] * x_end)
+                    I_fwd[j] = y0_array_fwd[i, j] * trans_0_in[j] - refl_0_in[j] * A_bwd_end_j
+
+            # ---- convergence check -------------------------------------- #
+            if k > 1:
+                nf = 0.0
+                nb_ = 0.0
+                for j in range(n_modes):
+                    v = np.abs(A_fwd[i, j, -1] - prev_fwd[j]) / (np.abs(A_fwd[i, j, -1]) + 1e-30)
+                    w = np.abs(A_bwd[i, j, -1] - prev_bwd[j]) / (np.abs(A_bwd[i, j, -1]) + 1e-30)
+                    if v > nf:
+                        nf = v
+                    if w > nb_:
+                        nb_ = w
+                if nf < convergence_threshold and nb_ < convergence_threshold:
+                    stable_count += 1
+                else:
+                    stable_count = 0
+                if stable_count >= 3:
+                    converged = True
+
+            # ---- store output ------------------------------------------- #
+            # Last x-point overwritten with physical output amplitude:
+            #   fwd out: trans_end_out = 1 + refl_end_out[j]
+            #   bwd out: trans_0_out   = 1 - refl_0_out[j]
+            if save_all_passes:
+                I_out[i + k * n_freq]                   = A_fwd[i, :n_modes, :]
+                I_out[i + k * n_freq + n_freq * passes] = A_bwd[i, :n_modes, :]
+                for j in range(n_modes):
+                    I_out[i + k * n_freq,                   j, -1] = A_fwd[i, j, -1] * (1.0 + refl_end_out[j])
+                    I_out[i + k * n_freq + n_freq * passes, j, -1] = A_bwd[i, j, -1] * (1.0 + refl_0_out[j])
+            else:
+                I_out[i]          = A_fwd[i, :n_modes, :]
+                I_out[i + n_freq] = A_bwd[i, :n_modes, :]
+                for j in range(n_modes):
+                    I_out[i,          j, -1] = A_fwd[i, j, -1] * (1.0 + refl_end_out[j])
+                    I_out[i + n_freq, j, -1] = A_bwd[i, j, -1] * (1.0 + refl_0_out[j])
+
+            for j in range(n_modes):
+                prev_fwd[j] = A_fwd[i, j, -1]
+                prev_bwd[j] = A_bwd[i, j, -1]
+
+            # ---- early exit on convergence ------------------------------ #
+            if converged:
+                if save_all_passes:
+                    for kk in range(k + 1, passes):
+                        I_out[i + kk * n_freq]                   = A_fwd[i, :n_modes, :]
+                        I_out[i + kk * n_freq + n_freq * passes] = A_bwd[i, :n_modes, :]
+                        for j in range(n_modes):
+                            I_out[i + kk * n_freq,                   j, -1] = A_fwd[i, j, -1] * (1.0 + refl_end_out[j])
+                            I_out[i + kk * n_freq + n_freq * passes, j, -1] = A_bwd[i, j, -1] * (1.0 + refl_0_out[j])
+                break
+
+    return I_out
+
+
+# ---------------------------------------------------------------------------
+# Parallel outer loop — segmented device
+# ---------------------------------------------------------------------------
+
+@nb.njit(parallel=True)
+def _general_cmes_solve_fb_cutoff_segmented(
+    x_array,
+    y0_array_fwd,
+    y0_array_bwd,
+    gammas_array,
+    Zb_table,
+    relations_3wm,
+    relations_4wm,
+    coeffs_3wm_table,
+    coeffs_4wm_table,
+    segment_midpoints,
+    passes,
+    kappa_cutoff,
+    update_rate,
+    convergence_threshold,
+    save_all_passes,
+    Ze_table,
+    Zout_in_table,
+    Zout_out_table,
+    abcd_in_table,
+    abcd_out_table,
+):
+    """
+    Forward/backward CME solver for segmented (position-dependent) devices.
+
+    Two-port boundary model
+    -----------------------
+    Each boundary carries a generic reciprocal/non-reciprocal two-port
+    (port 1 -> external cable Ze, port 2 -> TWPA) described by its ABCD matrix.
+    All four boundary coefficients follow from voltage/current continuity on
+    the *total* field with each traveling wave carrying its own generalized
+    current impedance
+
+        Ztilde_wave = Zb * (1 + raw_wave / (gamma * B_wave)),
+
+    where ``raw`` is the pure nonlinear derivative (rows [n:2n] of the RHS) and
+    ``B`` the slow envelope.  With  W = (A + C*Ze)*Ztilde_launch + (B + D*Ze),
+    Zin = (A*Ztilde_launch + B)/(C*Ztilde_launch + D)  and
+    Zout = (D*Ze + B)/(C*Ze + A):
+
+      t_in      = 2*Ze / W                      (cable  -> launched TWPA wave)
+      Gamma_in  = (Ze - Zin)/(Ze + Zin)         (cable  -> reflected cable, prompt)
+      rho       = (Ztilde_launch - Zout)
+                  /(Ztilde_inc   + Zout)         (arriving TWPA wave -> re-launched)
+      t_out     = det * (Ztilde_launch + Ztilde_inc)/W
+                = (det/(A+C*Ze)) * (1 + rho)     (arriving TWPA wave -> cable)
+
+    with det = A*D - B*C.  "launch" is the wave sent *into* the TWPA at that
+    boundary (forward at x=0, backward at x=L); "inc" is the internal wave
+    arriving *from* the TWPA (backward at x=0, forward at x=L).  Identity ABCD
+    (A=D=1, B=C=0, Ze=Zout) plus pump-off (Ztilde->Zb) recover the bare
+    single-impedance boundary.
+
+    Parameters (boundary tables; all sliced per frequency i)
+    --------------------------------------------------------
+    Ze_table       : (n_freq, n_modes) complex   external cable impedance.
+    Zout_in_table  : (n_freq, n_modes) complex   (D*Ze+B)/(C*Ze+A) at x=0.
+    Zout_out_table : (n_freq, n_modes) complex   (D*Ze+B)/(C*Ze+A) at x=L.
+    abcd_in_table  : (n_freq, n_modes, 4) complex [A,B,C,D] input connector.
+    abcd_out_table : (n_freq, n_modes, 4) complex [A,B,C,D] output connector.
+
+    Parameters
+    ----------
+    gammas_array : (n_freq, n_modes, n_segments)
+        Complex propagation constants along the device.
+    Zb_table : (n_freq, n_modes, n_segments)
+        Bloch impedance table.  Boundary reflections and transmission
+        coefficients are evaluated at the endpoint columns:
+          - input  end: Zb_table[i, j, 0]   (column 0)
+          - output end: Zb_table[i, j, -1]  (last column)
+    coeffs_3wm_table, coeffs_4wm_table : (n_relations, n_segments)
+        Position-dependent coupling coefficients.
+    segment_midpoints : (n_segments,)
+        Sorted positions at which the parameter tables are defined.
+
+    Phase convention
+    ----------------
+    phi_table[m, k] = integral_0^{x[k]} kappa_m(x') dx'   (forward phase)
+
+    Both RHS calls receive this same phi_table.  Inside cme_rhs_segmented:
+      - forward  carrier: exp(i * phi_table[m, x])
+      - backward carrier: exp(i * (phi_table[m, x_end] - phi_table[m, x]))
+        derived from phi_total[m] = phi_table[m, -1], so no separate table
+        is needed.
+
+    The counter-propagating envelope stored in A_counter is the slow
+    envelope reversed in x; cme_rhs_segmented restores the full-phase field
+    via the backward carrier above.
+    """
+    n_freq   = gammas_array.shape[0]
+    n_modes  = gammas_array.shape[1]
+    n_out    = 2 * n_modes
+    n_x      = len(x_array)
+    x_span   = (x_array[0], x_array[-1])
+
+    if save_all_passes:
+        I_out = np.empty((2 * n_freq * passes, n_modes, n_x), dtype=np.complex128)
+    else:
+        I_out = np.empty((2 * n_freq, n_modes, n_x), dtype=np.complex128)
+
+    A_fwd     = np.zeros((n_freq, n_out, n_x), dtype=np.complex128)
+    A_bwd     = np.zeros((n_freq, n_out, n_x), dtype=np.complex128)
+    A_counter = np.zeros((n_freq, n_modes, n_x), dtype=np.complex128)
+
+    for i in nb.prange(n_freq):
+        alphas_i = np.ascontiguousarray(gammas_array[i].real)   # (n_modes, n_seg)
+        kappas_i = np.ascontiguousarray(gammas_array[i].imag)   # (n_modes, n_seg)
+        Zb_i     = np.ascontiguousarray(Zb_table[i])            # (n_modes, n_seg)
+
+        # ---- boundary two-port tables for this frequency ---------------- #
+        Ze_i       = Ze_table[i]        # (n_modes,) external cable impedance
+        Zout_in_i  = Zout_in_table[i]   # (n_modes,) network seen from TWPA @ x=0
+        Zout_out_i = Zout_out_table[i]  # (n_modes,) network seen from TWPA @ x=L
+        abcd_in_i  = abcd_in_table[i]   # (n_modes, 4)
+        abcd_out_i = abcd_out_table[i]  # (n_modes, 4)
+
+        # Field-independent ABCD scalars (precomputed once per frequency):
+        #   apcz = A + C*Ze            (denominator prefactor of W)
+        #   tof  = det/(A + C*Ze)      (current-transfer factor multiplying 1+rho)
+        apcz_in  = np.empty(n_modes, dtype=nb.complex128)
+        apcz_out = np.empty(n_modes, dtype=nb.complex128)
+        tof_in   = np.empty(n_modes, dtype=nb.complex128)
+        tof_out  = np.empty(n_modes, dtype=nb.complex128)
+        for j in range(n_modes):
+            Ain, Bin, Cin, Din = abcd_in_i[j, 0], abcd_in_i[j, 1], abcd_in_i[j, 2], abcd_in_i[j, 3]
+            Ao,  Bo,  Co,  Do  = abcd_out_i[j, 0], abcd_out_i[j, 1], abcd_out_i[j, 2], abcd_out_i[j, 3]
+            apcz_in[j]  = Ain + Cin * Ze_i[j]
+            apcz_out[j] = Ao  + Co  * Ze_i[j]
+            tof_in[j]   = (Ain * Din - Bin * Cin) / apcz_in[j]
+            tof_out[j]  = (Ao  * Do  - Bo  * Co)  / apcz_out[j]
+
+        # Endpoint Zb and gamma used for boundary conditions.
+        # Input end:  column 0;  output end: column -1.
+        n_seg = alphas_i.shape[1]
+        Zb_0  = np.empty(n_modes, dtype=nb.complex128)
+        Zb_end = np.empty(n_modes, dtype=nb.complex128)
+        gam_0  = np.empty(n_modes, dtype=nb.complex128)
+        gam_end = np.empty(n_modes, dtype=nb.complex128)
+        for j in range(n_modes):
+            Zb_0[j]  = Zb_i[j, 0]
+            Zb_end[j] = Zb_i[j, n_seg - 1]
+            gam_0[j]  = alphas_i[j, 0]          + 1j * kappas_i[j, 0]
+            gam_end[j] = alphas_i[j, n_seg - 1]  + 1j * kappas_i[j, n_seg - 1]
+
+        # Launch transmissions t_in (cable -> TWPA) and initial internal
+        # re-reflections rho, in the linear (Ztilde = Zb) limit used until the
+        # self-consistent nonlinear impedances become available (pass k > 1).
+        #   t_in  = 2*Ze / (apcz * (Zb_launch + Zout))
+        #   rho   = (Zb_launch - Zout)/(Zb_inc + Zout)   ->  (Zb - Zout)/(Zb + Zout)
+        # launch = forward @ x=0, backward @ x=L.
+        trans_0_in   = np.empty(n_modes, dtype=nb.complex128)
+        trans_end_in = np.empty(n_modes, dtype=nb.complex128)
+        for j in range(n_modes):
+            trans_0_in[j]   = 2.0 * Ze_i[j] / (apcz_in[j]  * (Zb_0[j]  + Zout_in_i[j]))
+            trans_end_in[j] = 2.0 * Ze_i[j] / (apcz_out[j] * (Zb_end[j] + Zout_out_i[j]))
+
+        # Precompute cumulative forward phase on the output grid.
+        # phi_table[m, k] = Phi_m(x[k]) = integral_0^{x[k]} kappa_m(x') dx'.
+        # kappa_m(x) is piecewise-linear between segment_midpoints, so the
+        # trapezoid rule on the linearly-interpolated values is exact.
+        phi_table = np.zeros((n_modes, n_x), dtype=nb.float64)
+        phi_table_bwd = np.zeros((n_modes, n_x), dtype=nb.float64)
+        for kx in range(1, n_x):
+            lo_l, hi_l = _sorted_interp_bracket(segment_midpoints, x_array[kx - 1])
+            fl = 0.0 if lo_l == hi_l else (x_array[kx - 1] - segment_midpoints[lo_l]) / (segment_midpoints[hi_l] - segment_midpoints[lo_l])
+            lo_r, hi_r = _sorted_interp_bracket(segment_midpoints, x_array[kx])
+            fr = 0.0 if lo_r == hi_r else (x_array[kx] - segment_midpoints[lo_r]) / (segment_midpoints[hi_r] - segment_midpoints[lo_r])
+            dx = x_array[kx] - x_array[kx - 1]
+            for m in range(n_modes):
+                kl = kappas_i[m, lo_l] + fl * (kappas_i[m, hi_l] - kappas_i[m, lo_l])
+                kr = kappas_i[m, lo_r] + fr * (kappas_i[m, hi_r] - kappas_i[m, lo_r])
+                phi_table[m, kx] = phi_table[m, kx - 1] + 0.5 * (kl + kr) * dx
+        # phi_table[m, -1] = Phi_m(x_end): used by cme_rhs_segmented for en.
+
+        # phi_total[m] = Phi_m(x_end), used for boundary IC phase restoration.
+        # phi_table_bwd[m, k] = cumulative phase for the backward solve.
+        # The backward solve uses a mirrored coordinate  s = x_end - x  so that
+        # s runs from 0 (physical x_end) to x_end (physical x=0) in the same
+        # ascending direction the ODE integrator expects.
+        # phi_table_bwd[m, k] = Phi_m(x_end) - Phi_m(x_array[n_x-1-k])
+        # = total accumulated phase minus the phase at the mirrored position.
+        phi_total = np.empty(n_modes, dtype=nb.float64)
+        for m in range(n_modes):
+            phi_total[m] = phi_table[m, n_x - 1]
+            for kx in range(n_x):
+                phi_table_bwd[m, kx] = phi_total[m] - phi_table[m, n_x - 1 - kx]
+
+        # Reversed coordinate grid for the backward solve.
+        # x_array_bwd[k] = x_end - x_array[n_x-1-k]  (ascending 0→x_end).
+        # All five parameter tables are reversed along the segment axis once
+        # here, outside the pass loop, so the RHS inner loop stays branchless.
+        x_end_val = x_array[n_x - 1]
+        x_array_bwd = np.empty(n_x, dtype=nb.float64)
+        for kx in range(n_x):
+            x_array_bwd[kx] = x_end_val - x_array[n_x - 1 - kx]
+
+        segment_midpoints_bwd = np.empty(n_seg, dtype=nb.float64)
+        alphas_i_bwd   = np.empty((n_modes, n_seg), dtype=nb.float64)
+        kappas_i_bwd   = np.empty((n_modes, n_seg), dtype=nb.float64)
+        Zb_i_bwd       = np.empty((n_modes, n_seg), dtype=nb.complex128)
+        n_rel3 = coeffs_3wm_table.shape[0]
+        n_rel4 = coeffs_4wm_table.shape[0]
+        coeffs_3wm_bwd = np.empty((n_rel3, n_seg), dtype=nb.complex128)
+        coeffs_4wm_bwd = np.empty((n_rel4, n_seg), dtype=nb.complex128)
+        for s in range(n_seg):
+            s_rev = n_seg - 1 - s
+            segment_midpoints_bwd[s] = x_end_val - segment_midpoints[s_rev]
+            for m in range(n_modes):
+                alphas_i_bwd[m, s] = alphas_i[m, s_rev]
+                kappas_i_bwd[m, s] = kappas_i[m, s_rev]
+                Zb_i_bwd[m, s]     = Zb_i[m, s_rev]
+            for r in range(n_rel3):
+                coeffs_3wm_bwd[r, s] = coeffs_3wm_table[r, s_rev]
+            for r in range(n_rel4):
+                coeffs_4wm_bwd[r, s] = coeffs_4wm_table[r, s_rev]
+
+        # Use midpoint kappas for the wave-mixing filter (conservative: keeps
+        # terms that are phase-matched anywhere in the device).
+        mid_seg = n_seg // 2
+        kappas_mid = np.empty(n_modes, dtype=nb.float64)
+        for m in range(n_modes):
+            kappas_mid[m] = kappas_i[m, mid_seg]
+        r3, r4 = _filter_wm_terms(kappas_mid, relations_3wm, relations_4wm, kappa_cutoff)
+
+        I_fwd = np.zeros(n_modes, dtype=np.complex128)
+        I_bwd = np.zeros(n_modes, dtype=np.complex128)
+        refl_end_out = np.zeros(n_modes, dtype=np.complex128)
+
+        converged    = False
+        stable_count = 0
+        prev_fwd = np.zeros(n_modes, dtype=np.complex128)
+        prev_bwd = np.zeros(n_modes, dtype=np.complex128)
+
+        refl_0_out = np.empty(n_modes, dtype=nb.complex128)
+        for j in range(n_modes):
+            I_fwd[j]      = y0_array_fwd[i, j] * trans_0_in[j]
+            I_bwd[j]      = y0_array_bwd[i, j] * trans_end_in[j]
+            # Linear-limit internal re-reflection rho = (Zb - Zout)/(Zb + Zout).
+            refl_end_out[j] = (Zb_end[j] - Zout_out_i[j]) / (Zb_end[j] + Zout_out_i[j])
+            refl_0_out[j]   = (Zb_0[j]  - Zout_in_i[j])  / (Zb_0[j]  + Zout_in_i[j])
+
+        x_array_i = np.ascontiguousarray(x_array)
+
+        atol_fwd = np.full(n_modes, SOLVER_ATOL)
+        atol_bwd = np.full(n_modes, SOLVER_ATOL)
+        
+        for k in range(passes):
+            # ---- forward solve ------------------------------------------ #
+            A_fwd[i] = nbsolve_ivp(
+                cme_rhs_segmented,
+                x_span,
+                I_fwd,
+                args=(
+                    alphas_i, kappas_i,
+                    r3, r4,
+                    coeffs_3wm_table, coeffs_4wm_table,
+                    segment_midpoints, x_array_i,
+                    phi_table,
+                    A_counter[i],
+                 #   Zb_i,
+                ),
+                atols=atol_fwd, rtol=SOLVER_RTOL,
+                max_num_steps=x_span[-1], t_eval=x_array_i,
+                rk_method=SOLVER_RK_METHOD, first_step=SOLVER_FIRST_STEP,
+                capture_extra=True,
+            ).y
+
+            # ---- reflection at output end → backward IC ----------------- #
+            # Precompute full-phase forward field at x_end once; reused by the
+            # self-consistent reflection update below.
+            A_fwd_end_full = np.empty(n_modes, dtype=nb.complex128)
+            for j in range(n_modes):
+                A_fwd_end_full[j] = A_fwd[i, j, -1] * np.exp(1j * phi_total[j])
+                I_bwd[j] = y0_array_bwd[i, j] * trans_end_in[j] + refl_end_out[j] * A_fwd_end_full[j]
+
+            # Reverse A_fwd slow envelope into counter buffer (fused loop).
+            for j in range(n_modes):
+                for ix in range(n_x):
+                    A_counter[i, j, ix] = A_fwd[i, j, n_x - 1 - ix]
+
+            # ---- backward solve ----------------------------------------- #
+            # All parameter tables are pre-reversed (segment axis flipped) so
+            # the RHS reads physical positions from the output end first as the
+            # solver steps from s=0 to s=x_end.  No branching in the inner loop.
+            A_bwd[i] = nbsolve_ivp(
+                cme_rhs_segmented,
+                x_span,
+                I_bwd,
+                args=(
+                    alphas_i_bwd, kappas_i_bwd,
+                    r3, r4,
+                    coeffs_3wm_bwd, coeffs_4wm_bwd,
+                    segment_midpoints_bwd, x_array_bwd,
+                    phi_table_bwd,
+                    A_counter[i],
+                  #  Zb_i_bwd,
+                ),
+                atols=atol_bwd, rtol=SOLVER_RTOL,
+                max_num_steps=x_span[-1], t_eval=x_array_bwd,
+                rk_method=SOLVER_RK_METHOD, first_step=SOLVER_FIRST_STEP,
+                capture_extra=True,
+            ).y
+
+            # ---- self-consistent reflection update at output end -------- #
+            # launch = backward wave (into TWPA), inc = forward wave (arriving).
+            # rho = (Ztilde_bwd - Zout_out)/(Ztilde_fwd + Zout_out), written in
+            # the factored form (envelope ratio cancels the internal g*B factors,
+            # avoiding division by a small envelope).
+            if k > 1:
+                for j in range(n_modes):
+                    raw_bwd   = A_bwd[i, n_modes + j, 0]
+                    B_bwd0    = A_bwd[i, j, 0]
+                    raw_fwd   = A_fwd[i, n_modes + j, -1]
+                    B_fwd_end = A_fwd[i, j, -1]
+                    gj  = gam_end[j]
+                    Zbj = Zb_end[j]
+                    Zo  = Zout_out_i[j]
+                    refl_end_out[j] = (
+                        - B_fwd_end / B_bwd0
+                        * ((Zo - Zbj) * gj * B_bwd0 - Zbj * raw_bwd)
+                        / ((Zo + Zbj) * gj * B_fwd_end + Zbj * raw_fwd)
+                    )
+                    # Refresh backward launch transmission with the nonlinear
+                    # Ztilde_bwd(L) = Zb*(1 + raw_bwd/(gamma*B_bwd0)):
+                    gBm = gj * B_bwd0
+                    if np.abs(gBm) < 1e-30:
+                        Zm_L = Zbj
+                    else:
+                        Zm_L = Zbj * (1.0 + raw_bwd / gBm)
+                    trans_end_in[j] = 2.0 * Ze_i[j] / (apcz_out[j] * (Zm_L + Zo))
+
+            # Reverse A_bwd slow envelope into counter buffer (fused loop).
+            for j in range(n_modes):
+                for ix in range(n_x):
+                    A_counter[i, j, ix] = A_bwd[i, j, n_x - 1 - ix]
+
+            # ---- self-consistent reflection update at input end --------- #
+            # launch = forward wave (into TWPA), inc = backward wave (arriving).
+            # rho = (Ztilde_fwd - Zout_in)/(Ztilde_bwd + Zout_in).
+            if k > 1:
+                for j in range(n_modes):
+                    raw_fwd   = A_fwd[i, n_modes + j, 0]*0
+                    B_fwd0    = A_fwd[i, j, 0]
+                    raw_bwd   = A_bwd[i, n_modes + j, -1]*0
+                    B_bwd_end = A_bwd[i, j, -1]
+                    gj  = gam_0[j]
+                    Zbj = Zb_0[j]
+                    Zo  = Zout_in_i[j]
+                    refl_0_out[j] = (
+                        -B_bwd_end / B_fwd0
+                        * ((Zo - Zbj) * gj * B_fwd0 - Zbj * raw_fwd)
+                        / ((Zo + Zbj) * gj * B_bwd_end + Zbj * raw_bwd)
+                    )
+                    # Refresh forward launch transmission with the nonlinear
+                    # Ztilde_fwd(0) = Zb*(1 + raw_fwd/(gamma*B_fwd0)):
+                    gBp = gj * B_fwd0
+                    if np.abs(gBp) < 1e-30:
+                        Zp_0 = Zbj
+                    else:
+                        Zp_0 = Zbj * (1.0 + raw_fwd / gBp)
+                    trans_0_in[j] = 2.0 * Ze_i[j] / (apcz_in[j] * (Zp_0 + Zo))
+                    A_bwd_end_j = A_bwd[i, j, -1] * np.exp(1j * phi_total[j])
+                    I_fwd[j] = y0_array_fwd[i, j] * trans_0_in[j] + refl_0_out[j] * A_bwd_end_j
+            else:
+                for j in range(n_modes):
+                    A_bwd_end_j = A_bwd[i, j, -1] * np.exp(1j * phi_total[j])
+                    I_fwd[j] = y0_array_fwd[i, j] * trans_0_in[j] + refl_0_out[j] * A_bwd_end_j
+
+                    
+            # ---- update per-mode atol vectors after the first pass ------- #
+            if k == 0:
+                atol_fwd = _compute_atol_vec(A_fwd[i], n_modes, SOLVER_ATOL)
+                atol_bwd = _compute_atol_vec(A_bwd[i], n_modes, SOLVER_ATOL)
+
+            # ---- convergence check -------------------------------------- #
+            if k > 1:
+                nf  = 0.0
+                nb_ = 0.0
+                for j in range(n_modes):
+                    v = np.abs(A_fwd[i, j, -1] - prev_fwd[j]) / (np.abs(A_fwd[i, j, -1]) + 1e-30)
+                    w = np.abs(A_bwd[i, j, -1] - prev_bwd[j]) / (np.abs(A_bwd[i, j, -1]) + 1e-30)
+                    if v > nf:
+                        nf = v
+                    if w > nb_:
+                        nb_ = w
+                if nf < convergence_threshold and nb_ < convergence_threshold:
+                    stable_count += 1
+                else:
+                    stable_count = 0
+                if stable_count >= 3:
+                    converged = True
+
+            # ---- store output ------------------------------------------- #
+            # Last x-point overwritten with the physical outcoupled current:
+            #   forward-out (S21, output end): A_fwd(L) * t_out_out
+            #   backward-out (S11, input end): A_bwd(0) * t_out_in
+            # with t_out = (det/(A+C*Ze)) * (1 + rho).  The (1 + rho) factor is
+            # required by current continuity given that refl_*_out enters the
+            # boundary IC with a + sign (transmitted = incident + reflected).
+            if save_all_passes:
+                I_out[i + k * n_freq]                   = A_fwd[i, :n_modes, :]
+                I_out[i + k * n_freq + n_freq * passes] = A_bwd[i, :n_modes, :]
+                for j in range(n_modes):
+                    I_out[i + k * n_freq,                   j, -1] = A_fwd[i, j, -1] * (1.0 + refl_end_out[j]) * tof_out[j]
+                    I_out[i + k * n_freq + n_freq * passes, j, -1] = A_bwd[i, j, -1] * (1.0 + refl_0_out[j]) * tof_in[j]
+            else:
+                I_out[i]          = A_fwd[i, :n_modes, :]
+                I_out[i + n_freq] = A_bwd[i, :n_modes, :]
+                for j in range(n_modes):
+                    I_out[i,          j, -1] = A_fwd[i, j, -1] * (1.0 + refl_end_out[j]) * tof_out[j]
+                    I_out[i + n_freq, j, -1] = A_bwd[i, j, -1] * (1.0 + refl_0_out[j]) * tof_in[j]
+
+            for j in range(n_modes):
+                prev_fwd[j] = A_fwd[i, j, -1]
+                prev_bwd[j] = A_bwd[i, j, -1]
+
+            # ---- early exit on convergence ------------------------------ #
+            if converged:
+                if save_all_passes:
+                    for kk in range(k + 1, passes):
+                        I_out[i + kk * n_freq]                   = A_fwd[i, :n_modes, :]
+                        I_out[i + kk * n_freq + n_freq * passes] = A_bwd[i, :n_modes, :]
+                        for j in range(n_modes):
+                            I_out[i + kk * n_freq,                   j, -1] = A_fwd[i, j, -1] * (1.0 + refl_end_out[j]) * tof_out[j]
+                            I_out[i + kk * n_freq + n_freq * passes, j, -1] = A_bwd[i, j, -1] * (1.0 + refl_0_out[j]) * tof_in[j]
+                break
+
+    return I_out
+
+
+# ---------------------------------------------------------------------------
+# Public Python-level dispatcher
+# ---------------------------------------------------------------------------
+
 def general_cmes_solve_fb_cutoff(
     x_array: FloatArray,
     y0_array_fwd: ComplexArray,
     y0_array_bwd: ComplexArray,
     gammas_array: ComplexArray,
-    reflections_array: ComplexArray,
+    Zb_table: ComplexArray,
     relations_3wm,
     relations_4wm,
     coeffs_3wm,
@@ -187,199 +1043,148 @@ def general_cmes_solve_fb_cutoff(
     update_rate: float = 0.8,
     convergence_threshold: float = 0.05,
     save_all_passes: bool = False,
-    Z0: float = 50,
+    Z0: float | ComplexArray = 50,
+    segment_midpoints: FloatArray | None = None,
+    Ze: float | ComplexArray | None = None,
+    Zout_in: ComplexArray | None = None,
+    Zout_out: ComplexArray | None = None,
+    abcd_in: ComplexArray | None = None,
+    abcd_out: ComplexArray | None = None,
 ) -> ComplexArray:
     """
-    Solve full general CMEs (forward + backward) for all frequency points.
+    Solve the full forward/backward CME system for every signal frequency.
 
-    The parallel body contains only calls to statically-known njit functions
-    (_filter_wm_terms, _solve_one) with no function-pointer arguments, giving
-    Numba a fully static call graph and avoiding the parallel-compilation
-    deadlock that occurs with higher-order function arguments in prange.
+    Dispatches to the segmented or uniform Numba kernel based on
+    gammas_array.ndim:
+
+    Uniform  : gammas_array (n_freq, n_modes),          coeffs_* 1-D.
+               Zb_table     (n_freq, n_modes)
+    Segmented: gammas_array (n_freq, n_modes, n_seg),    coeffs_* (n_rel, n_seg).
+               Zb_table     (n_freq, n_modes, n_seg)
+               segment_midpoints (n_seg,) required.
+
+    Two-port boundaries (segmented path only)
+    -----------------------------------------
+    The segmented kernel models each boundary as a generic two-port
+    (port 1 -> external cable ``Ze``, port 2 -> TWPA).  Supply:
+      Ze       : scalar or (n_freq, n_modes) external cable impedance.
+      Zout_in  : (n_freq, n_modes) = (D*Ze+B)/(C*Ze+A) at x=0.
+      Zout_out : (n_freq, n_modes) = same at x=L.
+      abcd_in  : (n_freq, n_modes, 4) [A,B,C,D] input connector.
+      abcd_out : (n_freq, n_modes, 4) [A,B,C,D] output connector.
+    These are exactly the tables produced by
+    ``TWPAnalysis._build_port_tables`` (Zout_in/out are its Z0_in/out).
+    When left None, identity connectors are used (A=D=1, B=C=0) with
+    Ze = Zout_in = Zout_out = Z0, recovering the bare boundary.
+
+    Z0 (used for the uniform path and as the default external reference) may be:
+      - a scalar float: broadcast to all frequencies and modes.
+      - a 2-D complex array of shape (n_freq, n_modes).
     """
-    n_freq = gammas_array.shape[0]
-    n_modes = gammas_array.shape[1]
-    n_out = 2 * n_modes
-    n_x = len(x_array)
-    x_end = x_array[-1]
-    x_span_0 = x_array[0]
-    x_span = (x_array[0], x_array[-1])
-    trans_in = 1 - reflections_array
-    Zb = Z0 * (1 + reflections_array) / (1 - reflections_array)
-
-    if save_all_passes:
-        I_out = np.empty((2 * n_freq * passes, n_modes, n_x), dtype=np.complex128)
+    n_freq, n_modes = gammas_array.shape[0], gammas_array.shape[1]
+    # Normalise Z0 to a (n_freq, n_modes) complex128 array.
+    if np.ndim(Z0) == 0:
+        Z0_table_arg = np.full((n_freq, n_modes), complex(Z0), dtype=np.complex128)
     else:
-        I_out = np.empty((2 * n_freq, n_modes, n_x), dtype=np.complex128)
+        Z0_table_arg = np.asarray(Z0, dtype=np.complex128)
+        if Z0_table_arg.shape != (n_freq, n_modes):
+            raise ValueError(
+                f"Z0 array must have shape (n_freq, n_modes)=({n_freq}, {n_modes}), "
+                f"got {Z0_table_arg.shape}."
+            )
 
-    # ---- thread-local buffers (never aliased to solver internals) ---- #
-    A_fwd = np.zeros((n_freq, n_out, n_x), dtype=np.complex128)
-    A_bwd = np.zeros((n_freq, n_out, n_x), dtype=np.complex128)
-    A_tmp = np.zeros((n_freq, n_out, n_x), dtype=np.complex128)
-    # Counter-propagating field passed to cme_rhs.
-    # Initialised to zero so the first forward pass has no backward source.
-    A_counter = np.zeros((n_freq, n_modes, n_x), dtype=np.complex128)
+    def _as_nfm(val, default_table):
+        """Broadcast a scalar/array to a (n_freq, n_modes) complex128 table."""
+        if val is None:
+            return default_table
+        if np.ndim(val) == 0:
+            return np.full((n_freq, n_modes), complex(val), dtype=np.complex128)
+        arr = np.asarray(val, dtype=np.complex128)
+        if arr.shape != (n_freq, n_modes):
+            raise ValueError(
+                f"Boundary table must have shape (n_freq, n_modes)="
+                f"({n_freq}, {n_modes}), got {arr.shape}."
+            )
+        return arr
 
-    for i in nb.prange(n_freq):
-        I_fwd = np.zeros(n_modes, dtype=np.complex128)
-        I_bwd = np.zeros(n_modes, dtype=np.complex128)
-        refl = np.zeros(n_modes, dtype=np.complex128)
+    if gammas_array.ndim == 3:
+        if segment_midpoints is None:
+            raise ValueError(
+                "segment_midpoints is required for segmented devices "
+                "(gammas_array.ndim == 3)."
+            )
+        if Zb_table.ndim != 3 or Zb_table.shape != gammas_array.shape:
+            raise ValueError(
+                "For segmented devices Zb_table must have shape "
+                "(n_freq, n_modes, n_seg) matching gammas_array. "
+                f"Got Zb_table.shape={Zb_table.shape}, "
+                f"gammas_array.shape={gammas_array.shape}."
+            )
 
-        converged = False
-        stable_count = 0
-        prev_fwd = np.zeros(n_modes, dtype=np.complex128)
-        prev_bwd = np.zeros(n_modes, dtype=np.complex128)
+        # ---- assemble boundary two-port tables -------------------------- #
+        # Defaults (no connector): Ze = Zout = Z0, identity ABCD.
+        Ze_table       = _as_nfm(Ze,       Z0_table_arg)
+        Zout_in_table  = _as_nfm(Zout_in,  Ze_table)
+        Zout_out_table = _as_nfm(Zout_out, Ze_table)
 
-        alphas_i = np.ascontiguousarray(gammas_array[i].real)
-        kappas_i = np.ascontiguousarray(gammas_array[i].imag)
-        refl_i = np.ascontiguousarray(reflections_array[i])
-        trans_i = np.ascontiguousarray(trans_in[i])
-        Zb_i = np.ascontiguousarray(Zb[i])
-        x_array_i = np.ascontiguousarray(x_array)
+        abcd_identity = np.zeros((n_freq, n_modes, 4), dtype=np.complex128)
+        abcd_identity[:, :, 0] = 1.0   # A
+        abcd_identity[:, :, 3] = 1.0   # D
+        if abcd_in is None:
+            abcd_in_table = abcd_identity
+        else:
+            abcd_in_table = np.asarray(abcd_in, dtype=np.complex128)
+        if abcd_out is None:
+            abcd_out_table = abcd_identity.copy()
+        else:
+            abcd_out_table = np.asarray(abcd_out, dtype=np.complex128)
+        for name, tab in (("abcd_in", abcd_in_table), ("abcd_out", abcd_out_table)):
+            if tab.shape != (n_freq, n_modes, 4):
+                raise ValueError(
+                    f"{name} must have shape (n_freq, n_modes, 4)="
+                    f"({n_freq}, {n_modes}, 4), got {tab.shape}."
+                )
 
-        for j in range(n_modes):
-            I_fwd[j] = y0_array_fwd[i, j] * trans_i[j]
-            I_bwd[j] = y0_array_bwd[i, j] * trans_i[j]
-            refl[j] = refl_i[j]
-
-        r3, r4 = _filter_wm_terms(kappas_i, relations_3wm, relations_4wm, kappa_cutoff)
-
-        for k in range(passes):
-            A_fwd[i] = nbsolve_ivp(
-                cme_rhs,
-                x_span,
-                I_fwd,
-                args=(
-                    alphas_i,
-                    kappas_i,
-                    r3,
-                    r4,
-                    coeffs_3wm,
-                    coeffs_4wm,
-                    x_array_i,
-                    A_counter[i],
-                    x_end,
-                ),
-                atol=SOLVER_ATOL,
-                rtol=SOLVER_RTOL,
-                max_num_steps=x_end,
-                t_eval=x_array_i,
-                rk_method=SOLVER_RK_METHOD,
-                first_step=SOLVER_FIRST_STEP,
-                capture_extra=True,
-            ).y
-
-            # ---- reflection at far end → backward IC ----------------- #
-            for j in range(n_modes):
-                A_fwd_end_j = A_fwd[i, j, -1] * np.exp(1j * kappas_i[j] * x_end)
-                I_bwd[j] = y0_array_bwd[i, j] * trans_i[j] + refl[j] * A_fwd_end_j
-
-            # ---- backward solve --------------------------------------- #
-            # Reverse A_fwd i, into counter buffer.
-            for j in range(n_modes):
-                for ix in range(n_x):
-                    A_counter[i, j, ix] = A_fwd[i, j, n_x - 1 - ix]
-
-            A_bwd[i] = nbsolve_ivp(
-                cme_rhs,
-                x_span,
-                I_bwd,
-                args=(
-                    alphas_i,
-                    kappas_i,
-                    r3,
-                    r4,
-                    coeffs_3wm,
-                    coeffs_4wm,
-                    x_array_i,
-                    A_counter[i],
-                    x_end,
-                ),
-                atol=SOLVER_ATOL,
-                rtol=SOLVER_RTOL,
-                max_num_steps=x_end,
-                t_eval=x_array_i,
-                rk_method=SOLVER_RK_METHOD,
-                first_step=SOLVER_FIRST_STEP,
-                capture_extra=True,
-            ).y
-
-            # # ---- update refl (fwd end → next bwd IC) ----------------- #
-            if k > 20:
-                for j in range(n_modes):
-                    de = np.exp(-alphas_i[j] * x_end)
-                    raw_bwd = A_bwd[i, n_modes + j, 0]
-                    B_bwd0 = A_bwd[i, j, 0]
-                    raw_fwd = A_fwd[i, n_modes + j, -1] * de
-                    B_fwd_end = A_fwd[i, j, -1]
-                    gj = gammas_array[i, j]
-                    Zbj = Zb_i[j]
-                    refl[j] = (
-                        -B_fwd_end
-                        / B_bwd0
-                        * ((Z0 - Zbj) * gj * B_bwd0 + Zbj * raw_bwd)
-                        / ((Z0 + Zbj) * gj * B_fwd_end + Zbj * raw_fwd)
-                    )
-
-            # ---- reverse A_bwd → counter; update fwd IC -------------- #
-            for j in range(n_modes):
-                for ix in range(n_x):
-                    A_counter[i, j, ix] = A_bwd[i, j, n_x - 1 - ix]
-
-            if k > 20:
-                for j in range(n_modes):
-                    de = np.exp(-alphas_i[j] * x_end)
-                    raw_fwd = A_fwd[i, n_modes + j, 0]
-                    B_fwd0 = A_fwd[i, j, 0]
-                    raw_bwd = A_bwd[i, n_modes + j, -1]
-                    B_bwd_end = A_bwd[i, j, -1] * de
-                    gj = gammas_array[i, j]
-                    Zbj = Zb_i[j]
-                    rb = (
-                        -B_bwd_end
-                        / B_fwd0
-                        * ((Z0 - Zbj) * gj * B_fwd0 + Zbj * raw_fwd)
-                        / ((Z0 + Zbj) * gj * B_bwd_end + Zbj * raw_bwd)
-                    )
-                    A_bwd_end_j = A_bwd[i, j, -1] * np.exp(1j * kappas_i[j] * x_end)
-                    I_fwd[j] = y0_array_fwd[i, j] * trans_i[j] + rb * A_bwd_end_j
-            else:
-                for j in range(n_modes):
-                    A_bwd_end_j = A_bwd[i, j, -1] * np.exp(1j * kappas_i[j] * x_end)
-                    I_fwd[j] = y0_array_fwd[i, j] * trans_i[j] + refl_i[j] * A_bwd_end_j
-
-            # # ---- convergence check ----------------------------------- #
-            if k > 1:
-                nf = 0.0
-                nb_ = 0.0
-                for j in range(n_modes):
-                    v = np.abs(A_fwd[i, j, -1] - prev_fwd[j]) / (
-                        np.abs(A_fwd[i, j, -1]) + 1e-30
-                    )
-                    w = np.abs(A_bwd[i, j, -1] - prev_bwd[j]) / (
-                        np.abs(A_bwd[i, j, -1]) + 1e-30
-                    )
-                    if v > nf:
-                        nf = v
-                    if w > nb_:
-                        nb_ = w
-                if nf < convergence_threshold and nb_ < convergence_threshold:
-                    stable_count += 1
-                else:
-                    stable_count = 0
-                if stable_count >= 4:
-                    converged = True
-
-            # ---- store output ------------------------------------------- #
-            if save_all_passes:
-                I_out[i + k * n_freq] = A_fwd[i, :n_modes, :]
-                I_out[i + k * n_freq + n_freq * passes] = A_bwd[i, :n_modes, :]
-            else:
-                I_out[i] = A_fwd[i, :n_modes, :]
-                I_out[i + n_freq] = A_bwd[i, :n_modes, :]
-
-            for j in range(n_modes):
-                prev_fwd[j] = A_fwd[i, j, -1]
-                prev_bwd[j] = A_bwd[i, j, -1]
-
-    return I_out
+        return _general_cmes_solve_fb_cutoff_segmented(
+            np.ascontiguousarray(x_array),
+            np.ascontiguousarray(y0_array_fwd),
+            np.ascontiguousarray(y0_array_bwd),
+            np.ascontiguousarray(gammas_array),
+            np.ascontiguousarray(Zb_table),
+            relations_3wm,
+            relations_4wm,
+            np.ascontiguousarray(coeffs_3wm),
+            np.ascontiguousarray(coeffs_4wm),
+            np.ascontiguousarray(segment_midpoints),
+            passes,
+            kappa_cutoff,
+            update_rate,
+            convergence_threshold,
+            save_all_passes,
+            np.ascontiguousarray(Ze_table),
+            np.ascontiguousarray(Zout_in_table),
+            np.ascontiguousarray(Zout_out_table),
+            np.ascontiguousarray(abcd_in_table),
+            np.ascontiguousarray(abcd_out_table),
+        )
+    else:
+        # Uniform path: compute reflections_array per-frequency and per-mode
+        # using the (n_freq, n_modes) Z0 table.
+        reflections_array = (Zb_table - Z0_table_arg) / (Zb_table + Z0_table_arg)
+        return _general_cmes_solve_fb_cutoff_uniform(
+            np.ascontiguousarray(x_array),
+            np.ascontiguousarray(y0_array_fwd),
+            np.ascontiguousarray(y0_array_bwd),
+            np.ascontiguousarray(gammas_array),
+            np.ascontiguousarray(reflections_array),
+            relations_3wm,
+            relations_4wm,
+            np.ascontiguousarray(coeffs_3wm),
+            np.ascontiguousarray(coeffs_4wm),
+            passes,
+            kappa_cutoff,
+            update_rate,
+            convergence_threshold,
+            save_all_passes,
+            np.ascontiguousarray(Z0_table_arg),
+        )
