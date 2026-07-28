@@ -14,6 +14,7 @@ from twpasolver.basemodel import BaseModel
 from twpasolver.bonus_types import FloatArray
 from twpasolver.cmes.base import no_reflections_cmes_solve
 from twpasolver.cmes.cmes_fb import general_cmes_solve_fb_cutoff
+from twpasolver.cmes.solver_config import FBSolverConfig
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.frequency import Frequencies
 from twpasolver.logger import log
@@ -24,7 +25,6 @@ from twpasolver.plotting import (
     plot_gain,
     plot_mode_currents,
     plot_phase_matching,
-    plot_quantum_efficiency,
     plot_response,
 )
 from twpasolver.twoport import TwoPortCell, TwoPortModel
@@ -511,6 +511,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         signal_mode: str,
         pump_mode: str,
         Is0: float,
+        Ip0: float,
         initial_amplitudes: Optional[Union[List[float], np.ndarray]] = None,
         default_fill: float = 0,
     ) -> np.ndarray:
@@ -519,14 +520,14 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         If *initial_amplitudes* is provided it is returned as-is (cast to
         complex128).  Otherwise a vector of *default_fill* is constructed with
-        the pump amplitude set to ``twpa.Ip0`` and the signal to *Is0*.
+        the pump amplitude set to ``Ip0`` and the signal to *Is0*.
         """
         if initial_amplitudes is not None:
             return np.array(initial_amplitudes, dtype=np.complex128)
         n_modes = len(mode_array.modes)
         mode_labels = list(mode_array.modes.keys())
         y0 = np.full(n_modes, default_fill, dtype=np.complex128)
-        y0[mode_labels.index(pump_mode)] = self.twpa.Ip0
+        y0[mode_labels.index(pump_mode)] = Ip0
         y0[mode_labels.index(signal_mode)] = Is0
         return y0
 
@@ -621,12 +622,9 @@ class TWPAnalysis(Analyzer, Frequencies):
             # nonlinearity coefficients (epsilon, xi) vary.  Call
             # prepare_relations_coefficients once with unit scaling to get the
             # index tables, then build per-segment coefficient arrays by scaling.
-            (
-                relations_3wm,
-                relations_4wm,
-                c3_unit,
-                c4_unit,
-            ) = prepare_relations_coefficients(terms_3wm, terms_4wm, 1.0, 1.0)
+            relations_3wm, relations_4wm, c3_unit, c4_unit = (
+                prepare_relations_coefficients(terms_3wm, terms_4wm, 1.0, 1.0)
+            )
             coeffs_3wm = np.stack(
                 [c3_unit * eps for eps in segments["epsilon"]], axis=-1
             )
@@ -638,13 +636,10 @@ class TWPAnalysis(Analyzer, Frequencies):
             Zb_table = np.stack(Zb_vals, axis=-2).transpose(2, 1, 0)
             segment_midpoints = segments["midpoints"]
         else:
-            (
-                relations_3wm,
-                relations_4wm,
-                coeffs_3wm,
-                coeffs_4wm,
-            ) = prepare_relations_coefficients(
-                terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
+            relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm = (
+                prepare_relations_coefficients(
+                    terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
+                )
             )
             gammas = np.stack(complex_gammas, axis=-1)
             reflections = np.stack(gamma_vals, axis=-1)
@@ -776,7 +771,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         self,
         signal_freqs: FloatArray,
         pump: Optional[float] = None,
-        Is0: float = 1e-6,
+        Is0: float = 1e-7,
         Ip0: Optional[float] = None,
         model: Union[str, GainModel] = GainModel.GENERAL_NO_REFLECTIONS,
         mode_array_config: str = "basic_3wm",
@@ -786,12 +781,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         thin: int = 100,
-        passes: int = 3,
-        kappa_cutoff: float = 0.2,
-        update_rate: float = 0.9,
-        convergence_threshold: float = 0.05,
-        save_all_passes: bool = False,
-        floquet: bool = False,
+        fb_config: FBSolverConfig = FBSolverConfig(),
     ) -> dict[str, Any]:
         """
         Compute the TWPA gain using coupled mode equation models.
@@ -821,10 +811,10 @@ class TWPAnalysis(Analyzer, Frequencies):
             Initial conditions for forward/backward waves; override Is0 and Ip0.
         thin : int, default 100
             Position array thinning factor.
-        passes : int, default 3
-            Number of forward-backward passes for convergence (GENERAL model only).
-        save_all_passes : bool, default False
-            Store intermediate results for every pass (GENERAL model only).
+        fb_config : FBSolverConfig, default FBSolverConfig()
+            Convergence parameters for the forward-backward solver (GENERAL model
+            only): ``passes``, ``kappa_cutoff``, ``update_rate``,
+            ``convergence_threshold``, ``save_all_passes``.
         Returns
         -------
         dict
@@ -859,11 +849,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 x,
                 initial_amplitudes_fwd,
                 initial_amplitudes_bwd,
-                passes,
-                kappa_cutoff=kappa_cutoff,
-                update_rate=update_rate,
-                convergence_threshold=convergence_threshold,
-                save_all_passes=save_all_passes,
+                fb_config,
             )
         else:
             return self._compute_general_gain_no_reflections(
@@ -877,7 +863,6 @@ class TWPAnalysis(Analyzer, Frequencies):
                 model,
                 initial_amplitudes_fwd,
                 Is0,
-                floquet,
             )
 
     # ------------------------------------------------------------------
@@ -896,13 +881,10 @@ class TWPAnalysis(Analyzer, Frequencies):
         x: FloatArray,
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
-        passes: int = 3,
-        kappa_cutoff: float = 0.2,
-        update_rate: float = 0.95,
-        convergence_threshold: float = 0.05,
-        save_all_passes: bool = False,
+        fb_config: Optional[FBSolverConfig] = None,
     ) -> dict[str, Any]:
         """Compute gain using the forward-backward propagation model."""
+        fb_config = fb_config if fb_config is not None else FBSolverConfig()
         mode_array = self.get_mode_array(mode_array_config)
 
         # Forward wave: pump + signal, backward wave: zero (unless overridden).
@@ -911,6 +893,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             signal_mode,
             pump_mode,
             Is0,
+            self.twpa.Ip0,
             initial_amplitudes_fwd,
             default_fill=0.0,
         )
@@ -919,6 +902,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             signal_mode,
             pump_mode,
             Is0=0.0,
+            Ip0=0.0,
             initial_amplitudes=initial_amplitudes_bwd,
             default_fill=0.0,
         )
@@ -952,11 +936,11 @@ class TWPAnalysis(Analyzer, Frequencies):
             cme_inputs["relations_4wm"],
             cme_inputs["coeffs_3wm"],
             cme_inputs["coeffs_4wm"],
-            passes,
-            kappa_cutoff,
-            update_rate=update_rate,
-            convergence_threshold=convergence_threshold,
-            save_all_passes=save_all_passes,
+            fb_config.passes,
+            fb_config.kappa_cutoff,
+            update_rate=fb_config.update_rate,
+            convergence_threshold=fb_config.convergence_threshold,
+            save_all_passes=fb_config.save_all_passes,
             Z0=self.port_Z_ext,
             Ze=self.port_Z_ext,
             Zout_in=Zout_in,
@@ -969,7 +953,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         # Unpack forward/backward blocks for each saved pass and apply phase correction.
         # Raw layout: [fwd_pass_0, ..., fwd_pass_N, bwd_pass_0, ..., bwd_pass_N]
         # each block is (n_freq, n_modes, n_x).
-        num_saved_passes = passes if save_all_passes else 1
+        num_saved_passes = fb_config.passes if fb_config.save_all_passes else 1
         I_tuples_all_passes = {}
         for p in range(num_saved_passes):
             if gammas.ndim == 3:
@@ -1079,7 +1063,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             "gain_db_11": gains_fwd_11,
             "gain_db_22": gains_bwd_22,
             "gains_all_passes": gains_all_passes,
-            "passes": passes,
+            "passes": fb_config.passes,
             "mode_info": {
                 "mode_array": mode_array_config,
                 "mode_map": mode_map,
@@ -1102,13 +1086,17 @@ class TWPAnalysis(Analyzer, Frequencies):
         model: GainModel,
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         Is0: float = 1e-6,
-        second_order: bool = False,
     ) -> dict[str, Any]:
         """Compute gain using the general coupled mode equations without reflections."""
         mode_array = self.get_mode_array(mode_array_config)
 
         y0 = self._setup_initial_conditions(
-            mode_array, signal_mode, pump_mode, Is0, initial_amplitudes_fwd
+            mode_array,
+            signal_mode,
+            pump_mode,
+            Is0,
+            self.twpa.Ip0,
+            initial_amplitudes_fwd,
         )
 
         cme_inputs = self._prepare_cme_inputs(
@@ -1251,16 +1239,6 @@ class TWPAnalysis(Analyzer, Frequencies):
             pm["pump_freqs"],
             pm["signal_freqs"],
             pm["delta"],
-            freqs_unit=self.unit,
-            **kwargs,
-        )
-
-    def plot_quantum_efficiency(self, **kwargs) -> np.ndarray:
-        """Plot quantum efficiency."""
-        if "quantum_efficiency" not in self.data:
-            raise RuntimeError("Run quantum_efficiency() first.")
-        return plot_quantum_efficiency(
-            self.data["quantum_efficiency"],
             freqs_unit=self.unit,
             **kwargs,
         )
