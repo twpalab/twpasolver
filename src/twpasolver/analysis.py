@@ -213,6 +213,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         raise ValueError(
             f"port must be a TwoPortModel instance or a list of impedances, got {type(v)}"
         )
+
     _previous_state: dict[str, Any] = PrivateAttr()
     _mode_arrays: Dict[str, ModeArray] = PrivateAttr(default_factory=dict)
 
@@ -235,7 +236,9 @@ class TWPAnalysis(Analyzer, Frequencies):
             isinstance(cell, TWPA) for cell in self.twpa.cells
         )
 
-    def _bloch_params_for_cell(self, cell: TWPA, Z0_override: float | None = None) -> dict[str, Any]:
+    def _bloch_params_for_cell(
+        self, cell: TWPA, Z0_override: float | None = None
+    ) -> dict[str, Any]:
         """Extract Bloch-mode propagation parameters for a single uniform TWPA segment.
 
         Parameters
@@ -259,7 +262,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         Zb = -2 * B / (A - D - np.sqrt((A + D) ** 2 - 4))
         gamma_bloch.real = np.abs(gamma_bloch.real) / int(cell.N_tot / cell.N)
         gamma_bloch.imag = (
-            np.unwrap(gamma_bloch.imag * np.sign(Zb.real) * 2) / 2 / int(cell.N_tot / cell.N)
+            np.unwrap(gamma_bloch.imag * np.sign(Zb.real) * 2)
+            / 2
+            / int(cell.N_tot / cell.N)
         )
         Zb.real = np.abs(Zb.real)
 
@@ -293,9 +298,9 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         Returns
         -------
-        Z0_in_table : (n_freq, n_modes) complex
+        Zout_in_table : (n_freq, n_modes) complex
             Zout = (D·Ze + B)/(C·Ze + A) at x=0.
-        Z0_out_table : (n_freq, n_modes) complex
+        Zout_out_table : (n_freq, n_modes) complex
             Zout = (D·Ze + B)/(C·Ze + A) at x=L.
         abcd_in_table : (n_freq, n_modes, 4) complex
             [A,B,C,D] of input connector at x=0.
@@ -303,35 +308,48 @@ class TWPAnalysis(Analyzer, Frequencies):
             [A,B,C,D] of output connector at x=L.
 
         When both port fields are None all tables encode identity connectors
-        (A=1,B=0,C=0,D=1, Z0=self.twpa.Z0_ref), recovering bare behaviour.
+        (A=1,B=0,C=0,D=1, Zout=Ze=self.port_Z_ext), recovering bare behaviour.
+        Note the identity default is ``port_Z_ext``, not ``self.twpa.Z0_ref`` --
+        for an identity connector Zout=(D*Ze+B)/(C*Ze+A)=Ze exactly, so using
+        anything else here would silently introduce a spurious boundary
+        mismatch whenever twpa.Z0_ref != port_Z_ext.
         """
         n_modes = len(mode_labels)
         Ze = self.port_Z_ext
 
-        Z0_default = np.full(
-            (n_freq, n_modes), complex(self.twpa.Z0_ref), dtype=np.complex128
-        )
+        # NOTE: the identity/bare default must use Ze (port_Z_ext), not
+        # self.twpa.Z0_ref.  For an identity connector (A=D=1,B=C=0),
+        # Zout=(D*Ze+B)/(C*Ze+A)=Ze exactly -- using twpa.Z0_ref here would
+        # silently introduce a spurious boundary mismatch (and hence a
+        # spurious reflection/phase error) whenever twpa.Z0_ref != port_Z_ext,
+        # even when no connector is present at that boundary.
+        Zout_default = np.full((n_freq, n_modes), complex(Ze), dtype=np.complex128)
         abcd_identity = np.zeros((n_freq, n_modes, 4), dtype=np.complex128)
-        abcd_identity[:, :, 0] = 1.0   # A
-        abcd_identity[:, :, 3] = 1.0   # D
+        abcd_identity[:, :, 0] = 1.0  # A
+        abcd_identity[:, :, 3] = 1.0  # D
 
         # Resolve effective port models: port_out falls back to port when None.
-        port_in  = self.port
-        port_out = self.port_out# if self.port_out is not None else self.port
+        port_in = self.port
+        port_out = self.port_out if self.port_out is not None else self.port
 
         if port_in is None and port_out is None:
-            return Z0_default, Z0_default.copy(), abcd_identity, abcd_identity.copy()
+            return (
+                Zout_default,
+                Zout_default.copy(),
+                abcd_identity,
+                abcd_identity.copy(),
+            )
 
-        Z0_in    = Z0_default.copy()
-        Z0_out   = Z0_default.copy()
-        abcd_in  = abcd_identity.copy()
+        Zout_in = Zout_default.copy()
+        Zout_out = Zout_default.copy()
+        abcd_in = abcd_identity.copy()
         abcd_out = abcd_identity.copy()
 
         for m_idx, m in enumerate(mode_labels):
             freqs_m = np.abs(mode_params[m]["freqs"]) * self.unit_multiplier
-            for table_Z0, table_abcd, port_model in (
-                (Z0_in,  abcd_in,  port_in),
-                (Z0_out, abcd_out, port_out),
+            for table_Zout, table_abcd, port_model in (
+                (Zout_in, abcd_in, port_in),
+                (Zout_out, abcd_out, port_out),
             ):
                 if port_model is None:
                     continue
@@ -339,15 +357,17 @@ class TWPAnalysis(Analyzer, Frequencies):
                     abcd = np.asarray(port_model.get_abcd(freqs_m))  # (n_freq, 2, 2)
                     A, B = abcd[:, 0, 0], abcd[:, 0, 1]
                     C, D = abcd[:, 1, 0], abcd[:, 1, 1]
-                    table_Z0[:, m_idx]      = (D * Ze + B) / (C * Ze + A)
-                    table_abcd[:, m_idx, 0] = A; table_abcd[:, m_idx, 1] = B
-                    table_abcd[:, m_idx, 2] = C; table_abcd[:, m_idx, 3] = D
+                    table_Zout[:, m_idx] = (D * Ze + B) / (C * Ze + A)
+                    table_abcd[:, m_idx, 0] = A
+                    table_abcd[:, m_idx, 1] = B
+                    table_abcd[:, m_idx, 2] = C
+                    table_abcd[:, m_idx, 3] = D
                 else:
-                    table_Z0[:, m_idx] = np.interp(
+                    table_Zout[:, m_idx] = np.interp(
                         freqs_m, self.data["freqs"] * self.unit_multiplier, port_model
                     )
-       # print(Z0_in, Z0_out, abcd_in, abcd_out)
-        return Z0_in, Z0_out, abcd_in, abcd_out
+
+        return Zout_in, Zout_out, abcd_in, abcd_out
 
     def update_base_data(self) -> None:
         """Update data extracted from the twpa model."""
@@ -358,7 +378,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         ):
             log.info("Computing base parameters.")
             abcd_single = self.twpa.single_abcd(self.f)
-            cell = TwoPortCell(self.f, abcd=abcd_single**self.twpa.N, Z0=self.twpa.Z0_ref)
+            cell = TwoPortCell(
+                self.f, abcd=abcd_single**self.twpa.N, Z0=self.twpa.Z0_ref
+            )
             freqs = self.f / self.unit_multiplier
 
             # S-parameters: always from the full device.
@@ -388,7 +410,9 @@ class TWPAnalysis(Analyzer, Frequencies):
                     self._bloch_params_for_cell(seg, Z0_override=self.twpa.Z0_ref)
                     for seg in self.twpa.cells
                 ]
-                seg_N_tot = np.array([r["N_tot"] for r in seg_results], dtype=np.float64)
+                seg_N_tot = np.array(
+                    [r["N_tot"] for r in seg_results], dtype=np.float64
+                )
                 seg_boundaries = np.concatenate([[0.0], np.cumsum(seg_N_tot)])
 
                 self.data["k"] = np.stack([r["k"] for r in seg_results])
@@ -540,11 +564,15 @@ class TWPAnalysis(Analyzer, Frequencies):
         """
         if gammas.ndim == 3:
             # Interpolate κ_m onto the output grid: (n_freq, n_modes, n_x)
-            kappa_at_x = np.array([
-                [np.interp(x, segment_midpoints, gammas[i, j].imag)
-                 for j in range(gammas.shape[1])]
-                for i in range(gammas.shape[0])
-            ])
+            kappa_at_x = np.array(
+                [
+                    [
+                        np.interp(x, segment_midpoints, gammas[i, j].imag)
+                        for j in range(gammas.shape[1])
+                    ]
+                    for i in range(gammas.shape[0])
+                ]
+            )
             dx = np.diff(x)
             dphi = 0.5 * (kappa_at_x[..., :-1] + kappa_at_x[..., 1:]) * dx
             phi = np.concatenate(
@@ -585,7 +613,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             -mode_params[m]["alpha"] + 1j * mode_params[m]["k"] for m in mode_labels
         ]
         gamma_vals = [mode_params[m]["gamma"] for m in mode_labels]
-        Zb_vals    = [mode_params[m]["Zb"]    for m in mode_labels]
+        Zb_vals = [mode_params[m]["Zb"] for m in mode_labels]
 
         segments = self.data.get("segments")
         if segments is not None:
@@ -593,30 +621,34 @@ class TWPAnalysis(Analyzer, Frequencies):
             # nonlinearity coefficients (epsilon, xi) vary.  Call
             # prepare_relations_coefficients once with unit scaling to get the
             # index tables, then build per-segment coefficient arrays by scaling.
-            relations_3wm, relations_4wm, c3_unit, c4_unit = (
-                prepare_relations_coefficients(terms_3wm, terms_4wm, 1.0, 1.0)
-            )
+            (
+                relations_3wm,
+                relations_4wm,
+                c3_unit,
+                c4_unit,
+            ) = prepare_relations_coefficients(terms_3wm, terms_4wm, 1.0, 1.0)
             coeffs_3wm = np.stack(
                 [c3_unit * eps for eps in segments["epsilon"]], axis=-1
             )
-            coeffs_4wm = np.stack(
-                [c4_unit * xi for xi in segments["xi"]], axis=-1
-            )
+            coeffs_4wm = np.stack([c4_unit * xi for xi in segments["xi"]], axis=-1)
             # mode_params[m]["k"] is (n_segments, n_freq) from the 2-D interpolator;
             # final shapes: (n_freq, n_modes, n_segments)
-            gammas      = np.stack(complex_gammas, axis=-2).transpose(2, 1, 0)
-            reflections = np.stack(gamma_vals,     axis=-2).transpose(2, 1, 0)
-            Zb_table    = np.stack(Zb_vals,        axis=-2).transpose(2, 1, 0)
+            gammas = np.stack(complex_gammas, axis=-2).transpose(2, 1, 0)
+            reflections = np.stack(gamma_vals, axis=-2).transpose(2, 1, 0)
+            Zb_table = np.stack(Zb_vals, axis=-2).transpose(2, 1, 0)
             segment_midpoints = segments["midpoints"]
         else:
-            relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm = (
-                prepare_relations_coefficients(
-                    terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
-                )
+            (
+                relations_3wm,
+                relations_4wm,
+                coeffs_3wm,
+                coeffs_4wm,
+            ) = prepare_relations_coefficients(
+                terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
             )
-            gammas      = np.stack(complex_gammas, axis=-1)
-            reflections = np.stack(gamma_vals,     axis=-1)
-            Zb_table    = np.stack(Zb_vals,        axis=-1)
+            gammas = np.stack(complex_gammas, axis=-1)
+            reflections = np.stack(gamma_vals, axis=-1)
+            Zb_table = np.stack(Zb_vals, axis=-1)
             segment_midpoints = None
 
         return {
@@ -697,11 +729,11 @@ class TWPAnalysis(Analyzer, Frequencies):
             mode_params = mode_array.process_frequency_array(signal_mode, signal_f)
 
             signal_freqs_pm = mode_params[signal_mode]["freqs"]
-            idler_freqs_pm  = mode_params[idler_mode]["freqs"]
-            pump_k          = mode_array.get_mode(pump_mode).k
-            signal_k_array  = mode_params[signal_mode]["k"]
-            idler_k_array   = mode_params[idler_mode]["k"]
-            gamma           = mode_array.get_mode(pump_mode).gamma
+            idler_freqs_pm = mode_params[idler_mode]["freqs"]
+            pump_k = mode_array.get_mode(pump_mode).k
+            signal_k_array = mode_params[signal_mode]["k"]
+            idler_k_array = mode_params[idler_mode]["k"]
+            gamma = mode_array.get_mode(pump_mode).gamma
 
             for j, (s_freq, i_freq) in enumerate(zip(signal_freqs_pm, idler_freqs_pm)):
                 f_triplets.append([p_freq, s_freq, i_freq])
@@ -714,13 +746,13 @@ class TWPAnalysis(Analyzer, Frequencies):
                 deltas[:, i] = (
                     pump_coeff * pump_k
                     + signal_sign * signal_k_array
-                    + idler_sign  * idler_k_array
+                    + idler_sign * idler_k_array
                     + chi
                     * (1 + np.abs(gamma) ** 2)
                     * (
                         pump_k
                         + 2 * signal_sign * signal_k_array
-                        + 2 * idler_sign  * idler_k_array
+                        + 2 * idler_sign * idler_k_array
                     )
                 )
                 if relative:
@@ -829,6 +861,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 initial_amplitudes_bwd,
                 passes,
                 kappa_cutoff=kappa_cutoff,
+                update_rate=update_rate,
                 convergence_threshold=convergence_threshold,
                 save_all_passes=save_all_passes,
             )
@@ -864,7 +897,8 @@ class TWPAnalysis(Analyzer, Frequencies):
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         passes: int = 3,
-        kappa_cutoff: Optional[float] = None,
+        kappa_cutoff: float = 0.2,
+        update_rate: float = 0.95,
         convergence_threshold: float = 0.05,
         save_all_passes: bool = False,
     ) -> dict[str, Any]:
@@ -873,22 +907,30 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         # Forward wave: pump + signal, backward wave: zero (unless overridden).
         y0_fwd = self._setup_initial_conditions(
-            mode_array, signal_mode, pump_mode, Is0,
-            initial_amplitudes_fwd, default_fill=0.0,
+            mode_array,
+            signal_mode,
+            pump_mode,
+            Is0,
+            initial_amplitudes_fwd,
+            default_fill=0.0,
         )
         y0_bwd = self._setup_initial_conditions(
-            mode_array, signal_mode, pump_mode, Is0=0.0,
-            initial_amplitudes=initial_amplitudes_bwd, default_fill=0.0,
+            mode_array,
+            signal_mode,
+            pump_mode,
+            Is0=0.0,
+            initial_amplitudes=initial_amplitudes_bwd,
+            default_fill=0.0,
         )
 
         cme_inputs = self._prepare_cme_inputs(
             mode_array, signal_freqs, pump, signal_mode, pump_mode
         )
-        mode_labels  = cme_inputs["mode_labels"]
-        n_freq       = cme_inputs["n_freq"]
-        gammas       = cme_inputs["gammas"]
-        Zb_table     = cme_inputs["Zb_table"]
-        mode_params  = cme_inputs["mode_params"]
+        mode_labels = cme_inputs["mode_labels"]
+        n_freq = cme_inputs["n_freq"]
+        gammas = cme_inputs["gammas"]
+        Zb_table = cme_inputs["Zb_table"]
+        mode_params = cme_inputs["mode_params"]
 
         # Build the per-boundary two-port tables (Zout_in/out + ABCD in/out).
         # When self.port/self.port_out are None these encode identity connectors
@@ -912,6 +954,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             cme_inputs["coeffs_4wm"],
             passes,
             kappa_cutoff,
+            update_rate=update_rate,
             convergence_threshold=convergence_threshold,
             save_all_passes=save_all_passes,
             Z0=self.port_Z_ext,
@@ -935,15 +978,20 @@ class TWPAnalysis(Analyzer, Frequencies):
                 gammas_bwd = gammas
             I_tuples_all_passes[p] = {
                 "forward": self._apply_phase_carrier(
-                    I_tuples_raw[p * n_freq:(p + 1) * n_freq],
-                    gammas, x, cme_inputs["segment_midpoints"],
+                    I_tuples_raw[p * n_freq : (p + 1) * n_freq],
+                    gammas,
+                    x,
+                    cme_inputs["segment_midpoints"],
                 ),
                 "backward": self._apply_phase_carrier(
                     I_tuples_raw[
-                        num_saved_passes * n_freq + p * n_freq:
-                        num_saved_passes * n_freq + (p + 1) * n_freq
+                        num_saved_passes * n_freq
+                        + p * n_freq : num_saved_passes * n_freq
+                        + (p + 1) * n_freq
                     ],
-                    gammas_bwd, x, cme_inputs["segment_midpoints"],
+                    gammas_bwd,
+                    x,
+                    cme_inputs["segment_midpoints"],
                 ),
             }
 
@@ -960,29 +1008,35 @@ class TWPAnalysis(Analyzer, Frequencies):
         # evaluated in the linear limit Ztilde ~= Zb (the nonlinear correction
         # is handled self-consistently by the solver's internal rho update).
         Ze = self.port_Z_ext
-        Zb_in_sig  = Zb_table[:, signal_idx, 0]  if Zb_table.ndim == 3 else Zb_table[:, signal_idx]
-        Zb_out_sig = Zb_table[:, signal_idx, -1] if Zb_table.ndim == 3 else Zb_table[:, signal_idx]
+        Zb_in_sig = (
+            Zb_table[:, signal_idx, 0]
+            if Zb_table.ndim == 3
+            else Zb_table[:, signal_idx]
+        )
+        Zb_out_sig = (
+            Zb_table[:, signal_idx, -1]
+            if Zb_table.ndim == 3
+            else Zb_table[:, signal_idx]
+        )
 
         A_in, B_in, C_in, D_in = (abcd_in[:, signal_idx, k] for k in range(4))
-        Zin_in  = (A_in * Zb_in_sig + B_in) / (C_in * Zb_in_sig + D_in)
+        Zin_in = (A_in * Zb_in_sig + B_in) / (C_in * Zb_in_sig + D_in)
         refl_in = (Ze - Zin_in) / (Ze + Zin_in)
 
         A_out, B_out, C_out, D_out = (abcd_out[:, signal_idx, k] for k in range(4))
-        Zin_out  = (A_out * Zb_out_sig + B_out) / (C_out * Zb_out_sig + D_out)
+        Zin_out = (A_out * Zb_out_sig + B_out) / (C_out * Zb_out_sig + D_out)
         refl_out = (Ze - Zin_out) / (Ze + Zin_out)
 
         I_out_fwd = (
-            I_tuples_fwd[:, signal_idx, -1]
-            + y0_bwd_broadcast[:, signal_idx] * refl_out
+            I_tuples_fwd[:, signal_idx, -1] + y0_bwd_broadcast[:, signal_idx] * refl_out
         )
         I_out_bwd = (
-            I_tuples_bwd[:, signal_idx, -1]
-            + y0_fwd_broadcast[:, signal_idx] * refl_in
+            I_tuples_bwd[:, signal_idx, -1] + y0_fwd_broadcast[:, signal_idx] * refl_in
         )
 
         Is0_rep = np.repeat(y0_fwd[signal_idx], n_freq)
-        gains_fwd    = to_dB(np.abs(I_out_fwd / Is0_rep))
-        gains_bwd    = to_dB(np.abs(I_out_bwd / np.repeat(y0_bwd[signal_idx], n_freq)))
+        gains_fwd = to_dB(np.abs(I_out_fwd / Is0_rep))
+        gains_bwd = to_dB(np.abs(I_out_bwd / np.repeat(y0_bwd[signal_idx], n_freq)))
         gains_fwd_11 = to_dB(np.abs(I_out_bwd / Is0_rep))
         gains_bwd_22 = to_dB(np.abs(I_out_fwd / np.repeat(y0_bwd[signal_idx], n_freq)))
 
@@ -990,14 +1044,24 @@ class TWPAnalysis(Analyzer, Frequencies):
         for p in range(num_saved_passes):
             I_fwd_p = I_tuples_all_passes[p]["forward"]
             I_bwd_p = I_tuples_all_passes[p]["backward"]
-            I_out_fwd_p = I_fwd_p[:, signal_idx, -1] + y0_bwd_broadcast[:, signal_idx] * refl_out
-            I_out_bwd_p = I_bwd_p[:, signal_idx, -1] + y0_fwd_broadcast[:, signal_idx] * refl_in
-            gains_all_passes.append({
-                "gain_db_fwd": to_dB(np.abs(I_out_fwd_p / Is0_rep)),
-                "gain_db_bwd": to_dB(np.abs(I_out_bwd_p / np.repeat(y0_bwd[signal_idx], n_freq))),
-                "gain_db_11":  to_dB(np.abs(I_out_bwd_p / Is0_rep)),
-                "gain_db_22":  to_dB(np.abs(I_out_fwd_p / np.repeat(y0_bwd[signal_idx], n_freq))),
-            })
+            I_out_fwd_p = (
+                I_fwd_p[:, signal_idx, -1] + y0_bwd_broadcast[:, signal_idx] * refl_out
+            )
+            I_out_bwd_p = (
+                I_bwd_p[:, signal_idx, -1] + y0_fwd_broadcast[:, signal_idx] * refl_in
+            )
+            gains_all_passes.append(
+                {
+                    "gain_db_fwd": to_dB(np.abs(I_out_fwd_p / Is0_rep)),
+                    "gain_db_bwd": to_dB(
+                        np.abs(I_out_bwd_p / np.repeat(y0_bwd[signal_idx], n_freq))
+                    ),
+                    "gain_db_11": to_dB(np.abs(I_out_bwd_p / Is0_rep)),
+                    "gain_db_22": to_dB(
+                        np.abs(I_out_fwd_p / np.repeat(y0_bwd[signal_idx], n_freq))
+                    ),
+                }
+            )
 
         mode_map = {label: idx for idx, label in enumerate(mode_labels)}
 
@@ -1006,7 +1070,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             "pump_freq": pump,
             "signal_freqs": signal_freqs,
             "x": x,
-            "I_tuples": I_tuples_fwd,           # final-pass forward (backward-compat alias)
+            "I_tuples": I_tuples_fwd,  # final-pass forward (backward-compat alias)
             "I_tuples_fwd": I_tuples_fwd,
             "I_tuples_bwd": I_tuples_bwd,
             "I_tuples_all_passes": I_tuples_all_passes,
@@ -1051,8 +1115,8 @@ class TWPAnalysis(Analyzer, Frequencies):
             mode_array, signal_freqs, pump, signal_mode, pump_mode
         )
         mode_labels = cme_inputs["mode_labels"]
-        n_freq      = cme_inputs["n_freq"]
-        gammas      = cme_inputs["gammas"]
+        n_freq = cme_inputs["n_freq"]
+        gammas = cme_inputs["gammas"]
 
         I_tuples_array = no_reflections_cmes_solve(
             x,
