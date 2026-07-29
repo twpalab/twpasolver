@@ -7,8 +7,8 @@ from pydantic import Field
 from twpasolver.basemodel import BaseModel
 
 # Global solver configuration
-SOLVER_ATOL = 1e-14
-SOLVER_RTOL = 1e-10
+SOLVER_ATOL = 1e-12
+SOLVER_RTOL = 1e-8
 SOLVER_MAX_STEPS = 0
 SOLVER_RK_METHOD = 1
 SOLVER_FIRST_STEP = 10
