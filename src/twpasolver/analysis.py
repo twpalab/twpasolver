@@ -178,11 +178,9 @@ class TWPAnalysis(Analyzer, Frequencies):
     port: Any = Field(
         default=None,
         description=(
-            "Connector model at x=0 (input boundary).  Accepts either:\n"
-            "  • A ``TwoPortModel`` instance (port 1 → external line, port 2 → TWPA).\n"
-            "  • A precomputed list of impedances (one per frequency in\n"
-            "    ``self.data['freqs']``), treated as a bare impedance step.\n"
-            "When ``port_out`` is None this model is also used at x=L."
+            "Connector model at x=0 (input boundary). Accepts either a "
+            "``TwoPortModel`` instance or a precomputed list of per-frequency "
+            "impedances. When ``port_out`` is None, this model is also used at x=L."
         ),
         validate=False,
     )

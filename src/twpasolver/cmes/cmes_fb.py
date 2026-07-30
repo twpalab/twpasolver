@@ -248,41 +248,38 @@ def cme_rhs_segmented(
     """
     Unified CME RHS for segmented-device forward and backward passes.
 
+    Phase carriers (forward and backward) are derived internally from
+    ``phi_table`` rather than passed in directly.
+
     Parameters
     ----------
-    alphas_table, kappas_table : (n_modes, n_segments)
-        Piecewise-linear attenuation and wavenumber; interpolated at x via
-        segment_midpoints.
-    coeffs_3wm_table, coeffs_4wm_table : (n_relations, n_segments)
+    alphas_table, kappas_table : ndarray, shape (n_modes, n_segments)
+        Piecewise-linear attenuation and wavenumber, interpolated at ``x``
+        via ``segment_midpoints``.
+    coeffs_3wm_table, coeffs_4wm_table : ndarray, shape (n_relations, n_segments)
         Position-dependent nonlinear coupling coefficients.
-    segment_midpoints : (n_segments,)
+    segment_midpoints : ndarray, shape (n_segments,)
         Sorted grid for the parameter tables.
-    x_evals : (n_x,)
-        Sorted output grid on which phi_table and currents_evals are defined.
-    phi_table : (n_modes, n_x)
-        Forward cumulative phase  Phi_m(x[k]) = integral_0^{x[k]} kappa_m(x') dx',
-        precomputed on x_evals.  The value at the last point, phi_table[m, -1],
-        is the total accumulated phase Phi_m(x_end).
+    x_evals : ndarray, shape (n_x,)
+        Sorted output grid on which ``phi_table`` and ``currents_evals`` are
+        defined.
+    phi_table : ndarray, shape (n_modes, n_x)
+        Forward cumulative phase per mode, precomputed on ``x_evals``.
+    currents_evals : ndarray, shape (n_modes, n_x)
+        Reversed slow envelope of the counter-propagating wave. Zero on the
+        first forward pass, so the counter term vanishes.
+    Zb_table : ndarray, shape (n_modes, n_segments)
+        Local Bloch impedance along the device, used for the distributed
+        reflection gradient that couples forward and backward envelopes
+        (WKB correction for slowly-varying impedance). Pass the reversed
+        copy for the backward solve so the gradient sign flips correctly.
 
-    Phase carriers derived inside the RHS (no extra argument needed):
-      forward  carrier: ep[m] = exp(i * Phi_m(x))
-      backward carrier: en[m] = exp(i * (Phi_m(x_end) - Phi_m(x)))
-                               = exp(i * phi_total[m]) / ep[m]
-
-    currents_evals : (n_modes, n_x)
-        Reversed slow envelope of the counter-propagating wave, stored on
-        x_evals.  Zero on the first forward pass so the counter term vanishes.
-    Zb_table : (n_modes, n_segments)
-        Local Bloch impedance along the device.  Used to compute the
-        distributed reflection gradient  r(x) = (1/2) d ln Zb / dx
-        which couples forward and backward slow envelopes continuously
-        (WKB correction for slowly-varying impedance).  Pass in physical
-        order for the forward solve; pass the reversed copy for the backward
-        solve so that the gradient sign flips correctly without any branching.
-
-    Output length = 2*n_modes:
-      [0:n]   dB_m/dx  (full, with +alpha*B term)
-      [n:2n]  raw nonlinear part only (for reflection-coefficient update)
+    Returns
+    -------
+    ndarray
+        Array of length ``2 * n_modes``: the first half is ``dB_m/dx``
+        (full, with the attenuation term), the second half is the raw
+        nonlinear part only, used for the reflection-coefficient update.
     """
     n = len(currents)
     out = np.zeros(2 * n, nb.complex128)
@@ -1359,34 +1356,32 @@ def general_cmes_solve_fb_cutoff(
     Solve the full forward/backward CME system for every signal frequency.
 
     Dispatches to the segmented or uniform Numba kernel based on
-    gammas_array.ndim:
+    ``gammas_array.ndim``:
 
-    Uniform  : gammas_array (n_freq, n_modes),          coeffs_* 1-D.
-               Zb_table     (n_freq, n_modes)
-    Segmented: gammas_array (n_freq, n_modes, n_seg),    coeffs_* (n_rel, n_seg).
-               Zb_table     (n_freq, n_modes, n_seg)
-               segment_midpoints (n_seg,) required.
+    - Uniform: ``gammas_array`` and ``Zb_table`` shape (n_freq, n_modes);
+      ``coeffs_*`` 1-D.
+    - Segmented: ``gammas_array`` and ``Zb_table`` shape
+      (n_freq, n_modes, n_seg); ``coeffs_*`` shape (n_rel, n_seg);
+      ``segment_midpoints`` required.
 
     Two-port boundaries (both paths)
-    ---------------------------------
-    Both kernels model each boundary as a generic two-port
-    (port 1 -> external cable ``Ze``, port 2 -> TWPA).  Supply:
-      Ze       : scalar or (n_freq, n_modes) external cable impedance.
-      Zout_in  : (n_freq, n_modes) = (D*Ze+B)/(C*Ze+A) at x=0.
-      Zout_out : (n_freq, n_modes) = same at x=L.
-      abcd_in  : (n_freq, n_modes, 4) [A,B,C,D] input connector.
-      abcd_out : (n_freq, n_modes, 4) [A,B,C,D] output connector.
-    These are exactly the tables produced by
-    ``TWPAnalysis._build_port_tables`` (Zout_in/out are its Z0_in/out).
-    When left None, identity connectors are used (A=D=1, B=C=0) with
-    Ze = Zout_in = Zout_out = Z0, recovering the bare boundary.  The uniform
-    kernel is simply the degenerate case with constant Zb/gamma per mode
-    (no per-segment tables), and shares the same boundary-update helper
-    (``_boundary_reflection_update``) as the segmented kernel.
 
-    Z0 (used for the uniform path and as the default external reference) may be:
-      - a scalar float: broadcast to all frequencies and modes.
-      - a 2-D complex array of shape (n_freq, n_modes).
+    Both kernels model each boundary as a generic two-port (port 1 ->
+    external cable ``Ze``, port 2 -> TWPA), described by:
+
+    - ``Ze``: scalar or (n_freq, n_modes) external cable impedance.
+    - ``Zout_in``, ``Zout_out``: (n_freq, n_modes) two-port input impedance
+      at x=0 and x=L.
+    - ``abcd_in``, ``abcd_out``: (n_freq, n_modes, 4) ``[A, B, C, D]``
+      connector parameters.
+
+    These match the tables produced by ``TWPAnalysis._build_port_tables``.
+    When left as None, identity connectors are used and
+    ``Ze = Zout_in = Zout_out = Z0``, recovering the bare boundary.
+
+    ``Z0`` (used for the uniform path and as the default external
+    reference) may be a scalar float or a 2-D complex array of shape
+    (n_freq, n_modes).
     """
     n_freq, n_modes = gammas_array.shape[0], gammas_array.shape[1]
     # Normalise Z0 to a (n_freq, n_modes) complex128 array.
