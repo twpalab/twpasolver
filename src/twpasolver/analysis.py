@@ -611,7 +611,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         # comprehensions regardless of the device type; only the stacking
         # axis and final transpose differ between the two branches.
         complex_gammas = [
-            -mode_params[m]["alpha"] + 1j * mode_params[m]["k"] for m in mode_labels
+            -mode_params[m]["alpha"] - 1j * mode_params[m]["k"] for m in mode_labels
         ]
         gamma_vals = [mode_params[m]["gamma"] for m in mode_labels]
         Zb_vals = [mode_params[m]["Zb"] for m in mode_labels]

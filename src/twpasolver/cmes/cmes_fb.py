@@ -408,35 +408,48 @@ def _boundary_reflection_update(
     Self-consistent boundary reflection/transmission update, one boundary, one mode.
     Takes into account the field derivative to modify the reflection coefficient and
     applies a finite update rate to avoid oscillations when reflections are strong.
+
+    The field-derivative correction to Zb is a perturbative estimate,
+    valid only while |raw_launch / (gamma * B_launch)| stays small. Close to a
+    stopband edge with nonlinear interaction active, B_launch can pass through a
+    near-node of the standing-wave pattern while raw_launch stays finite, which
+    pushes this ratio to O(1) or larger and can drive refl_new outside the
+    physical |Gamma| <= 1 regime. Two safeguards are applied:
+      1. the correction ratio is saturated at BOUNDARY_CORR_MAX (keeps the
+         approximation perturbative by construction, smoothly, instead of
+         only guarding against the exact-zero division), and
+      2. refl_new is projected onto the physical |Gamma| <= 1 disk before
+         being mixed into the running estimate, since Zout is passive.
     """
-    gB = gamma * B_launch
-    if abs(gB) < 1e-30:
+    gB_launch = gamma * B_launch
+    gB_inc = gamma * B_inc
+
+    if abs(gB_launch) < 1e-20 or abs(gB_inc) < 1e-20:
         Ztilde_launch = Zb
-        refl_new = (Zout - Zb) / (Zout + Zb)
+        refl_new = -(Zout - Zb) / (Zout + Zb)
     else:
-        refl_new = (
-            -B_inc
-            / B_launch
-            * ((Zout - Zb) * gamma * B_launch - Zb * raw_launch)
-            / ((Zout + Zb) * gamma * B_inc + Zb * raw_inc)
-        )
-        Ztilde_launch = Zb * (1.0 + raw_launch / gB)
+        corr_launch = raw_launch / gB_launch
+        corr_launch_mag = abs(corr_launch)
+        if corr_launch_mag > BOUNDARY_CORR_MAX:
+            corr_launch = corr_launch * (BOUNDARY_CORR_MAX / corr_launch_mag)
+        Ztilde_launch = Zb * (1.0 + corr_launch)
+
+        corr_inc = raw_inc / gB_inc
+        corr_inc_mag = abs(corr_inc)
+        if corr_inc_mag > BOUNDARY_CORR_MAX:
+            corr_inc = corr_inc * (BOUNDARY_CORR_MAX / corr_inc_mag)
+        Ztilde_inc = Zb * (1.0 + corr_inc)
+
+        refl_new = -(Zout - Ztilde_launch) / (Zout + Ztilde_inc)
+    refl_mag = abs(refl_new)
+    if refl_mag > 1.0:
+        refl_new = refl_new / refl_mag
+
     trans_new = 2.0 * Ze / (apcz * (Ztilde_launch + Zout))
 
     refl = refl_old + update_rate * (refl_new - refl_old)
     trans = trans_old + update_rate * (trans_new - trans_old)
     return refl, trans
-
-
-# ---------------------------------------------------------------------------
-# Shared per-frequency helpers
-#
-# A uniform device is the degenerate single-segment case of the segmented
-# boundary formalism (constant Zb/gamma per mode instead of per-segment
-# tables), so both prange kernels below drive their forward/backward pass
-# loop through exactly these helpers. Only the RHS function/args and the
-# position-dependent parameter tables differ between the two kernels.
-# ---------------------------------------------------------------------------
 
 
 @nb.njit(inline="always")
@@ -838,32 +851,23 @@ def _general_cmes_solve_fb_cutoff_uniform(
             # Last x-point overwritten with the physical outcoupled current:
             #   forward-out (S21, output end): A_fwd(L) * (1+rho_out) * tof_out
             #   backward-out (S11, input end): A_bwd(0) * (1+rho_in)  * tof_in
+            id_add_fwd = 0
+            id_add_bwd = n_freq
             if save_all_passes:
-                _store_pass(
-                    I_out,
-                    A_fwd[i],
-                    A_bwd[i],
-                    refl_end_out,
-                    refl_0_out,
-                    tof_out,
-                    tof_in,
-                    i + k * n_freq,
-                    i + k * n_freq + n_freq * passes,
-                    n_modes,
-                )
-            else:
-                _store_pass(
-                    I_out,
-                    A_fwd[i],
-                    A_bwd[i],
-                    refl_end_out,
-                    refl_0_out,
-                    tof_out,
-                    tof_in,
-                    i,
-                    i + n_freq,
-                    n_modes,
-                )
+                id_add_fwd = k * n_freq
+                id_add_bwd = k * n_freq + n_freq * passes
+            _store_pass(
+                I_out,
+                A_fwd[i],
+                A_bwd[i],
+                refl_end_out,
+                refl_0_out,
+                tof_out,
+                tof_in,
+                i + id_add_fwd,
+                i + id_add_bwd,
+                n_modes,
+            )
 
             for j in range(n_modes):
                 prev_fwd[j] = A_fwd[i, j, -1]
@@ -1280,37 +1284,26 @@ def _general_cmes_solve_fb_cutoff_segmented(
 
             # ---- store output ------------------------------------------- #
             # Last x-point overwritten with the physical outcoupled current:
-            #   forward-out (S21, output end): A_fwd(L) * t_out_out
-            #   backward-out (S11, input end): A_bwd(0) * t_out_in
-            # with t_out = (det/(A+C*Ze)) * (1 + rho).  The (1 + rho) factor is
-            # required by current continuity given that refl_*_out enters the
-            # boundary IC with a + sign (transmitted = incident + reflected).
+            #   forward-out (S21, output end): A_fwd(L) * (1+rho_out) * tof_out
+            #   backward-out (S11, input end): A_bwd(0) * (1+rho_in)  * tof_in
+            id_add_fwd = 0
+            id_add_bwd = n_freq
             if save_all_passes:
-                _store_pass(
-                    I_out,
-                    A_fwd[i],
-                    A_bwd[i],
-                    refl_end_out,
-                    refl_0_out,
-                    tof_out,
-                    tof_in,
-                    i + k * n_freq,
-                    i + k * n_freq + n_freq * passes,
-                    n_modes,
-                )
-            else:
-                _store_pass(
-                    I_out,
-                    A_fwd[i],
-                    A_bwd[i],
-                    refl_end_out,
-                    refl_0_out,
-                    tof_out,
-                    tof_in,
-                    i,
-                    i + n_freq,
-                    n_modes,
-                )
+                id_add_fwd = k * n_freq
+                id_add_bwd = k * n_freq + n_freq * passes
+
+            _store_pass(
+                I_out,
+                A_fwd[i],
+                A_bwd[i],
+                refl_end_out,
+                refl_0_out,
+                tof_out,
+                tof_in,
+                i + id_add_fwd,
+                i + id_add_bwd,
+                n_modes,
+            )
 
             for j in range(n_modes):
                 prev_fwd[j] = A_fwd[i, j, -1]
@@ -1333,7 +1326,6 @@ def _general_cmes_solve_fb_cutoff_segmented(
                             n_modes,
                         )
                 break
-
     return I_out
 
 

@@ -13,6 +13,15 @@ SOLVER_MAX_STEPS = 0
 SOLVER_RK_METHOD = 1
 SOLVER_FIRST_STEP = 10
 
+# Cap on |raw_launch / (gamma * B_launch)| in the boundary reflection update.
+# This term is a perturbative correction to Zb; it is only valid
+# while it stays small. Near stopband edges with nonlinear interaction active,
+# B_launch can pass through a near-node while raw_launch stays finite, driving
+# the ratio (and hence the reflection coefficient) outside the physical
+# |Gamma| <= 1 regime. Saturating the ratio keeps the correction perturbative
+# by construction instead of letting it diverge.
+BOUNDARY_CORR_MAX = 0.3
+
 
 def configure_solver(
     atol=None, rtol=None, max_steps=None, rk_method=None, first_step=None
