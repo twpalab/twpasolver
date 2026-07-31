@@ -11,7 +11,7 @@ import numpy as np
 from pydantic import Field, PrivateAttr
 
 from twpasolver.basemodel import BaseModel
-from twpasolver.bonus_types import FrequencyArange, FrequencyList
+from twpasolver.bonus_types import FloatArray, FrequencyArange, FrequencyList
 
 
 class Frequencies(BaseModel):
@@ -37,10 +37,11 @@ class Frequencies(BaseModel):
         Returns:
             numpy.ndarray: Array of computed frequencies.
         """
+        freqs: FloatArray
         if self.f_arange:
-            freqs = np.arange(*list(self.f_arange))
+            freqs = np.arange(*list(self.f_arange), dtype=np.float64)
         elif self.f_list:
-            freqs = np.array(self.f_list)
+            freqs = np.array(self.f_list, dtype=np.float64)
         else:
             return np.array([])
         return self._unit_multipliers[self.unit] * freqs

@@ -79,6 +79,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+from matplotlib.figure import Figure
 from scipy.interpolate import CubicSpline
 from sympy import symbols
 
@@ -124,11 +125,17 @@ class ParameterInterpolator:
                 imags = [_spl(np.imag(row)) for row in values] if is_complex else None
                 self._splines[name] = ("2d", reals, imags)
             elif is_complex:
-                self._splines[name] = ("1c", _spl(np.real(values)), _spl(np.imag(values)))
+                self._splines[name] = (
+                    "1c",
+                    _spl(np.real(values)),
+                    _spl(np.imag(values)),
+                )
             else:
                 self._splines[name] = ("1r", _spl(np.real(values)))
 
-    def interpolate(self, frequencies: Union[float, np.ndarray]) -> Dict[str, np.ndarray]:
+    def interpolate(
+        self, frequencies: Union[float, np.ndarray]
+    ) -> Dict[str, np.ndarray]:
         """
         Interpolate all parameters at the requested frequency/frequencies.
 
@@ -677,10 +684,10 @@ class ModeArray:
 
                 mode_params[mode] = {
                     "freqs": np.full(n_freq, indep_mode.frequency),
-                    "k":     _broadcast(indep_mode.k),
+                    "k": _broadcast(indep_mode.k),
                     "gamma": _broadcast(indep_mode.gamma),
                     "alpha": _broadcast(indep_mode.alpha),
-                    "Zb":    _broadcast(indep_mode.Zb),
+                    "Zb": _broadcast(indep_mode.Zb),
                 }
                 continue
 
@@ -747,7 +754,7 @@ class ModeArray:
         show_frequencies: bool = False,
         show_directions: bool = True,
         layout: str = "hierarchical",
-    ) -> None:
+    ) -> Figure:
         """
         Plot the relationships between modes as a directed graph.
 
@@ -758,6 +765,9 @@ class ModeArray:
             show_frequencies: Whether to show current frequencies on nodes
             show_directions: Whether to show mode propagation directions
             layout: Graph layout algorithm ('spring', 'circular', 'hierarchical')
+
+        Returns:
+            Figure: The matplotlib figure containing the plot.
         """
         G = self.mode_graph
 

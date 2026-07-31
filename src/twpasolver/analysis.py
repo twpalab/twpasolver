@@ -141,7 +141,7 @@ class Analyzer(BaseModel, ABC):
         self, function: str, target: str, values: list, *args, **kwargs
     ) -> dict[str, list[Any]]:
         """Run an analysis function multiple times for different values of a parameter."""
-        results = {target: []}
+        results: dict[str, list[Any]] = {target: []}
         kwargs.update({"save": False})
         fn = getattr(self, function)
         target_savename = target
@@ -219,7 +219,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         """Try loading twpa model from file if filename string is provided."""
         if isinstance(twpa, str):
             try:
-                twpa = TWPA.from_file(twpa)
+                return TWPA.from_file(twpa)
             except Exception as exc:
                 raise ValueError(
                     "Input string must be valid path to model file."
@@ -233,7 +233,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         )
 
     def _bloch_params_for_cell(
-        self, cell: TWPA, Z0_override: float | None = None
+        self, cell: TWPA, Z0_override: complex | float | None = None
     ) -> dict[str, Any]:
         """Extract Bloch-mode propagation parameters for a single uniform TWPA segment.
 
@@ -241,7 +241,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         ----------
         cell : TWPA
             The cell whose ABCD matrix is used to compute Bloch parameters.
-        Z0_override : float, optional
+        Z0_override : complex | float, optional
             Reference impedance to use for the reflection coefficient and Bloch
             impedance computation.  When provided it overrides ``cell.Z0_ref``.
             This should be set to the parent TWPA's ``Z0_ref`` when computing
@@ -391,13 +391,14 @@ class TWPAnalysis(Analyzer, Frequencies):
             # 1-D (n_freq,) for uniform ones. ParameterInterpolator handles both
             # shapes identically, so _update_all_mode_arrays needs no branching.
             if self._is_segmented():
+                segments = [c for c in self.twpa.cells if isinstance(c, TWPA)]
                 log.info(
                     "Detected %d TWPA segments, computing Bloch parameters per segment.",
-                    len(self.twpa.cells),
+                    len(segments),
                 )
                 seg_results = [
                     self._bloch_params_for_cell(seg, Z0_override=self.twpa.Z0_ref)
-                    for seg in self.twpa.cells
+                    for seg in segments
                 ]
                 seg_N_tot = np.array(
                     [r["N_tot"] for r in seg_results], dtype=np.float64
@@ -414,8 +415,8 @@ class TWPAnalysis(Analyzer, Frequencies):
                     "boundaries": seg_boundaries,
                     "midpoints": 0.5 * (seg_boundaries[:-1] + seg_boundaries[1:]),
                     "N_tot": seg_N_tot,
-                    "epsilon": np.array([seg.epsilon for seg in self.twpa.cells]),
-                    "xi": np.array([seg.xi for seg in self.twpa.cells]),
+                    "epsilon": np.array([seg.epsilon for seg in segments]),  # type: ignore
+                    "xi": np.array([seg.xi for seg in segments]),  # type: ignore
                 }
                 # k_star for response plots uses the whole-device Bloch k.
                 k_full = self._bloch_params_for_cell(self.twpa)["k"]
@@ -551,6 +552,8 @@ class TWPAnalysis(Analyzer, Frequencies):
         segment_midpoints: (n_seg,), required when gammas.ndim == 3
         """
         if gammas.ndim == 3:
+            if segment_midpoints is None:
+                raise ValueError("segment_midpoints is required when gammas.ndim == 3.")
             # Interpolate κ_m onto the output grid: (n_freq, n_modes, n_x)
             kappa_at_x = np.array(
                 [
@@ -714,9 +717,11 @@ class TWPAnalysis(Analyzer, Frequencies):
                 f_triplets.append([p_freq, s_freq, i_freq])
                 k_triplets.append([pump_k, signal_k_array[j], idler_k_array[j]])
 
-            if all(
-                param is not None
-                for param in [gamma, pump_k, signal_k_array, idler_k_array]
+            if (
+                gamma is not None
+                and pump_k is not None
+                and signal_k_array is not None
+                and idler_k_array is not None
             ):
                 deltas[:, i] = (
                     pump_coeff * pump_k
@@ -815,7 +820,7 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         signal_freqs = np.asarray(signal_freqs)
         N_tot = self.twpa.N_tot
-        x = np.linspace(0, N_tot, int(N_tot / thin), endpoint=True)
+        x = np.linspace(0, N_tot, int(N_tot / thin), endpoint=True, dtype=np.float64)
 
         if model == GainModel.GENERAL:
             return self._compute_forward_backward_gain(

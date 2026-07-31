@@ -19,7 +19,7 @@ def inductance(freqs: FloatArray, L: float) -> ComplexArray:
         np.ndarray: Impedance of the inductance.
     """
     assert L >= 0
-    return 2j * np.pi * freqs * L
+    return (2j * np.pi * freqs * L).astype(np.complex128)
 
 
 @njit
@@ -35,7 +35,7 @@ def capacitance(freqs: FloatArray, C: float) -> ComplexArray:
         np.ndarray: Impedance of the capacitor.
     """
     assert np.real(C) >= 0
-    return -1j / (2 * np.pi * freqs * C)
+    return (-1j / (2 * np.pi * freqs * C)).astype(np.complex128)
 
 
 @njit
