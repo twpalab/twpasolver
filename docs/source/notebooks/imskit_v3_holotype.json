@@ -13,9 +13,9 @@
 	"N"   : 15,
 	"L"  : 55.5e-12,
 	"C"   : 21.9e-15,
-	"Lf"  : 0.29e-9,
+	"Lf"  : 0.12e-9,
     "centered": true,
-    "delta": 2.1e-4
+    "delta": 2e-4
     },
     {
 	"name": "LCLfBaseCell",
@@ -24,9 +24,9 @@
 	"N"   : 4,
 	"L"  : 50.5e-12,
 	"C"   : 8.3e-15,
-	"Lf"  : 0.088e-9,
+	"Lf"  : 0.02e-9,
     "centered": true,
-    "delta": 2.1e-4
+    "delta": 2e-4
     },
     {
 	"name": "LCLfBaseCell",
@@ -35,20 +35,14 @@
 	"N"   : 15,
 	"L"  : 55.5e-12,
 	"C"   : 21.9e-15,
-	"Lf"  : 0.29e-9,
+	"Lf"  : 0.12e-9,
     "centered": true,
-    "delta": 2.1e-4
+    "delta": 2e-4
     }
   ],
   "N"  : 1200,
-  "Istar": 3E-3,
-  "Idc"  : 5E-4,
-  "Ip0"  : 0.7e-4,
-  "Is0"  : 0.14e-6,
-  "fmax" : 20,
-  "fstep": 0.001,
-  "f"    : 0,
-  "df"   : 0.05,
-  "dfs"  : [0.05],
-  "fres" : 20
+  "Istar": 2e-3,
+  "Idc"  : 0.2e-3,
+  "Ip0"  : 0.1e-3,
+  "Is0"  : 0.1e-7
 }
