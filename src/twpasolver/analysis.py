@@ -37,13 +37,12 @@ class GainModel(str, enum.Enum):
     Args
     ----
     GENERAL_NO_REFLECTIONS : str
-        Extended mode system without reflections. Moderate computation
-        time with improved accuracy over basic model.
+        Extended mode system without reflections.
+        Fast and useful for initial assessment of the main nonlinear processes.
 
     GENERAL : str
         Forward-backward propagation model with iterative solving for reflections.
-        Most complete model including multiple passes for reflection convergence.
-        Use phase mismatch kappa_cutoff limit to greatly increase computation speed.
+        Most complete model modeling impedance mismatched at the edges of the device.
     """
 
     GENERAL_NO_REFLECTIONS = "general_no_reflections"
@@ -188,8 +187,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         default=None,
         description=(
             "Connector model at x=L (output boundary).  Same format as ``port``.\n"
-            "When None the input connector model ``port`` is used at both boundaries,\n"
-            "which is correct for identical connectors on both sides."
+            "When None the input connector model ``port`` is used at both boundaries"
+            "symmetrically, which is correct for identical connectors on both sides.\n"
+            "NOTE: port 2 of this model always faces the twpa."
         ),
         validate=False,
     )
@@ -315,18 +315,11 @@ class TWPAnalysis(Analyzer, Frequencies):
         n_modes = len(mode_labels)
         Ze = self.port_Z_ext
 
-        # NOTE: the identity/bare default must use Ze (port_Z_ext), not
-        # self.twpa.Z0_ref.  For an identity connector (A=D=1,B=C=0),
-        # Zout=(D*Ze+B)/(C*Ze+A)=Ze exactly -- using twpa.Z0_ref here would
-        # silently introduce a spurious boundary mismatch (and hence a
-        # spurious reflection/phase error) whenever twpa.Z0_ref != port_Z_ext,
-        # even when no connector is present at that boundary.
         Zout_default = np.full((n_freq, n_modes), complex(Ze), dtype=np.complex128)
         abcd_identity = np.zeros((n_freq, n_modes, 4), dtype=np.complex128)
         abcd_identity[:, :, 0] = 1.0  # A
         abcd_identity[:, :, 3] = 1.0  # D
 
-        # Resolve effective port models: port_out falls back to port when None.
         port_in = self.port
         port_out = self.port_out if self.port_out is not None else self.port
 
@@ -352,7 +345,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 if port_model is None:
                     continue
                 if isinstance(port_model, TwoPortModel):
-                    abcd = np.asarray(port_model.get_abcd(freqs_m))  # (n_freq, 2, 2)
+                    abcd = np.asarray(port_model.get_abcd(freqs_m))
                     A, B = abcd[:, 0, 0], abcd[:, 0, 1]
                     C, D = abcd[:, 1, 0], abcd[:, 1, 1]
                     table_Zout[:, m_idx] = (D * Ze + B) / (C * Ze + A)
@@ -499,9 +492,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         )
         return pump_f[np.argmin(deltas)]
 
-    # ------------------------------------------------------------------
     # Shared CME helpers
-    # ------------------------------------------------------------------
 
     def _setup_initial_conditions(
         self,
@@ -551,7 +542,7 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         Segmented device (gammas.ndim == 3, shape (n_freq, n_modes, n_seg)):
             κ_m(x) is piecewise-linear on *segment_midpoints*, so the cumulative
-            trapezoid rule on the interpolated grid is exact for that interpolant —
+            trapezoid rule on the interpolated grid is exact for that interpolant,
             consistent with the phi_table computed inside the segmented Numba kernel.
 
         Parameters
@@ -605,9 +596,6 @@ class TWPAnalysis(Analyzer, Frequencies):
         terms_3wm = mode_array.get_rwa_terms(power=2)
         terms_4wm = mode_array.get_rwa_terms(power=3)
 
-        # The complex propagation and reflection arrays share the same list
-        # comprehensions regardless of the device type; only the stacking
-        # axis and final transpose differ between the two branches.
         complex_gammas = [
             -mode_params[m]["alpha"] - 1j * mode_params[m]["k"] for m in mode_labels
         ]
@@ -616,10 +604,8 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         segments = self.data.get("segments")
         if segments is not None:
-            # Relations (topology) are segment-independent; only the scalar
-            # nonlinearity coefficients (epsilon, xi) vary.  Call
-            # prepare_relations_coefficients once with unit scaling to get the
-            # index tables, then build per-segment coefficient arrays by scaling.
+            # Relations are segment-independent. Only the scalar
+            # nonlinearity coefficients (epsilon, xi) vary.
             relations_3wm, relations_4wm, c3_unit, c4_unit = (
                 prepare_relations_coefficients(terms_3wm, terms_4wm, 1.0, 1.0)
             )
@@ -659,9 +645,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             "segment_midpoints": segment_midpoints,
         }
 
-    # ------------------------------------------------------------------
     # Public analysis methods
-    # ------------------------------------------------------------------
 
     @analysis_function
     def phase_matching(
@@ -863,9 +847,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 Is0,
             )
 
-    # ------------------------------------------------------------------
     # Private CME solvers
-    # ------------------------------------------------------------------
 
     def _compute_forward_backward_gain(
         self,
@@ -1144,9 +1126,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             },
         }
 
-    # ------------------------------------------------------------------
     # Bandwidth
-    # ------------------------------------------------------------------
 
     @analysis_function
     def bandwidth(
@@ -1192,9 +1172,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             "bw_freqs": ok_freqs,
         }
 
-    # ------------------------------------------------------------------
     # Plotting helpers
-    # ------------------------------------------------------------------
 
     def plot_response(self, **kwargs) -> Axes:
         """Plot response of twpa."""

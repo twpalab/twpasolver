@@ -23,7 +23,7 @@ def plot_mode_currents(
     backward=False,
 ) -> Axes:
     """
-    Plot the mean current of each mode in dB as a function of cell number.
+    Plot the mean current of each mode in dBm as a function of cell number.
 
     Args:
         gain_result: Dictionary output from the gain analysis function

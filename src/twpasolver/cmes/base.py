@@ -13,11 +13,13 @@ from twpasolver.bonus_types import (
     nb_float2d,
     nb_int2d,
 )
-from twpasolver.cmes.solver_config import *
-
-# ---------------------------------------------------------------------------
-# Fast bracket helper for sorted (strictly increasing) grids
-# ---------------------------------------------------------------------------
+from twpasolver.cmes.solver_config import (
+    SOLVER_ATOL,
+    SOLVER_FIRST_STEP,
+    SOLVER_MAX_STEPS,
+    SOLVER_RK_METHOD,
+    SOLVER_RTOL,
+)
 
 
 @nb.njit(
@@ -44,11 +46,6 @@ def _sorted_interp_bracket(xp: nb_float1d, x: nb.float64):
         return nb.int64(n - 1), nb.int64(n - 1)
     hi = nb.int64(np.searchsorted(xp, x))  # xp[hi-1] < x <= xp[hi]
     return hi - nb.int64(1), hi
-
-
-# ---------------------------------------------------------------------------
-# Uniform RHS
-# ---------------------------------------------------------------------------
 
 
 @nb.njit(
@@ -92,11 +89,6 @@ def no_reflections_cmes(
         )
     derivs = (alphas + 1j * kappas) * derivs / exp_pos + alphas * currents
     return derivs
-
-
-# ---------------------------------------------------------------------------
-# Segmented RHS  (position-dependent parameters, exact cumulative phase)
-# ---------------------------------------------------------------------------
 
 
 @nb.njit(
@@ -201,11 +193,6 @@ def no_reflections_cmes_segmented(
         )
     derivs = (alphas + 1j * kappas) * derivs / exp_pos + alphas * currents
     return derivs
-
-
-# ---------------------------------------------------------------------------
-# Parallel Numba kernels
-# ---------------------------------------------------------------------------
 
 
 @nb.njit(parallel=True)
@@ -334,11 +321,6 @@ def _no_reflections_solve_segmented(
         I_tuples[i] = result.y
 
     return I_tuples
-
-
-# ---------------------------------------------------------------------------
-# Public Python-level dispatcher — keeps the import name unchanged
-# ---------------------------------------------------------------------------
 
 
 def no_reflections_cmes_solve(

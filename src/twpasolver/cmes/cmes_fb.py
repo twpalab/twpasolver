@@ -14,7 +14,14 @@ from twpasolver.bonus_types import (
     nb_int2d,
 )
 from twpasolver.cmes.base import _sorted_interp_bracket
-from twpasolver.cmes.solver_config import *
+from twpasolver.cmes.solver_config import (
+    BOUNDARY_CORR_MAX,
+    SOLVER_ATOL,
+    SOLVER_FIRST_STEP,
+    SOLVER_MAX_STEPS,
+    SOLVER_RK_METHOD,
+    SOLVER_RTOL,
+)
 
 
 @nb.njit(cache=True)
@@ -49,9 +56,6 @@ def _compute_atol_vec(solution, n_modes, base_atol, scale=1e-2):
             candidate = scale * min_abs
             atol_vec[m] = candidate if candidate > base_atol else base_atol
     return atol_vec
-
-
-# Wave-mixing term filter
 
 
 @nb.njit(cache=True)
@@ -125,9 +129,6 @@ def _filter_wm_terms(kappas, relations_3wm, relations_4wm, relative_deltak_cutof
     return valid_3wm[:nv3], valid_4wm[:nv4]
 
 
-# Uniform RHS
-
-
 @nb.njit(
     nb_complex1d(
         nb.float64,
@@ -158,7 +159,7 @@ def cme_rhs(
     end,
 ):
     """
-    Unified CME RHS for uniform-device forward and backward passes.
+    CME RHS for uniform-device forward and backward passes.
 
     currents_evals holds the reversed counter-propagating slow envelope B_m.
     When it is all zeros (first forward pass) the counter term vanishes,
@@ -209,9 +210,6 @@ def cme_rhs(
     return out
 
 
-# Segmented RHS  (position-dependent parameters, exact cumulative phase)
-
-
 @nb.njit(
     nb_complex1d(
         nb.float64,
@@ -226,7 +224,6 @@ def cme_rhs(
         nb_float1d,
         nb_float2d,
         nb_complex2d,
-        #   nb_complex2d,
     ),
     cache=True,
 )
@@ -243,10 +240,9 @@ def cme_rhs_segmented(
     x_evals,
     phi_table,
     currents_evals,
-    #  Zb_table,
 ):
     """
-    Unified CME RHS for segmented-device forward and backward passes.
+    CME RHS for segmented-device forward and backward passes.
 
     Phase carriers (forward and backward) are derived internally from
     ``phi_table`` rather than passed in directly.
@@ -284,7 +280,7 @@ def cme_rhs_segmented(
     n = len(currents)
     out = np.zeros(2 * n, nb.complex128)
 
-    # ---- locate x in both sorted grids (one binary search each) --------- #
+    # locate x in both sorted grids (one binary search each)
     lo_s, hi_s = _sorted_interp_bracket(segment_midpoints, x)
     lo_x, hi_x = _sorted_interp_bracket(x_evals, x)
 
@@ -298,15 +294,11 @@ def cme_rhs_segmented(
         0.0 if lo_x == hi_x else (x - x_evals[lo_x]) / (x_evals[hi_x] - x_evals[lo_x])
     )
 
-    # ---- local alphas, kappas, phase carriers ---------------------------- #
-    # ep[m]  = exp(i * Phi_m(x))               forward carrier
-    # en[m]  = exp(i * (Phi_m(x_end) - Phi_m(x)))  backward carrier
-    #        = exp(i * phi_total[m]) / ep[m]
-    # phi_total[m] = phi_table[m, -1]  (last column, computed once per call)
+    # prepare carriers and interpolated coefficients
     alphas = np.empty(n, dtype=nb.float64)
     kappas = np.empty(n, dtype=nb.float64)
-    ep = np.empty(n, dtype=nb.complex128)
-    en = np.empty(n, dtype=nb.complex128)
+    ep = np.empty(n, dtype=nb.complex128)  # forward carrier
+    en = np.empty(n, dtype=nb.complex128)  # backward carrier
     n_x_tab = phi_table.shape[1]
     for m in range(n):
         alphas[m] = alphas_table[m, lo_s] + frac_s * (
@@ -318,9 +310,8 @@ def cme_rhs_segmented(
         phi_x = phi_table[m, lo_x] + frac_x * (phi_table[m, hi_x] - phi_table[m, lo_x])
         phi_total = phi_table[m, n_x_tab - 1]  # Phi_m(x_end)
         ep[m] = np.exp(1j * phi_x)
-        en[m] = np.exp(1j * (phi_total - phi_x))  # no extra allocation
+        en[m] = np.exp(1j * (phi_total - phi_x))
 
-    # ---- local nonlinear coefficients ------------------------------------ #
     n_rel3 = coeffs_3wm_table.shape[0]
     coeffs_3wm = np.empty(n_rel3, dtype=nb.complex128)
     for r in range(n_rel3):
@@ -335,12 +326,7 @@ def cme_rhs_segmented(
             coeffs_4wm_table[r, hi_s] - coeffs_4wm_table[r, lo_s]
         )
 
-    # ---- assemble field amplitudes --------------------------------------- #
-    # ar layout (same as uniform RHS):
-    #   [0 :  n]  A_m(x)  = B_m * ep[m]         (co-propagating, full phase)
-    #   [n : 2n]  conj(A_m)
-    #   [2n: 3n]  C_m(x)  = D_m * en[m]         (counter-propagating, full phase)
-    #   [3n: 4n]  conj(C_m)
+    # assemble field amplitudes
     ar = np.empty(4 * n, dtype=nb.complex128)
     for i in range(n):
         ctr_re = currents_evals[i, lo_x].real + frac_x * (
@@ -350,38 +336,21 @@ def cme_rhs_segmented(
             currents_evals[i, hi_x].imag - currents_evals[i, lo_x].imag
         )
         ctr = (ctr_re + 1j * ctr_im) * en[i]
-        ar[i] = currents[i] * ep[i]
+        ar[i] = currents[i] * ep[i]  # co-propagating with carrier
         ar[i + n] = np.conj(ar[i])
-        ar[i + 2 * n] = ctr
-        ar[i + 3 * n] = np.conj(ctr)
+        ar[i + 2 * n] = ctr  # counter-propagating with carrier
 
-    # ---- nonlinear coupling ---------------------------------------------- #
+    # nonlinear interactions
     for idx, i1, i2 in relations_3wm:
         out[idx] += coeffs_3wm[idx] * ar[i1] * ar[i2]
     for idx, i1, i2, i3 in relations_4wm:
         out[idx] += coeffs_4wm[idx] * ar[i1] * ar[i2] * ar[i3]
 
-    # ---- remove fast carrier; add loss term ------------------------------ #
+    # loss and derivatives
     for i in range(n):
         raw = (alphas[i] + 1j * kappas[i]) * out[i] / ep[i]
         out[i] = raw + alphas[i] * currents[i]
         out[n + i] = raw
-
-    # ---- distributed reflection from slowly-varying Zb(x) --------------- #
-    # WKB correction: r(x) = (1/2) d ln Zb / dx ≈ (Zb[hi] - Zb[lo]) / (seg_len * Zb(x))
-    # In current normalisation the equations are:
-    #   dI⁺/dx += -r(x) * I⁺  +  r(x) * I⁻ * (en / ep)    [fwd slow envelope]
-    #   dI⁻/dx += +r(x) * I⁺ * (ep / en)  -  r(x) * I⁻    [bwd slow envelope]
-    # if lo_s != hi_s:
-    #     seg_len = segment_midpoints[hi_s] - segment_midpoints[lo_s]
-    #     for m in range(n):
-    #         Zb_lo = Zb_table[m, lo_s]
-    #         Zb_hi = Zb_table[m, hi_s]
-    #         Zb_x  = Zb_lo + frac_s * (Zb_hi - Zb_lo)
-    #         r_m   = 0.5 * (Zb_lo - Zb_hi) / (seg_len * Zb_x)
-    #         refl_correction = r_m * (ar[m + 2 * n] / ep[m] - currents[m])
-    #         out[m]     += refl_correction
-    #         #out[m + n] += refl_correction
 
     return out
 
@@ -407,11 +376,10 @@ def _boundary_reflection_update(
     applies a finite update rate to avoid oscillations when reflections are strong.
 
     The field-derivative correction to Zb is a perturbative estimate,
-    valid only while |raw_launch / (gamma * B_launch)| stays small. Close to a
-    stopband edge with nonlinear interaction active, B_launch can pass through a
-    near-node of the standing-wave pattern while raw_launch stays finite, which
-    pushes this ratio to O(1) or larger and can drive refl_new outside the
-    physical |Gamma| <= 1 regime. Two safeguards are applied:
+    valid only while |raw_launch / (gamma * B_launch)| stays small (SVEA).
+    Close to a stopband edge, nonlinear interactions can push this ratio to O(1)
+    or larger and can drive refl_new outside the physical |Gamma| <= 1 regime.
+    Two safeguards are applied:
       1. the correction ratio is saturated at BOUNDARY_CORR_MAX (keeps the
          approximation perturbative by construction, smoothly, instead of
          only guarding against the exact-zero division), and
@@ -577,16 +545,16 @@ def _convergence_step(
     A_fwd_i, A_bwd_i, prev_fwd, prev_bwd, n_modes, convergence_threshold, stable_count
 ):
     """Relative-change convergence test; returns updated (stable_count, converged)."""
-    nf = 0.0
-    nb_ = 0.0
+    n_fwd = 0.0
+    n_bwd = 0.0
     for j in range(n_modes):
         v = np.abs(A_fwd_i[j, -1] - prev_fwd[j]) / (np.abs(A_fwd_i[j, -1]) + 1e-30)
         w = np.abs(A_bwd_i[j, -1] - prev_bwd[j]) / (np.abs(A_bwd_i[j, -1]) + 1e-30)
-        if v > nf:
-            nf = v
-        if w > nb_:
-            nb_ = w
-    if nf < convergence_threshold and nb_ < convergence_threshold:
+        if v > n_fwd:
+            n_fwd = v
+        if w > n_bwd:
+            n_bwd = w
+    if n_fwd < convergence_threshold and n_bwd < convergence_threshold:
         stable_count += 1
     else:
         stable_count = 0
@@ -618,7 +586,7 @@ def _store_pass(
         I_out[idx_bwd, j, -1] = A_bwd_i[j, -1] * (1.0 + refl_0_out[j]) * tof_in[j]
 
 
-@nb.njit(parallel=True)
+@nb.njit(parallel=True, cache=True)
 def _general_cmes_solve_fb_cutoff_uniform(
     x_array,
     y0_array_fwd,
@@ -683,7 +651,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
         Zb_i = Zb_table[i]
         gam_i = gammas_array[i]
 
-        # ---- boundary two-port tables for this frequency ---------------- #
+        # boundary two-port tables for this frequency
         Ze_i = Ze_table[i]
         Zout_in_i = Zout_in_table[i]
         Zout_out_i = Zout_out_table[i]
@@ -694,10 +662,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
 
         x_array_i = np.ascontiguousarray(x_array)
 
-        # Full-phase-at-x_end carrier, shared by both boundary launches. A
-        # uniform device is the degenerate single-segment case of the
-        # segmented formalism, so "the endpoint" is just (Zb_i, gam_i)
-        # themselves -- same shared helpers as the segmented kernel below.
+        # Full-phase-at-x_end carrier, shared by both boundary launches.
         phase_end = np.exp(1j * kappas_i * x_end)
 
         trans_0_in = np.empty(n_modes, dtype=nb.complex128)
@@ -724,7 +689,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
         r3, r4 = _filter_wm_terms(kappas_i, relations_3wm, relations_4wm, kappa_cutoff)
 
         for k in range(passes):
-            # ---- forward solve ------------------------------------------ #
+            # forward solve
             A_fwd[i] = nbsolve_ivp(
                 cme_rhs,
                 x_span,
@@ -749,7 +714,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
                 capture_extra=True,
             ).y
 
-            # ---- reflection at far end → backward IC -------------------- #
+            # reflection at far end updates backward initial conditions
             _compute_backward_launch(
                 A_fwd[i],
                 y0_array_bwd[i],
@@ -765,7 +730,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
                 for ix in range(n_x):
                     A_counter[i, j, ix] = A_fwd[i, j, n_x - 1 - ix]
 
-            # ---- backward solve ----------------------------------------- #
+            # backward solve
             A_bwd[i] = nbsolve_ivp(
                 cme_rhs,
                 x_span,
@@ -790,7 +755,6 @@ def _general_cmes_solve_fb_cutoff_uniform(
                 capture_extra=True,
             ).y
 
-            # ---- self-consistent reflection update (output end → bwd IC) #
             # launch = backward wave (into TWPA), inc = forward wave (arriving).
             if k > 1:
                 _update_output_boundary(
@@ -812,7 +776,6 @@ def _general_cmes_solve_fb_cutoff_uniform(
                 for ix in range(n_x):
                     A_counter[i, j, ix] = A_bwd[i, j, n_x - 1 - ix]
 
-            # ---- self-consistent reflection update (input end → fwd IC) -#
             # launch = forward wave (into TWPA), inc = backward wave (arriving).
             _update_input_boundary_and_launch(
                 A_fwd[i],
@@ -832,7 +795,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
                 k > 1,
             )
 
-            # ---- convergence check -------------------------------------- #
+            # convergence check
             if k > 1:
                 stable_count, converged = _convergence_step(
                     A_fwd[i],
@@ -844,7 +807,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
                     stable_count,
                 )
 
-            # ---- store output ------------------------------------------- #
+            # store output
             # Last x-point overwritten with the physical outcoupled current:
             #   forward-out (S21, output end): A_fwd(L) * (1+rho_out) * tof_out
             #   backward-out (S11, input end): A_bwd(0) * (1+rho_in)  * tof_in
@@ -870,7 +833,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
                 prev_fwd[j] = A_fwd[i, j, -1]
                 prev_bwd[j] = A_bwd[i, j, -1]
 
-            # ---- early exit on convergence ------------------------------ #
+            # early exit on convergence
             if converged:
                 if save_all_passes:
                     for kk in range(k + 1, passes):
@@ -891,10 +854,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
     return I_out
 
 
-# Parallel outer loop — segmented device
-
-
-@nb.njit(parallel=True)
+@nb.njit(parallel=True, cache=True)
 def _general_cmes_solve_fb_cutoff_segmented(
     x_array,
     y0_array_fwd,
@@ -1012,7 +972,7 @@ def _general_cmes_solve_fb_cutoff_segmented(
         alphas_i = np.ascontiguousarray(gammas_array[i].real)  # (n_modes, n_seg)
         kappas_i = np.ascontiguousarray(gammas_array[i].imag)  # (n_modes, n_seg)
 
-        # ---- boundary two-port tables for this frequency ---------------- #
+        # boundary two-port tables for this frequency
         # apcz/tof are field-independent ABCD scalars, precomputed once in
         # plain NumPy by the dispatcher (they don't depend on the
         # self-consistent iteration) -- just slice per frequency here.
@@ -1102,7 +1062,7 @@ def _general_cmes_solve_fb_cutoff_segmented(
             for r in range(n_rel4):
                 coeffs_4wm_bwd[r, s] = coeffs_4wm_table[r, s_rev]
 
-        # Use midpoint kappas for the wave-mixing filter (conservative: keeps
+        # Use average kappas for the wave-mixing filter (conservative: keeps
         # terms that are phase-matched anywhere in the device).
         mid_seg = n_seg // 2
         kappas_mid = np.empty(n_modes, dtype=nb.float64)
@@ -1149,7 +1109,7 @@ def _general_cmes_solve_fb_cutoff_segmented(
         atol_bwd = np.full(n_modes, SOLVER_ATOL)
 
         for k in range(passes):
-            # ---- forward solve ------------------------------------------ #
+            # forward solve
             A_fwd[i] = nbsolve_ivp(
                 cme_rhs_segmented,
                 x_span,
@@ -1175,7 +1135,7 @@ def _general_cmes_solve_fb_cutoff_segmented(
                 capture_extra=True,
             ).y
 
-            # ---- reflection at output end → backward IC ----------------- #
+            # # reflection at far end updates backward initial conditions
             _compute_backward_launch(
                 A_fwd[i],
                 y0_array_bwd[i],
@@ -1191,10 +1151,10 @@ def _general_cmes_solve_fb_cutoff_segmented(
                 for ix in range(n_x):
                     A_counter[i, j, ix] = A_fwd[i, j, n_x - 1 - ix]
 
-            # ---- backward solve ----------------------------------------- #
+            # backward solve
             # All parameter tables are pre-reversed (segment axis flipped) so
             # the RHS reads physical positions from the output end first as the
-            # solver steps from s=0 to s=x_end.  No branching in the inner loop.
+            # solver steps from s=0 to s=x_end.
             A_bwd[i] = nbsolve_ivp(
                 cme_rhs_segmented,
                 x_span,
@@ -1220,7 +1180,6 @@ def _general_cmes_solve_fb_cutoff_segmented(
                 capture_extra=True,
             ).y
 
-            # ---- self-consistent reflection update at output end -------- #
             # launch = backward wave (into TWPA), inc = forward wave (arriving).
             if k > 1:
                 _update_output_boundary(
@@ -1242,7 +1201,6 @@ def _general_cmes_solve_fb_cutoff_segmented(
                 for ix in range(n_x):
                     A_counter[i, j, ix] = A_bwd[i, j, n_x - 1 - ix]
 
-            # ---- self-consistent reflection update at input end --------- #
             # launch = forward wave (into TWPA), inc = backward wave (arriving).
             _update_input_boundary_and_launch(
                 A_fwd[i],
@@ -1262,12 +1220,12 @@ def _general_cmes_solve_fb_cutoff_segmented(
                 k > 1,
             )
 
-            # ---- update per-mode atol vectors after the first pass ------- #
+            # update per-mode atol vectors after the first pass
             if k == 0:
                 atol_fwd = _compute_atol_vec(A_fwd[i], n_modes, SOLVER_ATOL)
                 atol_bwd = _compute_atol_vec(A_bwd[i], n_modes, SOLVER_ATOL)
 
-            # ---- convergence check -------------------------------------- #
+            # convergence check
             if k > 1:
                 stable_count, converged = _convergence_step(
                     A_fwd[i],
@@ -1279,7 +1237,7 @@ def _general_cmes_solve_fb_cutoff_segmented(
                     stable_count,
                 )
 
-            # ---- store output ------------------------------------------- #
+            # store output
             # Last x-point overwritten with the physical outcoupled current:
             #   forward-out (S21, output end): A_fwd(L) * (1+rho_out) * tof_out
             #   backward-out (S11, input end): A_bwd(0) * (1+rho_in)  * tof_in
@@ -1306,7 +1264,7 @@ def _general_cmes_solve_fb_cutoff_segmented(
                 prev_fwd[j] = A_fwd[i, j, -1]
                 prev_bwd[j] = A_bwd[i, j, -1]
 
-            # ---- early exit on convergence ------------------------------ #
+            # early exit on convergence
             if converged:
                 if save_all_passes:
                     for kk in range(k + 1, passes):
@@ -1324,9 +1282,6 @@ def _general_cmes_solve_fb_cutoff_segmented(
                         )
                 break
     return I_out
-
-
-# Public Python-level dispatcher
 
 
 def general_cmes_solve_fb_cutoff(
@@ -1435,8 +1390,7 @@ def general_cmes_solve_fb_cutoff(
 
     # apcz = A + C*Ze  and  tof = det/(A + C*Ze)  are field-independent
     # (don't depend on the self-consistent iteration), so compute them
-    # once here in plain NumPy rather than per-thread inside either njit
-    # kernel's prange loop.
+    # once here rather than per-thread inside njit
     def _apcz_tof(abcd_table, Ze_tab):
         A, B, C, D = (abcd_table[..., k] for k in range(4))
         apcz = A + C * Ze_tab
