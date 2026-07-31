@@ -181,7 +181,6 @@ class TWPAnalysis(Analyzer, Frequencies):
             "``TwoPortModel`` instance or a precomputed list of per-frequency "
             "impedances. When ``port_out`` is None, this model is also used at x=L."
         ),
-        validate=False,
     )
     port_out: Any = Field(
         default=None,
@@ -191,7 +190,6 @@ class TWPAnalysis(Analyzer, Frequencies):
             "symmetrically, which is correct for identical connectors on both sides.\n"
             "NOTE: port 2 of this model always faces the twpa."
         ),
-        validate=False,
     )
     port_Z_ext: float = Field(
         default=50.0,

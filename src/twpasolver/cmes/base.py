@@ -81,11 +81,11 @@ def no_reflections_cmes(
         alphas_rhs[i] = currents[i] * exp_pos[i]
         alphas_rhs[i + num_modes] = np.conj(alphas_rhs[i])
 
-    for idx, idx1, idx2 in relations_3wm:
-        derivs[idx] += coeffs_3wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2]
-    for idx, idx1, idx2, idx3 in relations_4wm:
+    for i, (idx, idx1, idx2) in enumerate(relations_3wm):
+        derivs[idx] += coeffs_3wm[i] * alphas_rhs[idx1] * alphas_rhs[idx2]
+    for i, (idx, idx1, idx2, idx3) in enumerate(relations_4wm):
         derivs[idx] += (
-            coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
+            coeffs_4wm[i] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
         )
     derivs = (alphas + 1j * kappas) * derivs / exp_pos + alphas * currents
     return derivs
@@ -185,11 +185,11 @@ def no_reflections_cmes_segmented(
         alphas_rhs[i] = currents[i] * exp_pos[i]
         alphas_rhs[i + num_modes] = np.conj(alphas_rhs[i])
 
-    for idx, idx1, idx2 in relations_3wm:
-        derivs[idx] += coeffs_3wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2]
-    for idx, idx1, idx2, idx3 in relations_4wm:
+    for i, (idx, idx1, idx2) in enumerate(relations_3wm):
+        derivs[idx] += coeffs_3wm[i] * alphas_rhs[idx1] * alphas_rhs[idx2]
+    for i, (idx, idx1, idx2, idx3) in enumerate(relations_4wm):
         derivs[idx] += (
-            coeffs_4wm[idx] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
+            coeffs_4wm[i] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
         )
     derivs = (alphas + 1j * kappas) * derivs / exp_pos + alphas * currents
     return derivs
