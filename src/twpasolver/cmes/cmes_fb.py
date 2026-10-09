@@ -2,7 +2,6 @@
 
 import numba as nb
 import numpy as np
-from CyRK import nbsolve_ivp
 
 from twpasolver.bonus_types import (
     ComplexArray,
@@ -14,12 +13,12 @@ from twpasolver.bonus_types import (
     nb_int2d,
 )
 from twpasolver.cmes.base import _sorted_interp_bracket
+from twpasolver.cmes.rk45 import rk45_solve
 from twpasolver.cmes.solver_config import (
     BOUNDARY_CORR_MAX,
     SOLVER_ATOL,
     SOLVER_FIRST_STEP,
     SOLVER_MAX_STEPS,
-    SOLVER_RK_METHOD,
     SOLVER_RTOL,
 )
 
@@ -738,7 +737,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
         for k in range(passes):
             # forward solve. Counter field is A_bwd_i (previous pass's
             # backward solution, or all-zero on the very first pass).
-            A_fwd_i = nbsolve_ivp(
+            A_fwd_i = rk45_solve(
                 cme_rhs,
                 x_span,
                 I_fwd,
@@ -757,9 +756,8 @@ def _general_cmes_solve_fb_cutoff_uniform(
                 rtol=SOLVER_RTOL,
                 max_num_steps=SOLVER_MAX_STEPS,
                 t_eval=x_array0,
-                rk_method=SOLVER_RK_METHOD,
                 first_step=SOLVER_FIRST_STEP,
-            ).y
+            )
 
             # Raw nonlinear-only RHS at the two endpoints the boundary
             # updates need, recovered with a direct call using the same
@@ -810,7 +808,7 @@ def _general_cmes_solve_fb_cutoff_uniform(
             )
 
             # backward solve. Counter field is A_fwd_i, just computed above.
-            A_bwd_i = nbsolve_ivp(
+            A_bwd_i = rk45_solve(
                 cme_rhs,
                 x_span,
                 I_bwd,
@@ -829,9 +827,8 @@ def _general_cmes_solve_fb_cutoff_uniform(
                 rtol=SOLVER_RTOL,
                 max_num_steps=SOLVER_MAX_STEPS,
                 t_eval=x_array0,
-                rk_method=SOLVER_RK_METHOD,
                 first_step=SOLVER_FIRST_STEP,
-            ).y
+            )
 
             raw_bwd_0 = (
                 cme_rhs(
@@ -1224,7 +1221,7 @@ def _general_cmes_solve_fb_cutoff_segmented(
             # forward solve. Counter field is A_bwd_i (previous pass's
             # backward solution on its own s-grid x_array_bwd, or all-zero
             # on the very first pass).
-            A_fwd_i = nbsolve_ivp(
+            A_fwd_i = rk45_solve(
                 cme_rhs_segmented,
                 x_span,
                 I_fwd,
@@ -1246,9 +1243,8 @@ def _general_cmes_solve_fb_cutoff_segmented(
                 rtol=SOLVER_RTOL,
                 max_num_steps=SOLVER_MAX_STEPS,
                 t_eval=x_array0,
-                rk_method=SOLVER_RK_METHOD,
                 first_step=SOLVER_FIRST_STEP,
-            ).y
+            )
 
             # Raw nonlinear-only RHS at the two endpoints the boundary
             # updates need, recovered with a direct call using the same
@@ -1311,7 +1307,7 @@ def _general_cmes_solve_fb_cutoff_segmented(
             # (segment axis flipped) so the RHS reads physical positions
             # from the output end first as the solver steps from s=0 to
             # s=x_end.
-            A_bwd_i = nbsolve_ivp(
+            A_bwd_i = rk45_solve(
                 cme_rhs_segmented,
                 x_span,
                 I_bwd,
@@ -1333,9 +1329,8 @@ def _general_cmes_solve_fb_cutoff_segmented(
                 rtol=SOLVER_RTOL,
                 max_num_steps=SOLVER_MAX_STEPS,
                 t_eval=x_array_bwd,
-                rk_method=SOLVER_RK_METHOD,
                 first_step=SOLVER_FIRST_STEP,
-            ).y
+            )
 
             # s=0 -> physical x_end -> alpha=gam_end.real;
             # s=x_end -> physical x=0 -> alpha=gam_0.real.

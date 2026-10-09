@@ -13,7 +13,6 @@ from twpasolver.models.rf_functions import (
     LCLf_abcd,
     get_stub_cell,
     inductance,
-    lossless_line_abcd,
     series_impedance_abcd,
 )
 from twpasolver.twoport import TwoPortModel
@@ -24,12 +23,13 @@ required = partial(Field, ...)
 class StubBaseCell(TwoPortModel):
     """Base cell of twpa stub filter model."""
 
-    name: Literal["StubBaseCell2"] = "StubBaseCell2"
+    name: Literal["StubBaseCell"] = "StubBaseCell"
     L: NonNegativeFloat = required(description="Inductance of the straight line.")
     C: NonNegativeFloat = required(description="Capacitance of the line.")
     Lf: NonNegativeFloat = required(description="Inductance of the stub finger.")
-    l1: NonNegativeFloat = required(description="Length of the stub finger.")
-    l2: NonNegativeFloat = required(description="Length of the straight line.")
+    l1: NonNegativeFloat = Field(1, description="Length of the stub finger.")
+    l2: NonNegativeFloat = Field(1, description="Length of the straight line.")
+    qp_loss: NonNegativeFloat = Field(0, description=("Quasiparticle-loss coefficient"))
     delta: NonNegativeFloat = Field(0, description="Loss Tangent")
     line: bool = Field(
         False,
@@ -45,12 +45,14 @@ class StubBaseCell(TwoPortModel):
                     freqs, self.C * (1 - 1j * self.delta), self.Lf, self.l1, 0
                 )
             )
-            half_line = ABCDArray(
-                lossless_line_abcd(
-                    freqs, self.C * (1 - 1j * self.delta), self.L, self.l2 / 2
-                )
-            )
-            return half_line @ parallel_stubs @ half_line
+            # half_line = ABCDArray(
+            #     lossless_line_abcd(
+            #         freqs, self.C * (1 - 1j * self.delta), self.L, self.l2 / 2
+            #     )
+            # )
+            half_Z = inductance(freqs, self.L / 2) * (1 - 1j * self.qp_loss * freqs)
+            half_inductance = ABCDArray(series_impedance_abcd(half_Z))
+            return half_inductance @ parallel_stubs @ half_inductance
 
         return ABCDArray(
             get_stub_cell(

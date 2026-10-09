@@ -2,7 +2,6 @@
 
 import numba as nb
 import numpy as np
-from CyRK import nbsolve_ivp
 
 from twpasolver.bonus_types import (
     ComplexArray,
@@ -13,11 +12,11 @@ from twpasolver.bonus_types import (
     nb_float2d,
     nb_int2d,
 )
+from twpasolver.cmes.rk45 import rk45_solve
 from twpasolver.cmes.solver_config import (
     SOLVER_ATOL,
     SOLVER_FIRST_STEP,
     SOLVER_MAX_STEPS,
-    SOLVER_RK_METHOD,
     SOLVER_RTOL,
 )
 
@@ -195,7 +194,7 @@ def no_reflections_cmes_segmented(
     return derivs
 
 
-@nb.njit(parallel=True)
+@nb.njit(parallel=True, cache=True)
 def _no_reflections_solve_uniform(
     x_array,
     y0_broadcast,
@@ -212,7 +211,7 @@ def _no_reflections_solve_uniform(
     I_tuples = np.empty((n_freq, n_modes, len(x_array)), dtype=nb.complex128)
 
     for i in nb.prange(n_freq):
-        result = nbsolve_ivp(
+        I_tuples[i] = rk45_solve(
             no_reflections_cmes,
             x_span,
             y0_broadcast[i],
@@ -228,15 +227,13 @@ def _no_reflections_solve_uniform(
             rtol=SOLVER_RTOL,
             max_num_steps=SOLVER_MAX_STEPS,
             t_eval=x_array,
-            rk_method=SOLVER_RK_METHOD,
             first_step=SOLVER_FIRST_STEP,
         )
-        I_tuples[i] = result.y
 
     return I_tuples
 
 
-@nb.njit(parallel=True)
+@nb.njit(parallel=True, cache=True)
 def _no_reflections_solve_segmented(
     x_array,
     y0_broadcast,
@@ -296,7 +293,7 @@ def _no_reflections_solve_segmented(
                 kr = kappas_i[m, lo_r] + fr * (kappas_i[m, hi_r] - kappas_i[m, lo_r])
                 phi_table[m, k] = phi_table[m, k - 1] + 0.5 * (kl + kr) * dx
 
-        result = nbsolve_ivp(
+        I_tuples[i] = rk45_solve(
             no_reflections_cmes_segmented,
             x_span,
             y0_broadcast[i],
@@ -315,10 +312,8 @@ def _no_reflections_solve_segmented(
             rtol=SOLVER_RTOL,
             max_num_steps=SOLVER_MAX_STEPS,
             t_eval=x_array,
-            rk_method=SOLVER_RK_METHOD,
             first_step=SOLVER_FIRST_STEP,
         )
-        I_tuples[i] = result.y
 
     return I_tuples
 

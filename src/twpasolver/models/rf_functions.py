@@ -6,7 +6,7 @@ from numba import njit
 from twpasolver.bonus_types import ComplexArray, FloatArray
 
 
-@njit
+@njit(cache=True)
 def inductance(freqs: FloatArray, L: float) -> ComplexArray:
     """
     Calculate the impedance of an inductance as a function of frequency.
@@ -22,7 +22,7 @@ def inductance(freqs: FloatArray, L: float) -> ComplexArray:
     return (2j * np.pi * freqs * L).astype(np.complex128)
 
 
-@njit
+@njit(cache=True)
 def capacitance(freqs: FloatArray, C: float) -> ComplexArray:
     """
     Calculate the impedance of a capacitor as a function of frequency.
@@ -38,7 +38,7 @@ def capacitance(freqs: FloatArray, C: float) -> ComplexArray:
     return (-1j / (2 * np.pi * freqs * C)).astype(np.complex128)
 
 
-@njit
+@njit(cache=True)
 def stub(
     freqs: FloatArray, L: float, C: complex, length: float, open: bool = True
 ) -> ComplexArray:
@@ -62,7 +62,7 @@ def stub(
     return 1j * Z * np.tan(beta_l)
 
 
-@njit
+@njit(cache=True)
 def parallel_admittance_abcd(Y: ComplexArray) -> ComplexArray:
     """
     Calculate the ABCD matrix of a parallel admittance.
@@ -80,7 +80,7 @@ def parallel_admittance_abcd(Y: ComplexArray) -> ComplexArray:
     return abcd
 
 
-@njit
+@njit(cache=True)
 def series_impedance_abcd(Z: ComplexArray) -> ComplexArray:
     """
     Calculate the ABCD matrix of a series impedance.
@@ -98,7 +98,7 @@ def series_impedance_abcd(Z: ComplexArray) -> ComplexArray:
     return abcd
 
 
-@njit
+@njit(cache=True)
 def lossless_line_abcd(freqs: FloatArray, C: float, L: float, l: float) -> ComplexArray:
     """
     Calculate the ABCD matrix of a lossless transmission line.
@@ -126,7 +126,7 @@ def lossless_line_abcd(freqs: FloatArray, C: float, L: float, l: float) -> Compl
     return abcd
 
 
-@njit
+@njit(cache=True)
 def LCLf_abcd(
     freqs: FloatArray, C: float, L: float, Lf: float, qp_loss: float = 0.0
 ) -> ComplexArray:
@@ -159,7 +159,7 @@ def LCLf_abcd(
     return abcd
 
 
-@njit
+@njit(cache=True)
 def get_stub_cell(
     freqs: FloatArray, C: complex, L: float, l1: float, l2: float
 ) -> ComplexArray:
