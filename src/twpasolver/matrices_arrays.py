@@ -327,4 +327,7 @@ def abcd_identity(N_abcd: int) -> ABCDArray:
     Returns:
         ABCDArray: Array of identity matrices.
     """
-    return ABCDArray(np.array([[[1, 0], [0, 1]]] * N_abcd))
+    mat = np.zeros((N_abcd, 2, 2), dtype=np.complex128)
+    mat[:, 0, 0] = 1.0
+    mat[:, 1, 1] = 1.0
+    return ABCDArray(mat)

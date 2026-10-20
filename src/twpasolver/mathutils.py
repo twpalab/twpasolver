@@ -48,7 +48,9 @@ def matmul_2x2(
 @nb.njit(cache=True)
 def matpow_2x2(matrices_a: ComplexArray, exponent: int) -> ComplexArray:
     """
-    Fast exponentiation of arrays of 2x2 matrices using recursion.
+    Fast exponentiation of arrays of 2x2 matrices by repeated squaring.
+
+    Uses about ``2 log2(exponent)`` matrix products per matrix.
 
     Args:
         matrices_a (ComplexArray): Array of 2x2 complex matrices.
@@ -59,24 +61,21 @@ def matpow_2x2(matrices_a: ComplexArray, exponent: int) -> ComplexArray:
     """
     assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
     assert exponent > 0
-    if exponent == 1:
-        return matrices_a.astype(np.complex128)
-    if exponent % 2 == 0:
-        result_matrices = matpow_2x2(matrices_a, int(exponent / 2))
-        return matmul_2x2(result_matrices, result_matrices)
-    result_matrices = matrices_a.astype(np.complex128)
-    partial_exp = np.empty((2, 2), dtype=np.complex128)
-    n_mat = matrices_a.shape[0]
-    for k in range(n_mat):
-        for _ in range(1, exponent):
-            for i in range(2):
-                for j in range(2):
-                    partial_exp[i, j] = (
-                        matrices_a[k, i, 0] * result_matrices[k, 0, j]
-                        + matrices_a[k, i, 1] * result_matrices[k, 1, j]
-                    )
-            result_matrices[k, :, :] = partial_exp
-    return result_matrices
+    base = matrices_a.astype(np.complex128)
+    result = base.copy()
+    have_result = False
+    e = exponent
+    while e > 0:
+        if e & 1:
+            if have_result:
+                result = matmul_2x2(result, base)
+            else:
+                result = base.copy()
+                have_result = True
+        e >>= 1
+        if e > 0:
+            base = matmul_2x2(base, base)
+    return result
 
 
 @nb.njit(cache=True)

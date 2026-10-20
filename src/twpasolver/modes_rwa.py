@@ -46,7 +46,6 @@ Capabilities
 
 **Parameter Management**:
     - Easy interpolation of mode parameters from base circuit data
-    - Automatic handling of mode directions for wavenumber calculation
 
 Examples
 --------
@@ -93,7 +92,8 @@ class ParameterInterpolator:
     Parameters are passed as ``params={name: array}``. Each array may be:
 
     * **1D** ``(n_freq,)`` — real or complex, interpolated directly.
-    * **2D** ``(n, n_freq)`` — interpolated row-by-row; returns ``(n, n_freq_interp)``.
+    * **2D** ``(n, n_freq)`` — every row interpolated along the frequency axis
+      (one vectorised spline per parameter); returns ``(n, n_freq_interp)``.
 
     The base frequency array must be sorted (ascending). Uses ``CubicSpline``
     for fast, accurate interpolation (~20× faster than ``interp1d`` with cubic).
@@ -118,12 +118,15 @@ class ParameterInterpolator:
             is_complex = np.iscomplexobj(values)
 
             def _spl(arr: np.ndarray) -> CubicSpline:
-                return CubicSpline(self.frequencies, arr)
+                # axis=-1: a 2-D array is splined row by row in one call.
+                return CubicSpline(self.frequencies, arr, axis=-1)
 
             if is_2d:
-                reals = [_spl(np.real(row)) for row in values]
-                imags = [_spl(np.imag(row)) for row in values] if is_complex else None
-                self._splines[name] = ("2d", reals, imags)
+                self._splines[name] = (
+                    "2d",
+                    _spl(np.real(values)),
+                    _spl(np.imag(values)) if is_complex else None,
+                )
             elif is_complex:
                 self._splines[name] = (
                     "1c",
@@ -155,9 +158,9 @@ class ParameterInterpolator:
             elif t == "1c":
                 out[name] = spec[1](freqs) + 1j * spec[2](freqs)
             else:  # "2d"
-                real_rows = np.stack([s(freqs) for s in spec[1]])
+                real_rows = spec[1](freqs)
                 if spec[2] is not None:
-                    out[name] = real_rows + 1j * np.stack([s(freqs) for s in spec[2]])
+                    out[name] = real_rows + 1j * spec[2](freqs)
                 else:
                     out[name] = real_rows
         return out
@@ -179,30 +182,24 @@ class Mode:
     """
     Represents a single mode with its physical properties.
 
+    Every mode stands for both its +x and -x traveling waves; the propagation
+    direction of injected waves is chosen by the solver inputs
+    (``initial_amplitudes_fwd`` / ``initial_amplitudes_bwd``), not by the mode.
+
     Args:
         label: Mode identifier (e.g., 'p' for pump)
         frequency: Mode frequency
-        direction: 1 for forward, -1 for backward
         gamma: Reflection coefficient
         k: Wavenumber (calculated from frequency)
         alpha: Attenuation constant
     """
 
     label: str
-    direction: int = 1  # 1 for forward, -1 for backward
     frequency: Optional[float] = None
     k: Optional[float] = None
     gamma: Optional[Union[float, complex]] = 0.0
     alpha: Optional[float] = 0.0
     Zb: Optional[float] = 0.0
-
-    def __post_init__(self):
-        """Initialize derived quantities and validate inputs."""
-        # Ensure direction is ±1
-        if abs(self.direction) != 1:
-            raise ValueError("Direction must be either 1 (forward) or -1 (backward)")
-        if self.k is not None:
-            self.k = self.k * self.direction
 
     def __eq__(self, other):
         """Compare modes based on their physical properties."""
@@ -210,7 +207,6 @@ class Mode:
             return False
         return (
             self.frequency == other.frequency
-            and self.direction == other.direction
             and self.gamma == other.gamma
             and self.k == other.k
             and self.alpha == other.alpha
@@ -219,18 +215,17 @@ class Mode:
 
     def __hash__(self):
         """Get hash based on immutable properties."""
-        return hash((self.label, str(self.frequency), self.direction))
+        return hash((self.label, str(self.frequency)))
 
     def __str__(self):
-        """Get string representation showing direction and label."""
-        direction_str = "→" if self.direction == 1 else "←"
-        return f"{direction_str}{self.label}"
+        """Get string representation (the mode label)."""
+        return self.label
 
     def __repr__(self):
         """Get representation of class."""
         return (
             f'Mode("{self.label}", freq={self.frequency}, '
-            f"dir={self.direction}, gamma={self.gamma}, k={self.k}, alpha={self.alpha}, Zb={self.Zb})"
+            f"gamma={self.gamma}, k={self.k}, alpha={self.alpha}, Zb={self.Zb})"
         )
 
 
@@ -319,8 +314,10 @@ class RWAAnalyzer:
 
     def _compute_substitutions(self) -> List:
         """Compute all mode substitutions based on the relations."""
-        apply = True
         modes_subs = deepcopy(self.modes_symbolic)
+        # Without relations every mode is independent; the loop below would
+        # never reach its exit condition.
+        apply = bool(self.relations_idx)
         while apply:
             modes_subs_old = deepcopy(modes_subs)
             for output, input_idxs, input_signs in self.relations_idx:
@@ -622,7 +619,7 @@ class ModeArray:
                 kappa, gamma, alpha, Zb = self.interpolator.get_parameters(abs(freq))
                 mode.alpha = alpha  # type: ignore
                 mode.gamma = gamma  # type: ignore
-                mode.k = kappa * mode.direction  # type: ignore
+                mode.k = kappa  # type: ignore
                 mode.Zb = Zb  # type: ignore
 
     def update_base_data(self, interpolator: ParameterInterpolator) -> None:
@@ -702,16 +699,12 @@ class ModeArray:
                 ):
                     mode_freqs += coeff * self.modes[base_mode].frequency
 
-            # Get direction for this mode
-            direction = self.modes[mode].direction
-
             # Get parameters for all frequencies of this mode
             kappas, gammas, alphas, Zbs = self.interpolator.get_parameters(
                 np.abs(mode_freqs)
             )
 
-            # Apply direction to kappas; works for both 1D (n_freq,) and 2D (n, n_freq)
-            kappas = np.asarray(kappas) * direction
+            kappas = np.asarray(kappas)
 
             # Store parameters
             mode_params[mode] = {
@@ -740,7 +733,6 @@ class ModeArray:
         for mode_label, mode in self.modes.items():
             node_attrs = {
                 "frequency": mode.frequency,
-                "direction": mode.direction,
                 "is_independent": mode_label in self.independent_modes,
             }
             G.add_node(mode_label, **node_attrs)
@@ -752,7 +744,6 @@ class ModeArray:
         node_size: int = 3000,
         font_size: int = 12,
         show_frequencies: bool = False,
-        show_directions: bool = True,
         layout: str = "hierarchical",
     ) -> Figure:
         """
@@ -763,7 +754,6 @@ class ModeArray:
             node_size: Size of mode nodes
             font_size: Font size for labels
             show_frequencies: Whether to show current frequencies on nodes
-            show_directions: Whether to show mode propagation directions
             layout: Graph layout algorithm ('spring', 'circular', 'hierarchical')
 
         Returns:
@@ -856,22 +846,11 @@ class ModeArray:
             )
 
         # Node labels
-        if show_frequencies and show_directions:
-            labels = {}
-            for mode_label, mode in self.modes.items():
-                direction_str = "→" if mode.direction == 1 else "←"
-                freq_str = f"{mode.frequency:.1f}" if mode.frequency else "None"
-                labels[mode_label] = f"{mode_label}\n{direction_str}\n({freq_str})"
-        elif show_frequencies:
+        if show_frequencies:
             labels = {}
             for mode_label, mode in self.modes.items():
                 freq_str = f"{mode.frequency:.1f}" if mode.frequency else "None"
                 labels[mode_label] = f"{mode_label}\n({freq_str})"
-        elif show_directions:
-            labels = {}
-            for mode_label, mode in self.modes.items():
-                direction_str = "→" if mode.direction == 1 else "←"
-                labels[mode_label] = f"{mode_label}\n{direction_str}"
         else:
             labels = {mode: mode for mode in G.nodes()}
 
@@ -1001,7 +980,6 @@ class ModeArray:
             independence = " (independent)" if label in self.independent_modes else ""
             print(f"{label}{independence}:")
             print(f"  Frequency: {mode.frequency}")
-            print(f"  Direction: {mode.direction}")
             print(f"  k: {mode.k}")
             print(f"  gamma: {mode.gamma}")
             print(f"  alpha: {mode.alpha}")
@@ -1031,8 +1009,17 @@ class ModeArrayFactory:
     """Factory for creating standard ModeArray configurations."""
 
     @staticmethod
-    def _interpolator_from_data(base_data: Dict[str, Any]) -> "ParameterInterpolator":
-        """Build a ParameterInterpolator from a standard base_data dict."""
+    def _interpolator_from_data(
+        base_data: Dict[str, Any],
+        interpolator: Optional["ParameterInterpolator"] = None,
+    ) -> "ParameterInterpolator":
+        """Build a ParameterInterpolator from a standard base_data dict.
+
+        If ``interpolator`` is given it is returned unchanged, so several mode
+        arrays built from the same base data can share one interpolator.
+        """
+        if interpolator is not None:
+            return interpolator
         return ParameterInterpolator(
             base_data["freqs"],
             {
@@ -1045,27 +1032,25 @@ class ModeArrayFactory:
 
     @staticmethod
     def create_basic(
-        base_data: Dict[str, Any], forward_modes: bool = True, three_wave: bool = True
+        base_data: Dict[str, Any],
+        three_wave: bool = True,
+        interpolator: Optional[ParameterInterpolator] = None,
     ) -> ModeArray:
         """
         Create a basic 3WM ModeArray with pump, signal, and idler modes.
 
         Args:
             base_data: Dictionary containing 'freqs', 'k', 'gammas', and 'alpha' arrays
-            forward_modes: Whether to create forward (True) or backward (False) propagating modes
-            Three wave: Whether to include 3WM or 4WM mode relations
+            three_wave: Whether to include 3WM or 4WM mode relations
+            interpolator: Optional shared ParameterInterpolator (built from
+                ``base_data`` when omitted)
 
         Returns:
             ModeArray: Configured for basic 3WM operation
         """
-        interpolator = ModeArrayFactory._interpolator_from_data(base_data)
+        interpolator = ModeArrayFactory._interpolator_from_data(base_data, interpolator)
 
-        direction = 1 if forward_modes else -1
-        modes = [
-            Mode(label="p", direction=direction),
-            Mode(label="s", direction=direction),
-            Mode(label="i", direction=direction),
-        ]
+        modes = [Mode(label="p"), Mode(label="s"), Mode(label="i")]
         if three_wave:
             relations = [["i", "p-s"]]
         else:
@@ -1079,7 +1064,7 @@ class ModeArrayFactory:
         n_frequency_conversion: int = 1,
         n_signal_harmonics: int = 1,
         n_sidebands: int = 1,
-        forward_modes: bool = True,
+        interpolator: Optional[ParameterInterpolator] = None,
     ) -> ModeArray:
         """
         Create an extended 3WM ModeArray with pump harmonics and conversion terms.
@@ -1089,45 +1074,40 @@ class ModeArrayFactory:
             n_pump_harmonics: Number of pump harmonics to include
             n_frequency_conversion: Number of frequency conversion terms
             n_signal_harmonics: Number of signal and idler harmonics
-            forward_modes: Whether to create forward (True) or backward (False) propagating modes
+            interpolator: Optional shared ParameterInterpolator (built from
+                ``base_data`` when omitted)
 
         Returns:
             ModeArray: Configured for extended 3WM operation with harmonics
         """
-        interpolator = ModeArrayFactory._interpolator_from_data(base_data)
-
-        direction = 1 if forward_modes else -1
+        interpolator = ModeArrayFactory._interpolator_from_data(base_data, interpolator)
 
         # Create basic modes
-        modes = [
-            Mode(label="p", direction=direction),
-            Mode(label="s", direction=direction),
-            Mode(label="i", direction=direction),
-        ]
+        modes = [Mode(label="p"), Mode(label="s"), Mode(label="i")]
 
         # Basic relation
         relations = [["i", "p-s"]]  # Idler is pump minus signal
 
         for n in range(1, n_frequency_conversion + 1):
             if n == 1:
-                modes.append(Mode(label="ps", direction=direction))  # p+s
-                modes.append(Mode(label="pi", direction=direction))  # p+i
+                modes.append(Mode(label="ps"))  # p+s
+                modes.append(Mode(label="pi"))  # p+i
                 relations.append(["ps", "p+s"])
                 relations.append(["pi", "p+i"])
             else:
-                modes.append(Mode(label=f"p{n}s", direction=direction))  # p+s
-                modes.append(Mode(label=f"p{n}i", direction=direction))  # p+i
+                modes.append(Mode(label=f"p{n}s"))  # p+s
+                modes.append(Mode(label=f"p{n}i"))  # p+i
                 relations.append([f"p{n}s", "p+" * (n - 1) + "p+s"])
                 relations.append([f"p{n}i", "p+" * (n - 1) + "p+i"])
 
         for n in range(2, n_pump_harmonics + 2):
-            modes.append(Mode(label=f"p{n}", direction=direction))
+            modes.append(Mode(label=f"p{n}"))
             relations.append([f"p{n}", "p+" * (n - 1) + "p"])
 
         for n in range(2, n_signal_harmonics + 2):
-            modes.append(Mode(label=f"s{n}", direction=direction))
+            modes.append(Mode(label=f"s{n}"))
             relations.append([f"s{n}", "s+" * (n - 1) + "s"])
-            modes.append(Mode(label=f"i{n}", direction=direction))
+            modes.append(Mode(label=f"i{n}"))
             relations.append([f"i{n}", "i+" * (n - 1) + "i"])
 
         return ModeArray(modes, relations, interpolator)
@@ -1136,8 +1116,8 @@ class ModeArrayFactory:
     def create_custom(
         base_data: Dict[str, Any],
         mode_labels: List[str],
-        mode_directions: List[int],
         relations: List[List[str]],
+        interpolator: Optional[ParameterInterpolator] = None,
     ) -> ModeArray:
         """
         Create a custom ModeArray with user-defined modes and relations.
@@ -1145,22 +1125,15 @@ class ModeArrayFactory:
         Args:
             base_data: Dictionary containing 'freqs', 'k', 'gammas', and 'alpha' arrays
             mode_labels: List of mode labels
-            mode_directions: List of mode directions (1 for forward, -1 for backward)
             relations: List of relations between modes
+            interpolator: Optional shared ParameterInterpolator (built from
+                ``base_data`` when omitted)
 
         Returns:
             ModeArray: Custom configured ModeArray
         """
-        if len(mode_labels) != len(mode_directions):
-            raise ValueError(
-                "mode_labels and mode_directions must have the same length"
-            )
+        interpolator = ModeArrayFactory._interpolator_from_data(base_data, interpolator)
 
-        interpolator = ModeArrayFactory._interpolator_from_data(base_data)
-
-        modes = [
-            Mode(label=label, direction=direction)
-            for label, direction in zip(mode_labels, mode_directions)
-        ]
+        modes = [Mode(label=label) for label in mode_labels]
 
         return ModeArray(modes, relations, interpolator)

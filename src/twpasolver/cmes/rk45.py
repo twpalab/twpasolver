@@ -29,6 +29,8 @@ from typing import Tuple
 import numba as nb
 import numpy as np
 
+from twpasolver.cmes.solver_config import SOLVER_MAX_STEPS_PER_CELL
+
 EPS = np.finfo(np.float64).eps
 EMPTY_ARR = np.empty(0, dtype=np.float64)
 
@@ -172,6 +174,17 @@ def rk45_solve(
         for i in range(y_size):
             atol_array[i] = atol
 
+    # Cap the number of accepted steps at the integration length in unit cells
+    # (times SOLVER_MAX_STEPS_PER_CELL): the CMEs describe envelopes that vary
+    # slowly on the scale of one cell, so needing more steps than cells means
+    # the solution is running away (e.g. an unguarded stopband-edge process).
+    # The run then stops with status -7 and the unreached points are NaN.
+    if SOLVER_MAX_STEPS_PER_CELL > 0:
+        span_steps = (
+            int(np.ceil(np.abs(t_end - t_start) * SOLVER_MAX_STEPS_PER_CELL)) + 1
+        )
+        if max_num_steps <= 0 or max_num_steps > span_steps:
+            max_num_steps = span_steps
     use_max_steps = max_num_steps > 0
 
     # Initialize variables for start of integration
@@ -382,5 +395,12 @@ def rk45_solve(
     y_results_reduced = np.empty((y_size, t_eval.size), dtype=dtype)
     for i in range(y_size):
         y_results_reduced[i, :] = np.interp(t_eval, time_domain, y_results[i, :])
+    if status != 1:
+        # Failed integration: do not extrapolate the last accepted point.
+        t_reached = time_domain[len_t - 1]
+        for k in range(t_eval.size):
+            if direction * (t_eval[k] - t_reached) > 0:
+                for i in range(y_size):
+                    y_results_reduced[i, k] = np.nan
 
     return y_results_reduced

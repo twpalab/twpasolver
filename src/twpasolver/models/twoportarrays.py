@@ -81,10 +81,21 @@ class TWPA(TwoPortArray):
         """
         Coefficient of first-order term in inductance.
 
+        With L(I) = Lk (1 + (I/Istar)^2 + (I/Istar2)^4) and I = Idc + i,
+        L = L(Idc) (1 + epsilon i + xi i^2 + O(i^3)).
+
         Returns:
             NonNegativeFloat: The epsilon value.
         """
-        return 2 * self.Idc * self.xi
+        if self.Istar2 is None:
+            return 2 * self.Idc * self.xi
+
+        return (
+            2
+            * self.Idc
+            * (2 * (self.Istar * self.Idc) ** 2 + self.Istar2**4)
+            / self._xi_denominator
+        )
 
     @computed_field
     @property
@@ -99,7 +110,18 @@ class TWPA(TwoPortArray):
         if self.Istar2 is None:
             return 1 / (self.Istar**2 + self.Idc**2)
 
-        return (2 * (self.Istar * self.Idc) ** 2 + self.Istar2**4) / (
+        return (
+            6 * (self.Istar * self.Idc) ** 2 + self.Istar2**4
+        ) / self._xi_denominator
+
+    @property
+    def _xi_denominator(self) -> float:
+        """
+        Common denominator of epsilon and xi when Istar2 is set.
+
+        Equals Istar^2 * Istar2^4 * L(Idc) / Lk.
+        """
+        return (
             (self.Istar * self.Istar2**2) ** 2
             + (self.Istar * self.Idc**2) ** 2
             + (self.Idc * self.Istar2**2) ** 2
@@ -125,7 +147,10 @@ class TWPA(TwoPortArray):
         Returns:
             NonNegativeFloat: The alpha value.
         """
-        return 1 + self.Idc**2 / self.Istar**2
+        alpha = 1 + self.Idc**2 / self.Istar**2
+        if self.Istar2 is not None:
+            alpha += self.Idc**4 / self.Istar2**4
+        return alpha
 
     @computed_field
     @property
