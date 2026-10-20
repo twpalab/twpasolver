@@ -765,14 +765,15 @@ class TWPAnalysis(Analyzer, Frequencies):
         signal_freqs: FloatArray,
         injected: np.ndarray,
         forward_only: bool,
-        keep: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
-        Per-mode stopband-edge weights of the Bloch models.
+        Per-mode stopband-edge weights of the guarded Bloch models.
 
-        Works on tables of shape (n_freq, n_modes) or (n_freq, n_seg, n_modes).
+        Used by the no-reflections model and the segmented forward-backward
+        model; the uniform forward-backward model uses the fixed edge basis
+        instead (:meth:`_apply_edge_basis`). Works on tables of shape (n_freq, n_modes) or (n_freq, n_seg, n_modes).
 
-        * Edge guard (all Bloch models, ``solver_config.BLOCH_EDGE_GUARD``):
+        * Edge guard (``solver_config.BLOCH_EDGE_GUARD``):
           weight from the Bloch splitting ``|sinh(gamma d)|``, which vanishes
           only at the band edges (exceptional points). Modes inside a stopband,
           away from its edges, keep weight 1.
@@ -810,8 +811,6 @@ class TWPAnalysis(Analyzer, Frequencies):
                 [round(float(angle[..., j].max()), 1) for j in cols],
             )
         weights[..., injected] = 1.0
-        if keep is not None:
-            weights[keep] = 1.0  # edge-basis modes: described exactly
 
         sig = np.asarray(signal_freqs, dtype=np.float64)
         for j in np.flatnonzero((weights < 1.0).any(axis=lead)):
@@ -843,17 +842,16 @@ class TWPAnalysis(Analyzer, Frequencies):
         signal_freqs: FloatArray,
         injected: np.ndarray,
         forward_only: bool = False,
-        keep: Optional[np.ndarray] = None,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Stopband-edge guard of the uniform Bloch models.
+        Stopband-edge guard of the uniform no-reflections Bloch model.
 
         Per-mode weights from :meth:`_bloch_mode_weights`; returns the
         per-process weights (product over the modes of each relation row) for
         the 3WM and 4WM relation rows, shape (n_freq, n_rel).
         """
         weights = self._bloch_mode_weights(
-            bloch, cme_inputs["mode_labels"], signal_freqs, injected, forward_only, keep
+            bloch, cme_inputs["mode_labels"], signal_freqs, injected, forward_only
         )
         return (
             process_weights(cme_inputs["relations_3wm"], weights),
@@ -960,28 +958,41 @@ class TWPAnalysis(Analyzer, Frequencies):
         self,
         bloch: dict[str, Any],
         cme_inputs: dict[str, Any],
-        weak: np.ndarray,
         injected: np.ndarray,
+        threshold: Optional[float],
     ) -> Optional[dict[str, Any]]:
         """
-        Fixed ("edge") Bloch basis for weak modes close to a stopband edge.
+        Fixed ("edge") Bloch basis for modes close to a stopband edge.
 
-        Uniform devices, forward-backward model. Every weak mode without input
-        whose splitting is below ``e = solver_config.BLOCH_EDGE_BASIS`` is
-        expanded on the lossless Bloch pair at the reference frequency of the
-        nearest edge, where the splitting equals the same ``e`` (passband
-        side): the basis is anchored at the switch-over point. Its Bloch tables and ``prefac`` in
+        Uniform devices, forward-backward model. Every mode without input whose
+        splitting is below ``threshold`` (``FBSolverConfig.edge_basis_threshold``)
+        is expanded on the lossless Bloch pair at the reference frequency of
+        the nearest edge, where the splitting equals the same value (passband
+        side): the basis is anchored at the switch-over point. Modes with an
+        input are never flagged; a warning is logged when one lies below the
+        threshold. Their Bloch tables and ``prefac`` in
         ``bloch`` are overwritten in place, and the returned dict holds the
         kernel gammas (``-1j * kappa_e`` for flagged modes), the per-unit-cell
         generator ``K`` (``edge_K``), the mask (``edge_flag``) and diagnostics
         (also stored in ``bloch``). ``coeffs_3wm``/``coeffs_4wm`` are rebuilt
         from the new tables. Returns None when nothing is flagged.
         """
-        cfg = solver_config.BLOCH_EDGE_BASIS
-        if cfg is None:
+        if threshold is None:
             return None
-        e_edge = float(cfg)
-        flag = (bloch["split"] < e_edge) & weak[None, :] & ~injected[None, :]
+        e_edge = float(threshold)
+        near = bloch["split"] < e_edge
+        near_inj = injected & near.any(axis=0)
+        if near_inj.any():
+            labels = cme_inputs["mode_labels"]
+            cols = np.flatnonzero(near_inj)
+            log.warning(
+                "Edge basis: mode(s) %s with an input lie close to a stopband edge "
+                "(min |sinh(gamma d)| = %s) and keep their native Bloch basis; "
+                "their description there is unreliable.",
+                [labels[j] for j in cols],
+                [float(f"{bloch['split'][:, j].min():.3g}") for j in cols],
+            )
+        flag = near & ~injected[None, :]
         if not flag.any():
             return None
         gammas = cme_inputs["gammas"]
@@ -1964,20 +1975,12 @@ class TWPAnalysis(Analyzer, Frequencies):
             Zp_launch = bloch["Zb_plus"][:, 0]
             Zm_launch = bloch["Zb_minus"][:, -1]
         else:
-            weak_labels = set(mode_array.get_dependent_modes(signal_mode))
-            weak_labels.add(signal_mode)
-            weak = np.array([lab in weak_labels for lab in mode_labels])
-            edge = self._apply_edge_basis(bloch, cme_inputs, weak, injected)
+            edge = self._apply_edge_basis(
+                bloch, cme_inputs, injected, fb_config.edge_basis_threshold
+            )
             diag: dict[str, Any] = {}
             if edge is not None:
                 gammas = edge["gammas"]  # kernel and carrier: -1j kappa_e
-            pw3, pw4 = self._bloch_edge_guard(
-                bloch,
-                cme_inputs,
-                signal_freqs,
-                injected,
-                keep=None if edge is None else edge["edge_flag"],
-            )
             I_tuples_raw = bloch_fb_cmes_solve(
                 x,
                 y0_fwd_broadcast,
@@ -2001,8 +2004,6 @@ class TWPAnalysis(Analyzer, Frequencies):
                 convergence_threshold=fb_config.convergence_threshold,
                 save_all_passes=fb_config.save_all_passes,
                 anderson_depth=fb_config.anderson_depth,
-                process_weights_3wm=pw3,
-                process_weights_4wm=pw4,
                 Ze=self.port_Z_ext,
                 Zout_in=Zout_in,
                 Zout_out=Zout_out,

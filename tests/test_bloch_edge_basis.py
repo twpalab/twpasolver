@@ -73,39 +73,52 @@ def test_edge_basis_tables_exact():
         assert np.max(np.abs(lhs - rhs)) < 1e-10 * np.max(np.abs(rhs))
 
 
-def _gain(analysis, sig, basis, passes, depth, monkeypatch):
-    from twpasolver.cmes import solver_config
+def _gain(analysis, sig, threshold, passes=80, depth=15):
     from twpasolver.cmes.solver_config import FBSolverConfig
 
-    monkeypatch.setattr(solver_config, "BLOCH_EDGE_BASIS", basis)
     return analysis.gain(
         signal_freqs=np.asarray(sig),
         Is0=1e-9,
         pump=16.0,
         model="bloch",
         mode_array_config="ext2",
-        fb_config=FBSolverConfig(passes=passes, anderson_depth=depth),
+        fb_config=FBSolverConfig(
+            passes=passes, anderson_depth=depth, edge_basis_threshold=threshold
+        ),
     )
 
 
 @pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
-def test_edge_basis_matches_native_basis_in_passband(monkeypatch):
+def test_edge_basis_needed_at_the_edge():
+    """Without the edge basis the iteration fails at the p2s edge; with it, it converges."""
+    analysis = _holotype_analysis()
+    sig = [9.204, 9.212]
+    native = _gain(analysis, sig, None)
+    fixed = _gain(analysis, sig, 0.10)
+    bad = ~native["bloch"]["converged"] | ~np.isfinite(native["gain_db"])
+    assert bad.any()
+    assert fixed["bloch"]["converged"].all()
+    assert np.all(np.isfinite(fixed["gain_db"]))
+
+
+@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
+def test_edge_basis_matches_native_basis_in_passband():
     """p2s in the passband: fixed and native bases give the same gain."""
     analysis = _holotype_analysis()
-    native = _gain(analysis, [9.25], None, 80, 15, monkeypatch)["gain_db"]
-    fixed = _gain(analysis, [9.25], 0.09, 80, 15, monkeypatch)
+    native = _gain(analysis, [9.25], None)["gain_db"]
+    fixed = _gain(analysis, [9.25], 0.09)
     p2s = fixed["mode_info"]["mode_map"]["p2s"]
     assert fixed["bloch"]["edge_flag"][0, p2s]
     assert np.allclose(fixed["gain_db"], native, atol=0.02)
 
 
 @pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
-def test_edge_basis_independent_of_threshold(monkeypatch):
+def test_edge_basis_independent_of_threshold():
     """At the edge of p2s the gain barely depends on the threshold around 0.1."""
     analysis = _holotype_analysis()
     sig = [9.212]
-    g10 = _gain(analysis, sig, 0.10, 80, 15, monkeypatch)
-    g12 = _gain(analysis, sig, 0.12, 80, 15, monkeypatch)
+    g10 = _gain(analysis, sig, 0.10)
+    g12 = _gain(analysis, sig, 0.12)
     p2s = g10["mode_info"]["mode_map"]["p2s"]
     assert g10["bloch"]["edge_flag"][0, p2s]
     assert np.all(np.isfinite(g10["gain_db"]))
@@ -113,15 +126,12 @@ def test_edge_basis_independent_of_threshold(monkeypatch):
 
 
 @pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
-def test_edge_basis_seamless_at_passband_switch(monkeypatch):
+def test_edge_basis_seamless_at_passband_switch():
     """Just inside the window on the passband side, the basis is the native one."""
-    from twpasolver.cmes import solver_config
-
     analysis = _holotype_analysis()
     sig = [9.2711]  # p2s splitting 0.099
-    fixed = _gain(analysis, sig, 0.10, 80, 15, monkeypatch)
+    fixed = _gain(analysis, sig, 0.10)
     p2s = fixed["mode_info"]["mode_map"]["p2s"]
     assert fixed["bloch"]["edge_flag"][0, p2s]
-    monkeypatch.setattr(solver_config, "BLOCH_EDGE_GUARD", None)
-    native = _gain(analysis, sig, None, 80, 15, monkeypatch)
+    native = _gain(analysis, sig, None)
     assert np.allclose(fixed["gain_db"], native["gain_db"], atol=0.01)
