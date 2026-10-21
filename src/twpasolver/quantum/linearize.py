@@ -16,7 +16,7 @@ with ``c_q = sigma * (-2j omega_n / W_n) * base_q * w_q * Fhat_{q,m}``,
 ``Fhat_{q,m} = (1/d) sum_j L_j phi_n^{-sigma}(x_j) prod_r phi_r^{tau_r}(x_j)^{(*)}
 e^{-j G_m x_j}`` and residual phase ``r_q = Phi_q + G_m``,
 ``Phi_q = sigma k_n - sum_r c_r tau_r k_r`` (``c_r = -1`` for conjugated inputs).
-Selection: ``|r_q| < kappa_cutoff * k_proc``, ``|r_q| d < pi``, ``|m| <= m_max``
+Selection: ``|r_q| < kappa_cutoff * min(k_proc, pi / d)``, ``|m| <= m_max``
 (identical to ``_filter_wm_terms_bloch``, partners kept together).
 
 Only rows with a weak target and exactly one weak input enter the linear
@@ -85,8 +85,8 @@ def linear_terms(
     d = bg.n_cells
     g_unit = 2 * np.pi / d
     cutoff = bg.fb_config.kappa_cutoff
-    m_max = bg.fb_config.m_max
-    phase_cut = 3.141592653589793
+    m_max = bg.fb_config.m_max_fixed
+    k_edge = np.pi / d  # zone edge: cap of the reference wavenumber
     prefac = -2j * bg.omegas[i] / bg.W[i]
     phi = {+1: bg.phi_plus[i], -1: bg.phi_minus[i]}
     Lnl = bg.L_nl
@@ -124,7 +124,7 @@ def linear_terms(
                     if abs(mg) > m_max:
                         continue
                     res = Phi + mg * g_unit
-                    if not (abs(res) < cutoff * k_proc and abs(res) * d < phase_cut):
+                    if not abs(res) < min(cutoff * min(k_proc, k_edge), k_edge):
                         continue
                     F = Lnl * phi[-sigma][n]
                     for (m, cj), tau in zip(inputs, taus):

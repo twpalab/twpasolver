@@ -100,6 +100,172 @@ def _ratio_db(out: np.ndarray, ref: np.ndarray) -> np.ndarray:
     return res
 
 
+def _harmonic_limits(
+    split: np.ndarray,
+    W: np.ndarray,
+    kd_pi: np.ndarray,
+    base: int,
+    e_edge: float,
+) -> np.ndarray:
+    """
+    Per-mode harmonic limits of ``FBSolverConfig.m_max='auto'``.
+
+    ``base`` for every mode, raised to the Bragg order ``m = round(k d / pi)``
+    of a mode inside a stopband (``|arg W| > 45 deg``) or close to its edge
+    (``split < e_edge``, twice ``FBSolverConfig.edge_threshold``): its counter-propagating component, at
+    ``-m pi / d``, is reached only through ``G_m``. The zone centre
+    (``k d / pi < 0.5``) is excluded. All arrays share the shape
+    ``(..., n_modes)``.
+    """
+    zone_centre = kd_pi < 0.5
+    special = ((split < e_edge) | (reactive_angle_deg(W) > 45.0)) & ~zone_centre
+    order = np.round(kd_pi).astype(np.int64)
+    return np.where(special, np.maximum(base, order), base).astype(np.int64)
+
+
+def _stopband_guard_weights(
+    split: np.ndarray,
+    W: np.ndarray,
+    kd_pi: np.ndarray,
+    e_edge: float,
+) -> np.ndarray:
+    """
+    Per-mode weights of ``FBSolverConfig.simulate_stopband_modes=False``.
+
+    1 for ``split >= e_edge``, smoothstep down to 0 at the edge on the passband
+    side, and 0 inside a stopband (``|arg W| > 45 deg``). The zone centre
+    (``k d / pi < 0.5``), where the splitting also vanishes but the Bloch basis
+    stays valid, keeps weight 1. All arrays share the shape ``(..., n_modes)``.
+    """
+    zone_centre = kd_pi < 0.5
+    t = np.clip(np.asarray(split, dtype=np.float64) / e_edge, 0.0, 1.0)
+    w = t * t * (3.0 - 2.0 * t)
+    w = np.where(reactive_angle_deg(W) > 45.0, 0.0, w)
+    return np.where(zone_centre, 1.0, w)
+
+
+def _process_weights_nd(relations: np.ndarray, mode_weights: np.ndarray) -> np.ndarray:
+    """
+    Weight of every relation row, the product of the weights of its modes.
+
+    ``mode_weights`` has shape ``(..., n_modes)``; the result ``(..., n_rel)``.
+    Partner rows of a process contain the same modes and get the same weight.
+    """
+    n_modes = mode_weights.shape[-1]
+    out = np.ones(mode_weights.shape[:-1] + (len(relations),), dtype=np.float64)
+    for r, rel in enumerate(relations):
+        for idx in rel:
+            out[..., r] *= mode_weights[..., int(idx) % n_modes]
+    return out
+
+
+def _edge_basis_entries(
+    device: Any,
+    split: np.ndarray,
+    kappa: np.ndarray,
+    freqs_hz: np.ndarray,
+    n_cells: int,
+    injected: np.ndarray,
+    e_edge: float,
+    in_gap: Optional[np.ndarray] = None,
+) -> Tuple[np.ndarray, np.ndarray, Optional[dict[str, Any]]]:
+    """
+    Modes of one uniform device (or segment) to expand on the fixed edge basis.
+
+    Parameters
+    ----------
+    device : TWPA
+        Uniform device or segment; its supercell defines the Bloch modes.
+    split, kappa, freqs_hz : (n_freq, n_modes)
+        Bloch splitting ``|sinh(gamma d)|``, kernel wavenumber (``Im`` of the
+        kernel gamma, per unit cell) and mode frequency (Hz).
+    n_cells : int
+        Unit cells per supercell.
+    injected : (n_modes,) bool
+        Modes with an input, never flagged.
+    e_edge : float
+        Threshold on the splitting, also the anchor of the fixed basis.
+    in_gap : (n_freq, n_modes) bool, optional
+        Entries inside a stopband to flag as well, whatever their splitting
+        (``FBSolverConfig.simulate_stopband_modes``).
+
+    Returns
+    -------
+    near_injected : (n_modes,) bool
+        Injected modes that lie below the threshold somewhere.
+    flag : (n_freq, n_modes) bool
+        Entries expanded on the fixed basis.
+    entries : dict or None
+        ``ii, nn`` (indices of the flagged entries), ``f_mode``, ``f_ref``,
+        ``tab`` (:func:`edge_basis_tables`) and ``missing`` (mode indices for
+        which no stopband edge was found, kept in the native basis); None when
+        nothing is flagged (``ii`` is empty when no flagged entry has an edge).
+    """
+    # The splitting also vanishes at the zone centre (k -> 0, low frequency),
+    # where T -> I and the two Bloch modes stay distinct (W finite): no
+    # stopband edge there, the native basis is exact.
+    zone_centre = np.abs(kappa) * n_cells / np.pi < 0.5
+    near = (split < e_edge) & ~zone_centre
+    if in_gap is not None:
+        near |= in_gap & ~zone_centre
+    near_injected = injected & near.any(axis=0)
+    flag = near & ~injected[None, :]
+    if not flag.any():
+        return near_injected, flag, None
+    twpa_ll = lossless_copy(device)
+    ii, nn = np.nonzero(flag)
+    f_mode = freqs_hz[ii, nn]
+    # Edge index: k d = m pi at the edge, m with the parity of the edge.
+    kd_pi = np.abs(kappa[ii, nn]) * n_cells / np.pi
+    m_edge = np.zeros(len(f_mode), dtype=np.int64)
+    f_ref = np.empty(len(f_mode))
+    found = np.ones(len(f_mode), dtype=bool)
+    cache: list[tuple[float, float, float, int]] = []  # (lo, hi, f_ref, parity)
+    for q, f in enumerate(f_mode):
+        hit = [c for c in cache if c[0] <= f <= c[1]]
+        if hit:
+            f_ref[q], parity = hit[0][2], hit[0][3]
+        else:
+            try:
+                f_ref[q], f_edge, parity = edge_reference_frequency(twpa_ll, f, e_edge)
+            except ValueError:
+                # No stopband edge around f (e.g. a closed gap): no
+                # exceptional point, the native basis is kept.
+                found[q] = False
+                continue
+            lo, hi = sorted((f_ref[q], 2 * f_edge - f_ref[q]))
+            cache.append((lo, hi, f_ref[q], parity))
+        odd = 0 if parity > 0 else 1
+        m_edge[q] = 2 * int(np.round((kd_pi[q] - odd) / 2)) + odd
+        if abs(kd_pi[q] - m_edge[q]) > 0.5:
+            log.warning(
+                "Edge basis: a mode at %.4f GHz has k d / pi = %.3f, far from its "
+                "edge index %d.",
+                f / 1e9,
+                kd_pi[q],
+                m_edge[q],
+            )
+    missing = np.unique(nn[~found])
+    if not found.all():
+        flag[ii[~found], nn[~found]] = False
+        ii, nn, f_mode = ii[found], nn[found], f_mode[found]
+        f_ref, m_edge = f_ref[found], m_edge[found]
+    tab = (
+        edge_basis_tables(device, twpa_ll, f_mode, f_ref, m_edge)
+        if found.any()
+        else None
+    )
+    entries = {
+        "ii": ii,
+        "nn": nn,
+        "f_mode": f_mode,
+        "f_ref": f_ref,
+        "tab": tab,
+        "missing": missing,
+    }
+    return near_injected, flag, entries
+
+
 def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
     """
     Prepare relation terms and coefficients for 3-wave and 4-wave mixing.
@@ -769,9 +935,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         """
         Per-mode stopband-edge weights of the guarded Bloch models.
 
-        Used by the no-reflections model and the segmented forward-backward
-        model; the uniform forward-backward model uses the fixed edge basis
-        instead (:meth:`_apply_edge_basis`). Works on tables of shape (n_freq, n_modes) or (n_freq, n_seg, n_modes).
+        Used by the no-reflections model; the forward-backward models use the
+        fixed edge basis instead (:meth:`_apply_edge_basis`,
+        :meth:`_apply_edge_basis_segmented`). Works on tables of shape (n_freq, n_modes) or (n_freq, n_seg, n_modes).
 
         * Edge guard (``solver_config.BLOCH_EDGE_GUARD``):
           weight from the Bloch splitting ``|sinh(gamma d)|``, which vanishes
@@ -954,18 +1120,117 @@ class TWPAnalysis(Analyzer, Frequencies):
             "gamma_exact": shaped["gamma_exact"],
         }
 
+    @staticmethod
+    def _log_edge_basis_skipped(labels, near_injected, entries, e_edge):
+        """Warnings of the edge basis: injected modes near an edge, edges not found."""
+        if near_injected.any():
+            log.warning(
+                "Edge basis: mode(s) %s with an input lie close to a stopband edge "
+                "and keep their native Bloch basis; their description there is "
+                "unreliable.",
+                [labels[j] for j in np.flatnonzero(near_injected)],
+            )
+        if entries is not None and len(entries["missing"]):
+            log.warning(
+                "Edge basis: no stopband edge found near mode(s) %s with "
+                "|sinh(gamma d)| < %g at some points; they keep their native "
+                "Bloch basis there.",
+                [labels[j] for j in entries["missing"]],
+                e_edge,
+            )
+
+    def _fb_stopbands(
+        self,
+        bloch: dict[str, Any],
+        cme_inputs: dict[str, Any],
+        gammas: np.ndarray,
+        injected: np.ndarray,
+        fb_config: FBSolverConfig,
+        segmented: bool,
+    ) -> dict[str, Any]:
+        """
+        Stopband treatment and harmonic limits of the Bloch forward-backward models.
+
+        ``fb_config.edge_threshold`` marks the modes close to an edge;
+        ``fb_config.simulate_stopband_modes`` either expands them, and every
+        mode inside a stopband, on the fixed edge basis (:meth:`_apply_edge_basis`,
+        :meth:`_apply_edge_basis_segmented`), or switches their processes off
+        with :func:`_stopband_guard_weights`. Modes with an input are never
+        changed. ``m_max='auto'`` gives per-mode harmonic limits
+        (:func:`_harmonic_limits`, window ``2 * edge_threshold``).
+
+        Returns a dict with the kernel ``gammas``, ``edge`` (edge-basis tables or
+        None), ``m_max`` (int or per-mode table) and the process weights ``pw3``,
+        ``pw4`` (None when every process has weight 1).
+        """
+        e = fb_config.edge_threshold
+        labels = cme_inputs["mode_labels"]
+        if segmented:
+            kd_pi = (
+                np.abs(np.transpose(gammas.imag, (0, 2, 1)))
+                * np.asarray(bloch["n_cells"])[None, :, None]
+                / np.pi
+            )
+        else:
+            kd_pi = np.abs(gammas.imag) * bloch["n_cells"] / np.pi
+        if fb_config.m_max == "auto":
+            m_max = _harmonic_limits(
+                bloch["split"],
+                bloch["W"],
+                kd_pi,
+                solver_config.BLOCH_M_MAX_AUTO_BASE,
+                2.0 * (e if e is not None else 0.10),
+            )
+            bloch["m_lim"] = m_max
+        else:
+            m_max = fb_config.m_max
+        out: dict[str, Any] = dict(
+            gammas=gammas, edge=None, m_max=m_max, pw3=None, pw4=None
+        )
+        if e is None:
+            return out
+        if fb_config.simulate_stopband_modes:
+            apply = (
+                self._apply_edge_basis_segmented
+                if segmented
+                else self._apply_edge_basis
+            )
+            edge = apply(bloch, cme_inputs, injected, e, True)
+            if edge is not None:
+                out["edge"] = edge
+                out["gammas"] = edge["gammas"]  # kernel and carrier: -1j kappa_e
+            return out
+        weights = _stopband_guard_weights(bloch["split"], bloch["W"], kd_pi, e)
+        lead = tuple(range(weights.ndim - 1))
+        near_inj = injected & (weights < 1.0).any(axis=lead)
+        if near_inj.any():
+            log.warning(
+                "Stopband guard: mode(s) %s with an input lie in a stopband or close "
+                "to its edge and are kept in the native Bloch basis; their "
+                "description there is unreliable.",
+                [labels[j] for j in np.flatnonzero(near_inj)],
+            )
+        weights[..., injected] = 1.0
+        bloch["edge_weights"] = weights
+        if np.all(weights == 1.0):
+            return out
+        out["pw3"] = _process_weights_nd(cme_inputs["relations_3wm"], weights)
+        out["pw4"] = _process_weights_nd(cme_inputs["relations_4wm"], weights)
+        return out
+
     def _apply_edge_basis(
         self,
         bloch: dict[str, Any],
         cme_inputs: dict[str, Any],
         injected: np.ndarray,
         threshold: Optional[float],
+        gap: bool = False,
     ) -> Optional[dict[str, Any]]:
         """
         Fixed ("edge") Bloch basis for modes close to a stopband edge.
 
         Uniform devices, forward-backward model. Every mode without input whose
-        splitting is below ``threshold`` (``FBSolverConfig.edge_basis_threshold``)
+        splitting is below ``threshold`` (``FBSolverConfig.edge_threshold``)
         is expanded on the lossless Bloch pair at the reference frequency of
         the nearest edge, where the splitting equals the same value (passband
         side): the basis is anchored at the switch-over point. Modes with an
@@ -975,59 +1240,37 @@ class TWPAnalysis(Analyzer, Frequencies):
         kernel gammas (``-1j * kappa_e`` for flagged modes), the per-unit-cell
         generator ``K`` (``edge_K``), the mask (``edge_flag``) and diagnostics
         (also stored in ``bloch``). ``coeffs_3wm``/``coeffs_4wm`` are rebuilt
-        from the new tables. Returns None when nothing is flagged.
+        from the new tables. Returns None when nothing is flagged. With
+        ``gap`` (``FBSolverConfig.simulate_stopband_modes``) every mode without input
+        inside a stopband (reactive Bloch normalisation, ``|arg W| > 45 deg``)
+        is flagged as well.
         """
         if threshold is None:
             return None
-        e_edge = float(threshold)
-        near = bloch["split"] < e_edge
-        near_inj = injected & near.any(axis=0)
-        if near_inj.any():
-            labels = cme_inputs["mode_labels"]
-            cols = np.flatnonzero(near_inj)
-            log.warning(
-                "Edge basis: mode(s) %s with an input lie close to a stopband edge "
-                "(min |sinh(gamma d)| = %s) and keep their native Bloch basis; "
-                "their description there is unreliable.",
-                [labels[j] for j in cols],
-                [float(f"{bloch['split'][:, j].min():.3g}") for j in cols],
-            )
-        flag = near & ~injected[None, :]
-        if not flag.any():
-            return None
         gammas = cme_inputs["gammas"]
-        n_freq, n_modes = flag.shape
         n_cells = bloch["n_cells"]
-        twpa_ll = lossless_copy(self.twpa)
-        ii, nn = np.nonzero(flag)
-        f_mode = bloch["freqs_hz"][ii, nn]
-        # Edge index: k d = m pi at the edge, m with the parity of the edge.
-        kd_pi = -gammas.imag[ii, nn] * n_cells / np.pi
-        m_edge = np.empty(len(f_mode), dtype=np.int64)
-
-        f_ref = np.empty(len(f_mode))
-        cache: list[tuple[float, float, float, int]] = []  # (lo, hi, f_ref, parity)
-        for q, f in enumerate(f_mode):
-            hit = [c for c in cache if c[0] <= f <= c[1]]
-            if hit:
-                f_ref[q], parity = hit[0][2], hit[0][3]
-            else:
-                f_ref[q], f_edge, parity = edge_reference_frequency(twpa_ll, f, e_edge)
-                lo, hi = sorted((f_ref[q], 2 * f_edge - f_ref[q]))
-                cache.append((lo, hi, f_ref[q], parity))
-            odd = 0 if parity > 0 else 1
-            m_edge[q] = 2 * int(np.round((kd_pi[q] - odd) / 2)) + odd
-            if abs(kd_pi[q] - m_edge[q]) > 0.5:
-                log.warning(
-                    "Edge basis: mode %s at %.4f GHz has k d / pi = %.3f, far "
-                    "from its edge index %d.",
-                    cme_inputs["mode_labels"][nn[q]],
-                    f / 1e9,
-                    kd_pi[q],
-                    m_edge[q],
-                )
-        tab = edge_basis_tables(self.twpa, twpa_ll, f_mode, f_ref, m_edge)
-
+        labels = cme_inputs["mode_labels"]
+        near_inj, flag, ent = _edge_basis_entries(
+            self.twpa,
+            bloch["split"],
+            gammas.imag,
+            bloch["freqs_hz"],
+            n_cells,
+            injected,
+            float(threshold),
+            in_gap=(reactive_angle_deg(bloch["W"]) > 45.0) if gap else None,
+        )
+        self._log_edge_basis_skipped(labels, near_inj, ent, float(threshold))
+        if ent is None or len(ent["ii"]) == 0:
+            return None
+        n_freq, n_modes = flag.shape
+        ii, nn, f_mode, f_ref, tab = (
+            ent["ii"],
+            ent["nn"],
+            ent["f_mode"],
+            ent["f_ref"],
+            ent["tab"],
+        )
         for key in ("Zb_plus", "Zb_minus", "phi_plus", "phi_minus"):
             bloch[key][ii, nn] = tab[key]
         bloch["W"][ii, nn] = tab["W"]
@@ -1064,7 +1307,6 @@ class TWPAnalysis(Analyzer, Frequencies):
                 cme_inputs[rel], bloch[f"base_{key}"], 1.0, *coeff_args
             )
 
-        labels = cme_inputs["mode_labels"]
         for n in np.unique(nn):
             sel = nn == n
             log.info(
@@ -1078,6 +1320,127 @@ class TWPAnalysis(Analyzer, Frequencies):
                 float(bragg[ii[sel], n].max()),
             )
         return {"gammas": gammas_k, "edge_K": edge_K, "edge_flag": flag}
+
+    def _apply_edge_basis_segmented(
+        self,
+        bloch: dict[str, Any],
+        cme_inputs: dict[str, Any],
+        injected: np.ndarray,
+        threshold: Optional[float],
+        gap: bool = False,
+    ) -> Optional[dict[str, Any]]:
+        """
+        Fixed ("edge") Bloch basis in a segmented device.
+
+        Every segment is treated as in :meth:`_apply_edge_basis`, with its own
+        supercell: a mode without input whose splitting in segment ``s`` is
+        below ``threshold`` is expanded there on the lossless Bloch pair of that
+        segment's supercell, anchored on the passband side of the nearest edge.
+        The junction coefficients follow from the overwritten ``Zb_plus`` and
+        ``Zb_minus`` and stay exact. A mode flagged in at least one segment
+        (``edge_mode``) is solved exactly along the whole line; in its native
+        segments the generator is ``diag(-alpha, alpha)``.
+
+        Returns None when nothing is flagged, otherwise the kernel gammas
+        (``(n_freq, n_modes, n_seg)``), ``edge_K`` (``(n_freq, n_seg, n_modes,
+        2, 2)``, per unit cell), ``edge_flag`` (``(n_freq, n_seg, n_modes)``) and
+        ``edge_mode`` (``(n_freq, n_modes)``); diagnostics are stored in
+        ``bloch``.
+        """
+        if threshold is None:
+            return None
+        e_edge = float(threshold)
+        gammas = cme_inputs["gammas"]  # (n_freq, n_modes, n_seg)
+        labels = cme_inputs["mode_labels"]
+        segments = [c for c in self.twpa.cells if isinstance(c, TWPA)]
+        n_freq, n_seg, n_modes = bloch["split"].shape
+        freqs_hz = bloch["freqs_hz"]
+        flag = np.zeros((n_freq, n_seg, n_modes), dtype=bool)
+        near_inj = np.zeros(n_modes, dtype=bool)
+        missing: set[int] = set()
+        gammas_k = gammas.copy()
+        edge_K = np.zeros((n_freq, n_seg, n_modes, 2, 2), dtype=np.complex128)
+        f_ref_tab = np.full((n_freq, n_seg, n_modes), np.nan)
+        ham = np.zeros((n_freq, n_seg, n_modes))
+        cache: dict[Any, Any] = {}
+        for s, seg in enumerate(segments):
+            split_s = bloch["split"][:, s]
+            kappa_s = gammas[:, :, s].imag
+            in_gap = (reactive_angle_deg(bloch["W"][:, s]) > 45.0) if gap else None
+            key = (
+                repr([c.model_dump() for c in seg.cells]),
+                np.ascontiguousarray(kappa_s).tobytes(),
+                np.ascontiguousarray(split_s).tobytes(),
+            )
+            if key not in cache:
+                cache[key] = _edge_basis_entries(
+                    seg,
+                    split_s,
+                    kappa_s,
+                    freqs_hz,
+                    int(bloch["n_cells"][s]),
+                    injected,
+                    e_edge,
+                    in_gap=in_gap,
+                )
+            ni, fl, ent = cache[key]
+            near_inj |= ni
+            flag[:, s] = fl
+            if ent is None:
+                continue
+            missing.update(int(j) for j in ent["missing"])
+            if len(ent["ii"]) == 0:
+                continue
+            ii, nn, tab = ent["ii"], ent["nn"], ent["tab"]
+            n_nl = tab["phi_plus"].shape[-1]
+            bloch["Zb_plus"][ii, s, nn] = tab["Zb_plus"]
+            bloch["Zb_minus"][ii, s, nn] = tab["Zb_minus"]
+            bloch["W"][ii, s, nn] = tab["W"]
+            bloch["phi_plus"][ii, s, nn, :n_nl] = tab["phi_plus"]
+            bloch["phi_minus"][ii, s, nn, :n_nl] = tab["phi_minus"]
+            gammas_k[ii, nn, s] = -1j * tab["kappa_e"]
+            edge_K[ii, s, nn] = tab["K"]
+            f_ref_tab[ii, s, nn] = ent["f_ref"]
+            ham[ii, s, nn] = tab["ham_defect"]
+        self._log_edge_basis_skipped(
+            labels, near_inj, {"missing": np.array(sorted(missing), int)}, e_edge
+        )
+        if not flag.any():
+            return None
+        edge_mode = flag.any(axis=1)
+        # Native segments of a mode solved exactly: decoupled directions with
+        # the kernel attenuation (forward decays along +x, backward along -x).
+        for i, n in zip(*np.nonzero(edge_mode)):
+            for s in np.flatnonzero(~flag[i, :, n]):
+                a = gammas_k[i, n, s].real
+                edge_K[i, s, n] = np.array([[a, 0.0], [0.0, -a]], dtype=np.complex128)
+        omegas = 2 * np.pi * freqs_hz
+        bloch["prefac"] = -2j * omegas[:, None, :] / bloch["W"]
+        seg_len = np.diff(bloch["seg_bounds"])
+        bragg = np.abs(edge_K[..., 0, 1]) * seg_len[None, :, None]
+        bloch.update(
+            edge_flag=flag,
+            edge_mode=edge_mode,
+            edge_f_ref=f_ref_tab,
+            edge_bragg_strength=bragg,
+            edge_ham_defect=ham,
+        )
+        for n in np.flatnonzero(edge_mode.any(axis=0)):
+            log.info(
+                "Edge basis: mode %s at %d points, flagged in %d of %d segments, "
+                "max Bragg strength |K01| L_seg = %.1f.",
+                labels[n],
+                int(edge_mode[:, n].sum()),
+                int(flag[:, :, n].any(axis=0).sum()),
+                n_seg,
+                float(bragg[:, :, n].max()),
+            )
+        return {
+            "gammas": gammas_k,
+            "edge_K": edge_K,
+            "edge_flag": flag,
+            "edge_mode": edge_mode,
+        }
 
     def _prepare_bloch_segmented(
         self,
@@ -1189,31 +1552,8 @@ class TWPAnalysis(Analyzer, Frequencies):
             "base_3wm": np.stack([unit_3wm * seg.epsilon for seg in segments]),
             "base_4wm": np.stack([unit_4wm * seg.xi for seg in segments]),
             "prefac": -2j * omegas[:, None, :] / W,
+            "freqs_hz": freqs_hz,
         }
-
-    def _bloch_edge_guard_segmented(
-        self,
-        bloch: dict[str, Any],
-        cme_inputs: dict[str, Any],
-        signal_freqs: FloatArray,
-        injected: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Stopband-edge guard of the segmented Bloch model.
-
-        Same rule as :meth:`_bloch_edge_guard`, applied in every segment with
-        that segment's Bloch modes: inside a segment, each process is scaled by
-        the product of the weights of its modes there. Returns per-process
-        weights of shape (n_freq, n_seg, n_rel).
-        """
-        weights = self._bloch_mode_weights(
-            bloch, cme_inputs["mode_labels"], signal_freqs, injected, False
-        )
-        n_freq, n_seg, n_modes = weights.shape
-        flat = weights.reshape(n_freq * n_seg, n_modes)
-        pw3 = process_weights(cme_inputs["relations_3wm"], flat)
-        pw4 = process_weights(cme_inputs["relations_4wm"], flat)
-        return pw3.reshape(n_freq, n_seg, -1), pw4.reshape(n_freq, n_seg, -1)
 
     # Public analysis methods
 
@@ -1930,10 +2270,12 @@ class TWPAnalysis(Analyzer, Frequencies):
         injected = np.any(np.abs(y0_fwd_broadcast) > 0, axis=0) | np.any(
             np.abs(y0_bwd_broadcast) > 0, axis=0
         )
+        sb = self._fb_stopbands(
+            bloch, cme_inputs, gammas, injected, fb_config, segmented
+        )
+        gammas, edge = sb["gammas"], sb["edge"]
         if segmented:
-            pw3, pw4 = self._bloch_edge_guard_segmented(
-                bloch, cme_inputs, signal_freqs, injected
-            )
+            diag_seg: dict[str, Any] = {}
             I_tuples_raw = bloch_fb_segmented_cmes_solve(
                 x,
                 bloch["seg_bounds"],
@@ -1954,18 +2296,22 @@ class TWPAnalysis(Analyzer, Frequencies):
                 bloch["Zb_minus"],
                 passes=fb_config.passes,
                 kappa_cutoff=fb_config.kappa_cutoff,
-                m_max=fb_config.m_max,
+                m_max=sb["m_max"],
+                process_weights_3wm=sb["pw3"],
+                process_weights_4wm=sb["pw4"],
                 convergence_threshold=fb_config.convergence_threshold,
                 save_all_passes=fb_config.save_all_passes,
                 anderson_depth=fb_config.anderson_depth,
-                process_weights_3wm=pw3,
-                process_weights_4wm=pw4,
                 Ze=self.port_Z_ext,
                 Zout_in=Zout_in,
                 Zout_out=Zout_out,
                 abcd_in=abcd_in,
                 abcd_out=abcd_out,
+                edge_K=None if edge is None else edge["edge_K"],
+                edge_mode=None if edge is None else edge["edge_mode"],
+                diagnostics=diag_seg,
             )
+            bloch.update(diag_seg)
             # Exact phase of the piecewise-constant wavenumber.
             Phi_f, Phi_b = segmented_phase(gammas.imag, bloch["seg_bounds"], x)
             carrier_fwd = np.exp(1j * Phi_f)
@@ -1975,12 +2321,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             Zp_launch = bloch["Zb_plus"][:, 0]
             Zm_launch = bloch["Zb_minus"][:, -1]
         else:
-            edge = self._apply_edge_basis(
-                bloch, cme_inputs, injected, fb_config.edge_basis_threshold
-            )
             diag: dict[str, Any] = {}
-            if edge is not None:
-                gammas = edge["gammas"]  # kernel and carrier: -1j kappa_e
             I_tuples_raw = bloch_fb_cmes_solve(
                 x,
                 y0_fwd_broadcast,
@@ -2000,7 +2341,9 @@ class TWPAnalysis(Analyzer, Frequencies):
                 bloch["Zb_minus"],
                 passes=fb_config.passes,
                 kappa_cutoff=fb_config.kappa_cutoff,
-                m_max=fb_config.m_max,
+                m_max=sb["m_max"],
+                process_weights_3wm=sb["pw3"],
+                process_weights_4wm=sb["pw4"],
                 convergence_threshold=fb_config.convergence_threshold,
                 save_all_passes=fb_config.save_all_passes,
                 anderson_depth=fb_config.anderson_depth,

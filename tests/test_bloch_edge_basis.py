@@ -135,3 +135,408 @@ def test_edge_basis_seamless_at_passband_switch():
     assert fixed["bloch"]["edge_flag"][0, p2s]
     native = _gain(analysis, sig, None)
     assert np.allclose(fixed["gain_db"], native["gain_db"], atol=0.01)
+
+
+@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
+def test_zone_centre_is_not_an_edge():
+    """A low-frequency idler has a small splitting (k -> 0) but no stopband edge."""
+    analysis = _holotype_analysis()
+    res = analysis.gain(
+        signal_freqs=np.array([15.65]),  # idler at 0.35 GHz, splitting ~0.08
+        Is0=1e-9,
+        pump=16.0,
+        model="bloch",
+        mode_array_config="ext2",
+    )
+    i = res["mode_info"]["mode_map"]["i"]
+    assert res["bloch"]["split"][0, i] < 0.10
+    assert not res["bloch"].get("edge_flag", np.zeros((1, i + 1), bool))[0, i]
+    assert np.all(np.isfinite(res["gain_db"]))
+
+
+# --------------------------------------------------------------------------- #
+# Segmented devices
+# --------------------------------------------------------------------------- #
+
+
+def _random_segmented_problem(seed=3):
+    rng = np.random.default_rng(seed)
+    lens = np.array([200.0, 150.0, 300.0, 120.0, 230.0])
+    bounds = np.r_[0, np.cumsum(lens)]
+    sub = [41, 31, 61, 25, 47]
+    sub_off = np.r_[0, np.cumsum(sub)].astype(np.int64)
+    xs = np.concatenate(
+        [np.linspace(bounds[s], bounds[s + 1], sub[s]) for s in range(len(lens))]
+    )
+
+    def rand_K(gap):
+        d = rng.uniform(0.005, 0.02)
+        k = rng.uniform(0.01, 0.03) if gap else rng.uniform(0.001, 0.004)
+        a = rng.uniform(0, 1e-3)
+        return np.array(
+            [
+                [-a - 1j * d, k * np.exp(1j * rng.uniform(0, 6))],
+                [k * np.exp(-1j * rng.uniform(0, 6)), a + 1j * d],
+            ]
+        )
+
+    n_seg = len(lens)
+    K = np.array([rand_K(s % 2 == 0) for s in range(n_seg)])
+    cplx = lambda scale: scale * (rng.normal(size=n_seg) + 1j * rng.normal(size=n_seg))
+    t, tp = 1 + cplx(0.2), 1 + cplx(0.2)
+    rL, rR = cplx(0.3), cplx(0.3)
+    t[0] = tp[0] = 1
+    rL[0] = rR[0] = 0
+    Phi = rng.uniform(0, 6, n_seg + 1)
+    return lens, bounds, sub_off, xs, K, t, tp, rL, rR, Phi
+
+
+def test_segmented_bvp_matches_transfer_matrix():
+    """Riccati sweep across junctions: exact against the transfer matrix, junctions exact."""
+    from twpasolver.cmes.bloch_fb_segmented import _edge_bvp_solve_segmented
+
+    lens, bounds, sub_off, xs, K, t, tp, rL, rR, Phi = _random_segmented_problem()
+    n_seg = len(lens)
+    bc = (1.0 + 0j, 0.2 - 0.1j, 0.05j, -0.3 + 0.1j)  # cp_in, rho_in, cm_out, rho_out
+    z = np.zeros(len(xs), complex)
+    cp, cm = _edge_bvp_solve_segmented(K, xs, sub_off, z, z, *bc, t, tp, rL, rR, Phi)
+
+    def junction_T(s):  # (c+_L, c-_L) -> (c+_R, c-_R)
+        e2 = np.exp(2j * Phi[s])
+        cm_row = np.array([-rL[s] * e2 / tp[s], 1 / tp[s]])
+        cp_row = np.array([t[s], 0]) + rR[s] / e2 * cm_row
+        return np.vstack([cp_row, cm_row])
+
+    M = np.eye(2, dtype=complex)
+    starts = []
+    for s in range(n_seg):
+        if s > 0:
+            M = junction_T(s) @ M
+        starts.append(M.copy())
+        M = expm(K[s] * lens[s]) @ M
+    A = np.array([[1, -bc[1]], [M[1, 0] - bc[3] * M[0, 0], M[1, 1] - bc[3] * M[0, 1]]])
+    c0 = np.linalg.solve(A, [bc[0], bc[2]])
+    for s in range(n_seg):
+        for j in range(sub_off[s], sub_off[s + 1]):
+            ref = expm(K[s] * (xs[j] - bounds[s])) @ (starts[s] @ c0)
+            assert abs(cp[j] - ref[0]) + abs(cm[j] - ref[1]) < 1e-11
+
+    # with sources: junction relations and end conditions hold exactly
+    Sp, Sm = 1e-3 * np.exp(0.01j * xs), 2e-3 * np.exp(-0.02j * xs)
+    cp, cm = _edge_bvp_solve_segmented(K, xs, sub_off, Sp, Sm, *bc, t, tp, rL, rR, Phi)
+    for s in range(1, n_seg):
+        left, right = sub_off[s] - 1, sub_off[s]
+        e2 = np.exp(2j * Phi[s])
+        assert abs(cp[right] - (t[s] * cp[left] + rR[s] / e2 * cm[right])) < 1e-14
+        assert abs(cm[left] - (tp[s] * cm[right] + rL[s] * e2 * cp[left])) < 1e-14
+    assert abs(cp[0] - (bc[0] + bc[1] * cm[0])) < 1e-14
+    assert abs(cm[-1] - (bc[2] + bc[3] * cp[-1])) < 1e-14
+
+
+def test_segmented_bvp_trivial_junctions_equal_uniform():
+    """Identical segments with transparent junctions reproduce the uniform solve."""
+    from twpasolver.cmes.bloch_fb_segmented import _edge_bvp_solve_segmented
+
+    _, _, _, _, K, *_ = _random_segmented_problem()
+    n_seg, h, n_pts = 5, 5.0, 41
+    L = h * (n_pts - 1) * n_seg
+    bounds = np.linspace(0, L, n_seg + 1)
+    sub_off = (np.arange(n_seg + 1) * n_pts).astype(np.int64)
+    xs = np.concatenate(
+        [np.linspace(bounds[s], bounds[s + 1], n_pts) for s in range(n_seg)]
+    )
+    src = lambda x: (1e-3 * np.exp(0.01j * x), 2e-3 * np.exp(-0.02j * x))
+    bc = (1.0 + 0j, 0.2 - 0.1j, 0.05j, -0.3 + 0.1j)
+    ones, zeros = np.ones(n_seg, complex), np.zeros(n_seg, complex)
+    cps, _ = _edge_bvp_solve_segmented(
+        np.array([K[0]] * n_seg),
+        xs,
+        sub_off,
+        *src(xs),
+        *bc,
+        ones,
+        ones,
+        zeros,
+        zeros,
+        np.zeros(n_seg + 1),
+    )
+    xu = np.linspace(0, L, (n_pts - 1) * n_seg + 1)
+    cpu, _ = _edge_bvp_solve(K[0], h, *src(xu), *bc)
+    ref = np.interp(xs, xu, cpu.real) + 1j * np.interp(xs, xu, cpu.imag)
+    assert np.allclose(cps, ref, atol=1e-14)
+
+
+def test_relative_residual_is_infinite_for_nonfinite_iterates():
+    """A blown-up iterate never passes for converged."""
+    from twpasolver.cmes.bloch_fb import _relative_residual
+
+    f = np.zeros((2, 5), dtype=complex)
+    assert _relative_residual(f, np.ones(2)) == 0.0
+    f[1, 3] = np.nan
+    assert _relative_residual(f, np.ones(2)) == np.inf
+    f[1, 3] = 0.0
+    assert _relative_residual(f, np.array([1.0, np.inf])) == np.inf
+
+
+def _segmented_holotype(scale=(1.0, 1.0, 1.0, 1.0)):
+    """The holotype cut into equal segments; ``scale`` multiplies L and Lf per segment."""
+    from twpasolver import TWPAnalysis
+    from twpasolver.models import TWPA
+    from twpasolver.modes_rwa import ModeArrayFactory
+
+    base = TWPA.from_file(str(HOLOTYPE))
+    for cell in base.cells:
+        cell.delta = 2e-4
+    segs = []
+    for g in scale:
+        seg = base.model_copy(deep=True, update={"N": base.N // len(scale)})
+        for cell in seg.cells:
+            cell.L, cell.Lf = cell.L * g, cell.Lf * g
+        segs.append(seg)
+    dev = TWPA(cells=segs, Z0_ref=base.Z0_ref, Ip0=base.Ip0)
+    analysis = TWPAnalysis(twpa=dev, f_arange=(0.2, 80, 2e-3))
+    analysis.update_base_data()
+    analysis.add_mode_array(
+        "ext2",
+        ModeArrayFactory.create_extended_3wm(
+            analysis.data,
+            n_pump_harmonics=3,
+            n_frequency_conversion=2,
+            n_signal_harmonics=0,
+        ),
+    )
+    return analysis
+
+
+@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
+def test_segmented_copy_matches_uniform():
+    """Four identical segments reproduce the uniform edge-basis gain at the p2s edge."""
+    sig = [9.204, 9.212, 9.25]
+    uniform = _gain(_holotype_analysis(), sig, 0.10)
+    seg = _gain(_segmented_holotype(), sig, 0.10)
+    p2s = seg["mode_info"]["mode_map"]["p2s"]
+    assert seg["bloch"]["edge_flag"][:, :, p2s].all()
+    assert seg["bloch"]["converged"].all()
+    assert np.allclose(seg["gain_db"], uniform["gain_db"], atol=2e-3)
+
+
+@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
+def test_segmented_mixed_flags():
+    """p2s at its edge in some segments only: converges, weak threshold dependence."""
+    analysis = _segmented_holotype(scale=(1.0, 1.002, 1.004, 1.006))
+    sig = [9.168, 9.208]  # p2s flagged in segments 0-2 / 0-1
+    g10 = _gain(analysis, sig, 0.10)
+    g12 = _gain(analysis, sig, 0.12)
+    native = _gain(analysis, sig, None)
+    p2s = g10["mode_info"]["mode_map"]["p2s"]
+    flags = g10["bloch"]["edge_flag"][:, :, p2s]
+    assert flags.any(axis=1).all() and not flags.all(axis=1).any()
+    assert g10["bloch"]["converged"].all() and g12["bloch"]["converged"].all()
+    assert not native["bloch"]["converged"].all()
+    assert np.allclose(g10["gain_db"], g12["gain_db"], atol=0.03)
+
+
+def test_per_mode_harmonic_limits_in_filter():
+    """Row limit = largest limit among its modes; uniform limits = scalar m_max."""
+    from test_bloch import CELL_L, CELL_U
+
+    from twpasolver import TWPAnalysis
+    from twpasolver.analysis import prepare_relations_coefficients
+    from twpasolver.cmes.bloch_fb import _filter_wm_terms_bloch
+    from twpasolver.models import TWPA
+    from twpasolver.modes_rwa import ModeArrayFactory
+
+    analysis = TWPAnalysis(
+        twpa=TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10), f_arange=(0.05, 20, 1e-2)
+    )
+    analysis.update_base_data()
+    ma = ModeArrayFactory.create_extended_3wm(
+        analysis.data, n_pump_harmonics=1, n_frequency_conversion=1
+    )
+    rel3, rel4, _, _ = prepare_relations_coefficients(
+        ma.get_rwa_terms(2), ma.get_rwa_terms(3), 1.0, 1.0
+    )
+    n_modes = len(ma.modes)
+    rng = np.random.default_rng(5)
+    for _ in range(10):
+        kappas = -rng.uniform(0.01, 0.3, n_modes)
+        lim = rng.integers(0, 4, n_modes)
+        full = _filter_wm_terms_bloch(
+            kappas, rel3, rel4, 0.5, 66, np.full(n_modes, lim.max())
+        )
+        auto = _filter_wm_terms_bloch(kappas, rel3, rel4, 0.5, 66, lim)
+        for rows_full, rows_auto, rels in zip(full, auto, (rel3, rel4)):
+
+            def row_lim(row):
+                modes = [m % n_modes for m in rels[row[-2]]]
+                return lim[modes].max()
+
+            expected = [tuple(r) for r in rows_full if abs(r[-1]) <= row_lim(r)]
+            assert [tuple(r) for r in rows_auto] == expected
+
+
+def test_auto_m_max_config():
+    from twpasolver.cmes.solver_config import FBSolverConfig
+
+    assert FBSolverConfig(m_max="auto").m_max_fixed == 1
+    assert FBSolverConfig(m_max=3).m_max_fixed == 3
+    assert FBSolverConfig(edge_basis_threshold=0.12).edge_threshold == 0.12
+    with pytest.raises(ValueError):
+        FBSolverConfig(m_max=-1)
+    with pytest.raises(ValueError):
+        FBSolverConfig(m_max="automatic")
+
+
+def _gain_m(analysis, sig, m_max):
+    from twpasolver.cmes.solver_config import FBSolverConfig
+
+    return analysis.gain(
+        signal_freqs=np.asarray(sig),
+        Is0=1e-9,
+        pump=16.0,
+        model="bloch",
+        mode_array_config="ext2",
+        fb_config=FBSolverConfig(
+            passes=80,
+            anderson_depth=15,
+            edge_threshold=0.10,
+            m_max=m_max,
+        ),
+    )
+
+
+@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
+@pytest.mark.parametrize("segmented", [False, True])
+def test_auto_m_max_raises_edge_modes_only(segmented):
+    """At the p2s edge only p2s gets its Bragg order; elsewhere auto = 1."""
+    analysis = _segmented_holotype() if segmented else _holotype_analysis()
+    sig = [6.0, 9.204]
+    auto = _gain_m(analysis, sig, "auto")
+    lim = auto["bloch"]["m_lim"]
+    p2s = auto["mode_info"]["mode_map"]["p2s"]
+    s = auto["mode_info"]["mode_map"]["s"]
+    lim_p2s = lim[1, ..., p2s]
+    assert np.all(lim_p2s >= 2)
+    assert np.all(lim[..., s] == 1)
+    # where no mode is raised, auto is the fixed run with m_max = 1
+    plain = np.all(lim[0] == 1)
+    fixed1 = _gain_m(analysis, sig, 1)
+    if plain:
+        assert np.isclose(auto["gain_db"][0], fixed1["gain_db"][0], atol=1e-9)
+    # at the edge, auto agrees with the fixed run at the raised order
+    fixed = _gain_m(analysis, sig, int(lim_p2s.max()))
+    assert abs(auto["gain_db"][1] - fixed["gain_db"][1]) < 0.05
+
+
+def test_mismatch_cutoff_capped_at_zone_edge():
+    """Kept rows: |dk + G_m| < cutoff * min(k_proc, pi/d), never beyond pi/d; complete."""
+    from test_bloch import CELL_L, CELL_U
+
+    from twpasolver import TWPAnalysis
+    from twpasolver.analysis import prepare_relations_coefficients
+    from twpasolver.cmes.bloch_fb import _filter_wm_terms_bloch
+    from twpasolver.models import TWPA
+    from twpasolver.modes_rwa import ModeArrayFactory
+
+    analysis = TWPAnalysis(
+        twpa=TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10), f_arange=(0.05, 20, 1e-2)
+    )
+    analysis.update_base_data()
+    ma = ModeArrayFactory.create_extended_3wm(
+        analysis.data, n_pump_harmonics=1, n_frequency_conversion=1
+    )
+    rels = prepare_relations_coefficients(
+        ma.get_rwa_terms(2), ma.get_rwa_terms(3), 1.0, 1.0
+    )[:2]
+    nm, d = len(ma.modes), 20
+    g, k_edge = 2 * np.pi / d, np.pi / d
+    rng = np.random.default_rng(2)
+
+    def residuals(kappas, rel_tab, m_lim, cutoff):
+        """All (row, variant, m) with their residual, by brute force."""
+        out = []
+        for r, rel in enumerate(rel_tab):
+            modes = [rel[0]] + [m % nm for m in rel[1:]]
+            k_proc = np.abs(kappas[modes]).max()
+            thr = min(cutoff * min(k_proc, k_edge), k_edge)
+            m_row = m_lim[modes].max()
+            for v in range(2 ** (len(rel) - 1)):
+                dk = -kappas[rel[0]]
+                for q, m in enumerate(rel[1:]):
+                    sign = -1.0 if m >= nm else 1.0
+                    if (v >> q) & 1:
+                        sign = -sign
+                    dk += sign * kappas[m % nm]
+                for mg in range(-m_row, m_row + 1):
+                    out.append((abs(dk + mg * g), thr))
+        return out
+
+    for cutoff in (0.2, 0.6, 2.0):
+        for _ in range(5):
+            kappas = -rng.uniform(0.01, 0.6, nm)  # up to k d / pi ~ 4
+            m_lim = rng.integers(0, 4, nm)
+            kept = _filter_wm_terms_bloch(kappas, *rels, cutoff, d, m_lim)
+            for rows, rel_tab in zip(kept, rels):
+                expected = sum(
+                    res < thr for res, thr in residuals(kappas, rel_tab, m_lim, cutoff)
+                )
+                assert len(rows) == expected
+                assert np.all(np.abs(rows[:, -1]) <= m_lim.max())
+
+
+def test_cubic_table_interpolation():
+    """4-point stencil: exact for cubics, clamped like np.interp, linear on short grids."""
+    from twpasolver.cmes.bloch_fb import _interp_rows
+
+    rng = np.random.default_rng(4)
+    xp = np.sort(rng.uniform(0, 10, 12))
+    xp[0], xp[-1] = 0.0, 10.0
+    c = rng.normal(size=4) + 1j * rng.normal(size=4)
+    poly = lambda x: c[0] + c[1] * x + c[2] * x**2 + c[3] * x**3  # noqa: E731
+    arr = np.vstack([poly(xp), 2 * poly(xp)])
+    for x in np.linspace(0, 10, 57):
+        assert np.allclose(_interp_rows(arr, xp, x), [poly(x), 2 * poly(x)], atol=1e-9)
+    assert np.allclose(_interp_rows(arr, xp, -1.0), arr[:, 0])
+    assert np.allclose(_interp_rows(arr, xp, 11.0), arr[:, -1])
+    short = np.array([0.0, 1.0, 3.0])
+    vals = np.array([[1.0 + 0j, 3.0, 4.0]])
+    assert np.allclose(
+        _interp_rows(vals, short, 2.0), np.interp(2.0, short, vals[0].real)
+    )
+
+
+def test_stopband_guard_weights():
+    """1 away from edges, smoothstep to 0 at the edge, 0 in the gap, 1 at the zone centre."""
+    from twpasolver.analysis import _stopband_guard_weights
+
+    split = np.array([[0.5, 0.1, 0.05, 0.0, 0.3, 0.02]])
+    W = np.array([[50.0, 50.0, 50.0, 50.0, 40j, 50.0]])
+    kd = np.array([[0.7, 1.0, 1.0, 1.0, 2.0, 0.1]])
+    w = _stopband_guard_weights(split, W, kd, 0.1)
+    assert np.allclose(w, [[1.0, 1.0, 0.5, 0.0, 0.0, 1.0]])
+
+
+@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
+@pytest.mark.parametrize("segmented", [False, True])
+def test_stopband_modes_switched_off(segmented):
+    """simulate_stopband_modes=False: no edge basis, p2s processes off at its edge."""
+    from twpasolver.cmes.solver_config import FBSolverConfig
+
+    analysis = _segmented_holotype() if segmented else _holotype_analysis()
+    res = analysis.gain(
+        signal_freqs=np.array([9.204, 9.25]),
+        Is0=1e-9,
+        pump=16.0,
+        model="bloch",
+        mode_array_config="ext2",
+        fb_config=FBSolverConfig(
+            passes=80, anderson_depth=15, simulate_stopband_modes=False
+        ),
+    )
+    p2s = res["mode_info"]["mode_map"]["p2s"]
+    s = res["mode_info"]["mode_map"]["s"]
+    w = res["bloch"]["edge_weights"]
+    assert "edge_flag" not in res["bloch"]
+    assert np.all(w[0, ..., p2s] < 1.0) and np.all(w[..., s] == 1.0)
+    assert res["bloch"]["converged"].all()
+    assert np.all(np.isfinite(res["gain_db"]))

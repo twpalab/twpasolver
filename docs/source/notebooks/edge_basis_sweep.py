@@ -32,14 +32,13 @@ CACHE = HERE / "edge_basis_data" / "full_band.npz"
 
 PORT_Z = 40
 FP = 15.8  # pump (GHz)
-IS0 = 1e-9  # signal amplitude (A): small-signal gain
+IS0 = 1e-8  # signal amplitude (A): small-signal gain
+IP0 = 1.0e-4
 LOSS_TANGENT = 2e-4
 FS_RANGE = (1.0, 14.8)  # signal band (GHz)
 COARSE_STEP = 0.05
 FINE_STEP = 0.004
-E_WINDOW = (
-    FBSolverConfig().edge_basis_threshold
-)  # splitting below which a mode is flagged
+E_WINDOW = FBSolverConfig().edge_threshold  # splitting below which a mode is flagged
 MARGIN = 0.02  # GHz added on both sides of every window
 FB = dict(passes=60, anderson_depth=30)
 
@@ -75,6 +74,7 @@ RUNS = {"none": None, "edge": E_WINDOW}  # edge_basis_threshold of each run
 def make_analysis() -> TWPAnalysis:
     """Holotype with loss and the 9-mode array of the thesis (``ext2``)."""
     an = TWPAnalysis(twpa=str(MODEL), f_arange=(0.2, 60, 2e-3), port_Z_ext=PORT_Z)
+    an.twpa.Ip0 = IP0
     for cell in an.twpa.cells:
         cell.delta = LOSS_TANGENT
     an.update_base_data()

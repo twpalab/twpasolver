@@ -248,7 +248,9 @@ def test_mismatch_filter_keeps_partner_terms_together(which):
     def run(kappas, cutoff):
         if which == "general":
             return _filter_wm_terms(kappas, rel3, rel4, cutoff)
-        return _filter_wm_terms_bloch(kappas, rel3, rel4, cutoff, 66, np.pi, 5)
+        return _filter_wm_terms_bloch(
+            kappas, rel3, rel4, cutoff, 66, np.full(len(kappas), 5)
+        )
 
     for _ in range(20):
         kappas = -rng.uniform(0.01, 0.3, n_modes)
@@ -284,7 +286,12 @@ def test_bloch_rhs_conserves_energy_with_reciprocal_vectors():
     W = bl["W"][0].real
     L = float(analysis.twpa.N_tot)
     rows3, rows4 = _filter_wm_terms_bloch(
-        kappas, ci["relations_3wm"], ci["relations_4wm"], 0.2, bl["n_cells"], np.pi, 5
+        kappas,
+        ci["relations_3wm"],
+        ci["relations_4wm"],
+        0.2,
+        bl["n_cells"],
+        np.full(len(kappas), 5),
     )
     assert np.any(rows4[:, -1] != 0)  # G != 0 terms are present
     g_unit = 2 * np.pi / bl["n_cells"]
@@ -557,7 +564,12 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
     W = bl["W"][0].real
     L = float(analysis.twpa.N_tot)
     rows3, rows4 = _filter_wm_terms_bloch(
-        kappas, ci["relations_3wm"], ci["relations_4wm"], 0.2, bl["n_cells"], np.pi, 5
+        kappas,
+        ci["relations_3wm"],
+        ci["relations_4wm"],
+        0.2,
+        bl["n_cells"],
+        np.full(len(kappas), 5),
     )
     rng = np.random.default_rng(11)
     mode_w = rng.uniform(0.1, 1.0, size=(1, 3))

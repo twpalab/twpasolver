@@ -246,7 +246,7 @@ def build_background(
         Zb_minus[r0],
         passes=max(fb_config.passes, pump_passes),
         kappa_cutoff=fb_config.kappa_cutoff,
-        m_max=fb_config.m_max,
+        m_max=fb_config.m_max_fixed,
         convergence_threshold=min(fb_config.convergence_threshold, pump_tol),
         anderson_depth=fb_config.anderson_depth,
         process_weights_3wm=pw3[r0],

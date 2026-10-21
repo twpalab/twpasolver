@@ -68,7 +68,6 @@ from twpasolver.bonus_types import (
     nb_float1d,
     nb_int2d,
 )
-from twpasolver.cmes import solver_config
 from twpasolver.cmes.base import _sorted_interp_bracket
 from twpasolver.cmes.cmes_fb import _convergence_step, _store_pass
 from twpasolver.cmes.rk45 import rk45_solve
@@ -82,31 +81,79 @@ from twpasolver.logger import log
 
 
 @nb.njit(cache=True)
+def _cubic_stencil(xp, x):
+    """
+    First index and weights of the 4-point Lagrange stencil around ``x``.
+
+    The stored envelopes oscillate with the residual mismatch of the kept
+    terms, up to ``kappa_cutoff * pi`` per supercell; 4-point cubic
+    interpolation keeps the error of a table lookup at about ``phi^4 / 50``
+    for a phase ``phi`` per grid step (linear: ``phi^2 / 8``) without storing
+    anything more. Outside the grid the value is clamped as in ``np.interp``;
+    grids shorter than 4 points fall back to linear interpolation. Unused
+    weights are zero.
+    """
+    n = len(xp)
+    lo, hi = _sorted_interp_bracket(xp, x)
+    if lo == hi:
+        return lo, 1.0, 0.0, 0.0, 0.0
+    if n < 4:
+        frac = (x - xp[lo]) / (xp[hi] - xp[lo])
+        return lo, 1.0 - frac, frac, 0.0, 0.0
+    i0 = min(max(lo - 1, 0), n - 4)
+    x0, x1, x2, x3 = xp[i0], xp[i0 + 1], xp[i0 + 2], xp[i0 + 3]
+    d0, d1, d2, d3 = x - x0, x - x1, x - x2, x - x3
+    w0 = d1 * d2 * d3 / ((x0 - x1) * (x0 - x2) * (x0 - x3))
+    w1 = d0 * d2 * d3 / ((x1 - x0) * (x1 - x2) * (x1 - x3))
+    w2 = d0 * d1 * d3 / ((x2 - x0) * (x2 - x1) * (x2 - x3))
+    w3 = d0 * d1 * d2 / ((x3 - x0) * (x3 - x1) * (x3 - x2))
+    return i0, w0, w1, w2, w3
+
+
+@nb.njit(cache=True)
+def _stencil_value(arr, r, i0, w0, w1, w2, w3):
+    """Row ``r`` of ``arr`` (rows, n_x) at the point of :func:`_cubic_stencil`."""
+    v = w0 * arr[r, i0]
+    if w1 != 0.0:
+        v += w1 * arr[r, i0 + 1]
+    if w2 != 0.0:
+        v += w2 * arr[r, i0 + 2]
+    if w3 != 0.0:
+        v += w3 * arr[r, i0 + 3]
+    return v
+
+
+@nb.njit(cache=True)
 def _filter_wm_terms_bloch(
-    kappas, relations_3wm, relations_4wm, cutoff, n_cells, cell_phase_cutoff, m_max
+    kappas, relations_3wm, relations_4wm, cutoff, n_cells, m_lim
 ):
     """
     Keep the phase-matched (sign variant, reciprocal vector) pairs of every relation.
 
     Each sign variant of a relation has a mismatch ``dk``; each Fourier
-    component ``G_m = 2 pi m / d`` (``|m| <= m_max``, ``d = n_cells``) of the
-    intracell coupling profile turns it into a term with residual mismatch
-    ``dk + G_m``. A pair is kept when
+    component ``G_m = 2 pi m / d`` (``d = n_cells``) of the intracell coupling
+    profile turns it into a term with residual mismatch ``dk + G_m``. A pair is
+    kept when
 
-    * ``|dk + G_m| < cutoff * k_proc``, with ``k_proc`` the largest ``|kappa|``
-      among the modes of the process, and
-    * ``|dk + G_m| * n_cells < cell_phase_cutoff`` (pi by default),
+        |dk + G_m| < cutoff * k_ref,    k_ref = min(k_proc, pi / d),
 
-    so no kept term oscillates faster than the cutoffs allow, whatever ``m``.
-    Partner terms of a process have opposite ``dk`` and pair with opposite
-    ``m`` (symmetric range), so they are kept or dropped together.
-    ``m_max = 0`` gives the cell-averaged model.
+    with ``k_proc`` the largest ``|kappa|`` among the modes of the process: the
+    mismatch is measured relative to the process wavenumber, capped at the zone
+    edge, the largest wavenumber the supercell-averaged envelopes resolve. The
+    threshold never exceeds ``pi / d``, so every term is assigned to a single
+    ``G_m`` (the nearest one).
+    ``m_lim`` (n_modes,) is the harmonic limit of every mode; a row uses
+    ``|m| <= max(m_lim)`` over its modes. Partner terms of a process contain
+    the same modes and have opposite ``dk``, so they pair with opposite ``m``
+    within the same symmetric range and the same threshold, and are kept or
+    dropped together. ``m_lim = 0`` gives the cell-averaged model.
 
     Returns rows ``[target, field indices..., base relation index, m]``.
     """
     num_modes = len(kappas)
-    n_g = 2 * m_max + 1
+    n_g = 2 * np.max(m_lim) + 1 if num_modes > 0 else 1
     g_unit = 2.0 * np.pi / n_cells
+    k_edge = np.pi / n_cells
     out3 = np.empty((len(relations_3wm) * 4 * n_g, 5), dtype=relations_3wm.dtype)
     out4 = np.empty((len(relations_4wm) * 8 * n_g, 6), dtype=relations_4wm.dtype)
     n3 = 0
@@ -114,10 +161,13 @@ def _filter_wm_terms_bloch(
     for r in range(len(relations_3wm)):
         rel = relations_3wm[r]
         k_proc = abs(kappas[rel[0]])
+        m_row = m_lim[rel[0]]
         for q in range(2):
             m = rel[1 + q]
             base = m - num_modes if m >= num_modes else m
             k_proc = max(k_proc, abs(kappas[base]))
+            m_row = max(m_row, m_lim[base])
+        thr = min(cutoff * min(k_proc, k_edge), k_edge)
         for v in range(4):
             dk = -kappas[rel[0]]
             idx = np.empty(2, dtype=relations_3wm.dtype)
@@ -131,9 +181,9 @@ def _filter_wm_terms_bloch(
                     sign = -sign
                 dk += sign * kappas[base]
                 idx[q] = m + (2 * num_modes if counter else 0)
-            for mg in range(-m_max, m_max + 1):
+            for mg in range(-m_row, m_row + 1):
                 res = abs(dk + mg * g_unit)
-                if res < cutoff * k_proc and res * n_cells < cell_phase_cutoff:
+                if res < thr:
                     out3[n3, 0] = rel[0]
                     out3[n3, 1] = idx[0]
                     out3[n3, 2] = idx[1]
@@ -143,10 +193,13 @@ def _filter_wm_terms_bloch(
     for r in range(len(relations_4wm)):
         rel = relations_4wm[r]
         k_proc = abs(kappas[rel[0]])
+        m_row = m_lim[rel[0]]
         for q in range(3):
             m = rel[1 + q]
             base = m - num_modes if m >= num_modes else m
             k_proc = max(k_proc, abs(kappas[base]))
+            m_row = max(m_row, m_lim[base])
+        thr = min(cutoff * min(k_proc, k_edge), k_edge)
         for v in range(8):
             dk = -kappas[rel[0]]
             idx = np.empty(3, dtype=relations_4wm.dtype)
@@ -160,9 +213,9 @@ def _filter_wm_terms_bloch(
                     sign = -sign
                 dk += sign * kappas[base]
                 idx[q] = m + (2 * num_modes if counter else 0)
-            for mg in range(-m_max, m_max + 1):
+            for mg in range(-m_row, m_row + 1):
                 res = abs(dk + mg * g_unit)
-                if res < cutoff * k_proc and res * n_cells < cell_phase_cutoff:
+                if res < thr:
                     out4[n4, 0] = rel[0]
                     out4[n4, 1] = idx[0]
                     out4[n4, 2] = idx[1]
@@ -297,20 +350,9 @@ def bloch_fb_rhs(
 
     ar = np.empty(4 * n, dtype=nb.complex128)
     x_ctr = end - x
-    lo_e, hi_e = _sorted_interp_bracket(x_evals, x_ctr)
-    frac_e = (
-        0.0
-        if lo_e == hi_e
-        else (x_ctr - x_evals[lo_e]) / (x_evals[hi_e] - x_evals[lo_e])
-    )
+    i0, w0, w1, w2, w3 = _cubic_stencil(x_evals, x_ctr)
     for i in range(n):
-        ctr_re = currents_evals[i, lo_e].real + frac_e * (
-            currents_evals[i, hi_e].real - currents_evals[i, lo_e].real
-        )
-        ctr_im = currents_evals[i, lo_e].imag + frac_e * (
-            currents_evals[i, hi_e].imag - currents_evals[i, lo_e].imag
-        )
-        ctr = (ctr_re + 1j * ctr_im) * en[i]
+        ctr = _stencil_value(currents_evals, i, i0, w0, w1, w2, w3) * en[i]
         ar[i] = currents[i] * ep[i]
         ar[i + n] = np.conj(ar[i])
         ar[i + 2 * n] = ctr
@@ -401,11 +443,10 @@ def bloch_fb_rhs_edge(
         elif edge_code[i] == 2.0:
             any_lin = True
     if any_frozen:
-        lo, hi = _sorted_interp_bracket(x_evals, x)
-        frac = 0.0 if lo == hi else (x - x_evals[lo]) / (x_evals[hi] - x_evals[lo])
+        i0, w0, w1, w2, w3 = _cubic_stencil(x_evals, x)
         for i in range(n):
             if edge_code[i] == 1.0:
-                cur[i] = own_evals[i, lo] + frac * (own_evals[i, hi] - own_evals[i, lo])
+                cur[i] = _stencil_value(own_evals, i, i0, w0, w1, w2, w3)
     out = bloch_fb_rhs(
         x,
         cur,
@@ -421,18 +462,14 @@ def bloch_fb_rhs_edge(
         currents_evals,
         end,
     )
-    lo, hi, frac = 0, 0, 0.0
+    j0, v0, v1, v2, v3 = 0, 0.0, 0.0, 0.0, 0.0
     if any_lin:
-        xc = end - x
-        lo, hi = _sorted_interp_bracket(x_evals, xc)
-        frac = 0.0 if lo == hi else (xc - x_evals[lo]) / (x_evals[hi] - x_evals[lo])
+        j0, v0, v1, v2, v3 = _cubic_stencil(x_evals, end - x)
     for i in range(n):
         if edge_code[i] == 1.0:
             out[i] = 0.0
         elif edge_code[i] == 2.0:
-            ctr = currents_evals[i, lo] + frac * (
-                currents_evals[i, hi] - currents_evals[i, lo]
-            )
+            ctr = _stencil_value(currents_evals, i, j0, v0, v1, v2, v3)
             out[i] += lin_own[i] * cur[i] + lin_ctr[i] * ctr_phase[i] * ctr
     return out
 
@@ -503,12 +540,11 @@ def _edge_bvp_solve(K, h, S_plus, S_minus, cp_in, rho_in, cm_out, rho_out):
 
 @nb.njit(cache=True)
 def _interp_rows(arr, x_evals, x):
-    """Linear interpolation of every row of ``arr`` (rows, n_x) at ``x``."""
-    lo, hi = _sorted_interp_bracket(x_evals, x)
-    frac = 0.0 if lo == hi else (x - x_evals[lo]) / (x_evals[hi] - x_evals[lo])
+    """Cubic interpolation of every row of ``arr`` (rows, n_x) at ``x``."""
+    i0, w0, w1, w2, w3 = _cubic_stencil(x_evals, x)
     out = np.empty(arr.shape[0], dtype=np.complex128)
     for r in range(arr.shape[0]):
-        out[r] = arr[r, lo] + frac * (arr[r, hi] - arr[r, lo])
+        out[r] = _stencil_value(arr, r, i0, w0, w1, w2, w3)
     return out
 
 
@@ -629,13 +665,22 @@ def _mode_scales(g, floor):
 
 @nb.njit(cache=True)
 def _relative_residual(f, scales):
-    """Largest per-mode relative fixed-point residual ``max_x |f_j| / scale_j``."""
+    """Largest per-mode relative fixed-point residual ``max_x |f_j| / scale_j``.
+
+    Infinite if any entry or scale is not finite: a blown-up iterate must
+    never pass for converged (NaN entries would otherwise be skipped by the
+    comparisons) nor reach the Anderson least-squares step.
+    """
     n_modes, n_x = f.shape
     worst = 0.0
     for j in range(n_modes):
+        if not np.isfinite(scales[j]):
+            return np.inf
         m = 0.0
         for t in range(n_x):
             a = np.abs(f[j, t])
+            if not np.isfinite(a):
+                return np.inf
             if a > m:
                 m = a
         v = m / scales[j]
@@ -712,8 +757,7 @@ def _bloch_fb_solve_uniform(
     Zb_minus_table,
     passes,
     kappa_cutoff,
-    cell_phase_cutoff,
-    m_max,
+    m_lim_table,
     convergence_threshold,
     save_all_passes,
     anderson_depth,
@@ -771,8 +815,7 @@ def _bloch_fb_solve_uniform(
             relations_4wm,
             kappa_cutoff,
             n_cells,
-            cell_phase_cutoff,
-            m_max,
+            m_lim_table[i],
         )
         g_unit = 2.0 * np.pi / n_cells
         g3 = np.empty(r3.shape[0], dtype=np.float64)
@@ -1095,8 +1138,7 @@ def bloch_fb_cmes_solve(
     Zb_minus: ComplexArray,
     passes: int = 10,
     kappa_cutoff: float = 0.2,
-    cell_phase_cutoff: float | None = None,
-    m_max: int = 5,
+    m_max: int | np.ndarray = 5,
     convergence_threshold: float = 0.01,
     save_all_passes: bool = False,
     anderson_depth: int = 5,
@@ -1131,15 +1173,14 @@ def bloch_fb_cmes_solve(
     Zb_plus, Zb_minus : (n_freq, n_modes)
         Bloch impedances of the forward/backward modes at the device ends.
     kappa_cutoff : float
-        Relative phase-mismatch cutoff, ``|dk| < kappa_cutoff * k_proc`` with
-        ``k_proc`` the largest wavenumber among the modes of the process.
-    cell_phase_cutoff : float, optional
-        Maximum residual mismatch phase per supercell, ``|dk + G| * d``;
-        defaults to ``solver_config.BLOCH_CELL_PHASE_CUTOFF`` (pi).
-    m_max : int
+        Relative phase-mismatch cutoff, ``|dk + G_m| < kappa_cutoff * k_ref``
+        with ``k_ref = min(k_proc, pi / d)``: ``k_proc`` the largest wavenumber
+        among the modes of the process, capped at the zone edge.
+    m_max : int or (n_freq, n_modes) int array
         Largest ``|m|`` of the reciprocal vectors ``G_m = 2 pi m / d`` of the
         intracell coupling profiles (quasi-phase matching); 0 keeps only the
-        cell averages.
+        cell averages. An array gives a limit per frequency and mode; a
+        process uses the largest limit among its modes.
     anderson_depth : int
         Number of previous passes used by Anderson acceleration of the
         forward/backward iteration; 0 gives the plain fixed-point iteration.
@@ -1188,8 +1229,6 @@ def bloch_fb_cmes_solve(
         x-point holds the current coupled out to the external line.
     """
     gammas_array = np.asarray(gammas_array)
-    if cell_phase_cutoff is None:
-        cell_phase_cutoff = solver_config.BLOCH_CELL_PHASE_CUTOFF
     if gammas_array.ndim != 2:
         raise NotImplementedError(
             "Bloch forward/backward CMEs support only non-segmented devices."
@@ -1264,8 +1303,7 @@ def bloch_fb_cmes_solve(
         c(Zb_minus, dtype=np.complex128),
         int(passes),
         float(kappa_cutoff),
-        float(cell_phase_cutoff),
-        int(m_max),
+        c(np.broadcast_to(np.asarray(m_max, dtype=np.int64), gammas_array.shape)),
         float(convergence_threshold),
         bool(save_all_passes),
         int(anderson_depth),
