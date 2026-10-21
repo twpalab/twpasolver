@@ -352,6 +352,87 @@ def edge_reference_frequency(
     )
 
 
+def stopband_edges(
+    twpa_ll: TwoPortArray,
+    f_hz: FloatArray,
+    e_ref: float,
+    span_hz: float = 1.0e9,
+    step_hz: float = 0.5e6,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Stopband edges of a lossless supercell near a set of frequencies.
+
+    Scans ``|tr T / 2|`` on a grid of step ``step_hz`` over the union of the
+    intervals ``f +- span_hz`` (one vectorised supercell evaluation per
+    contiguous block), and refines every edge, ``|tr T / 2| = 1``, and its
+    reference frequency on the passband side, where the splitting equals
+    ``e_ref``, as :func:`edge_reference_frequency` does for a single
+    frequency. Used to look up the edge of many flagged entries at once.
+
+    Returns
+    -------
+    f_edge, f_ref : (E,) float
+        Edge and reference frequencies (Hz), sorted by edge; ``f_ref`` is NaN
+        when the passband next to the edge does not reach ``e_ref`` within the
+        scanned block.
+    parity : (E,) int
+        ``(-1)^m = sign(tr T / 2)`` at the edge.
+    """
+    from scipy.optimize import brentq
+
+    def half_trace(f):
+        T = supercell_matrix(twpa_ll, np.atleast_1d(f))
+        return 0.5 * (T[:, 0, 0] + T[:, 1, 1]).real
+
+    h_ref = np.sqrt(1.0 - e_ref**2)
+    n_span = int(np.ceil(span_hz / step_hz))
+    centres = np.unique(np.round(np.asarray(f_hz, dtype=np.float64) / step_hz)).astype(
+        np.int64
+    )
+    edges, refs, pars = [], [], []
+    if centres.size == 0:
+        return np.empty(0), np.empty(0), np.empty(0, dtype=np.int64)
+    # merge the intervals [c - n_span, c + n_span] into contiguous blocks
+    blocks = []
+    lo, hi = centres[0] - n_span, centres[0] + n_span
+    for c in centres[1:]:
+        if c - n_span <= hi + 1:
+            hi = c + n_span
+        else:
+            blocks.append((lo, hi))
+            lo, hi = c - n_span, c + n_span
+    blocks.append((lo, hi))
+    for lo, hi in blocks:
+        g = np.arange(max(lo, 1), hi + 1) * step_hz
+        if len(g) < 2:
+            continue
+        h = half_trace(g)
+        inband = np.abs(h) < 1.0
+        for j in np.flatnonzero(inband[1:] != inband[:-1]):
+            f_edge = brentq(
+                lambda f: abs(half_trace(f)[0]) - 1.0, g[j], g[j + 1], xtol=1.0
+            )
+            parity = int(np.sign(h[j] if not inband[j] else h[j + 1]))
+            # walk from the edge into the passband until |h| < h_ref
+            step = 1 if inband[j + 1] else -1
+            k = j + 1 if step == 1 else j
+            while 0 <= k < len(g) and inband[k] and abs(h[k]) >= h_ref:
+                k += step
+            f_ref = np.nan
+            if 0 <= k < len(g) and inband[k]:
+                a, b = sorted((g[k - step], g[k]))
+                f_ref = brentq(lambda f: abs(half_trace(f)[0]) - h_ref, a, b, xtol=1.0)
+            edges.append(f_edge)
+            refs.append(f_ref)
+            pars.append(parity)
+    order = np.argsort(edges)
+    return (
+        np.asarray(edges)[order],
+        np.asarray(refs, dtype=np.float64)[order],
+        np.asarray(pars, dtype=np.int64)[order],
+    )
+
+
 def _intracell_currents(
     twpa: TwoPortArray, freqs_hz: FloatArray, psi_p: np.ndarray, psi_m: np.ndarray
 ):

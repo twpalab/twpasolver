@@ -26,6 +26,7 @@ from twpasolver.cmes.bloch import (
     lossless_copy,
     process_weights,
     reactive_angle_deg,
+    stopband_edges,
 )
 from twpasolver.cmes.bloch_fb import bloch_fb_cmes_solve
 from twpasolver.cmes.bloch_fb_segmented import (
@@ -220,21 +221,35 @@ def _edge_basis_entries(
     m_edge = np.zeros(len(f_mode), dtype=np.int64)
     f_ref = np.empty(len(f_mode))
     found = np.ones(len(f_mode), dtype=bool)
-    cache: list[tuple[float, float, float, int]] = []  # (lo, hi, f_ref, parity)
+    # Every edge near the flagged frequencies, found in one scan; each entry
+    # takes the nearest one. An edge farther than the scanned span may not be
+    # the nearest, so those entries are rescanned with a wider span, and the
+    # per-frequency search is the last resort.
+    par_q = np.zeros(len(f_mode), dtype=np.int64)
+    todo = np.ones(len(f_mode), dtype=bool)
+    for span in (1.0e9, 4.0e9, 8.0e9):
+        if not todo.any():
+            break
+        e_tab, ref_tab, par_tab = stopband_edges(twpa_ll, f_mode[todo], e_edge, span)
+        if not len(e_tab):
+            continue
+        idx = np.flatnonzero(todo)
+        near = np.argmin(np.abs(e_tab[None, :] - f_mode[idx, None]), axis=1)
+        ok = (np.abs(e_tab[near] - f_mode[idx]) <= span) & np.isfinite(ref_tab[near])
+        f_ref[idx[ok]] = ref_tab[near[ok]]
+        par_q[idx[ok]] = par_tab[near[ok]]
+        todo[idx[ok]] = False
     for q, f in enumerate(f_mode):
-        hit = [c for c in cache if c[0] <= f <= c[1]]
-        if hit:
-            f_ref[q], parity = hit[0][2], hit[0][3]
+        if not todo[q]:
+            parity = int(par_q[q])
         else:
             try:
-                f_ref[q], f_edge, parity = edge_reference_frequency(twpa_ll, f, e_edge)
+                f_ref[q], _, parity = edge_reference_frequency(twpa_ll, f, e_edge)
             except ValueError:
                 # No stopband edge around f (e.g. a closed gap): no
                 # exceptional point, the native basis is kept.
                 found[q] = False
                 continue
-            lo, hi = sorted((f_ref[q], 2 * f_edge - f_ref[q]))
-            cache.append((lo, hi, f_ref[q], parity))
         odd = 0 if parity > 0 else 1
         m_edge[q] = 2 * int(np.round((kd_pi[q] - odd) / 2)) + odd
         if abs(kd_pi[q] - m_edge[q]) > 0.5:

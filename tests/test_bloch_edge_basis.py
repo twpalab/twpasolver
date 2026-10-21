@@ -540,3 +540,24 @@ def test_stopband_modes_switched_off(segmented):
     assert np.all(w[0, ..., p2s] < 1.0) and np.all(w[..., s] == 1.0)
     assert res["bloch"]["converged"].all()
     assert np.all(np.isfinite(res["gain_db"]))
+
+
+@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
+def test_stopband_edges_match_per_frequency_search():
+    """One-pass edge table: nearest edge gives the reference of edge_reference_frequency."""
+    from twpasolver.cmes.bloch import stopband_edges
+    from twpasolver.models import TWPA
+
+    ll = lossless_copy(TWPA.from_file(str(HOLOTYPE)))
+    rng = np.random.default_rng(6)
+    # near and inside the stopbands around 27 and 41 GHz, plus passband points
+    f = np.concatenate(
+        [rng.uniform(26.0e9, 28.5e9, 12), rng.uniform(40.8e9, 41.6e9, 12)]
+    )
+    e_tab, ref_tab, par_tab = stopband_edges(ll, f, 0.10)
+    for fq in f:
+        q = np.argmin(np.abs(e_tab - fq))
+        f_ref, f_edge, parity = edge_reference_frequency(ll, fq, 0.10)
+        assert abs(e_tab[q] - f_edge) < 10.0
+        assert abs(ref_tab[q] - f_ref) < 10.0
+        assert par_tab[q] == parity
