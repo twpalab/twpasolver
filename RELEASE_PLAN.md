@@ -220,7 +220,7 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
   - Move the shared numba helpers (stencils, mixing-term filter, row coefficients, expm, Anderson step, residual)
     into `cmes/bloch_common.py`.
   - The quantum background (`quantum/background.py`) calls the uniform pieces; it needs an adapter (or see D3).
-- [ ] **3.2 `analysis.py` uniform/segmented merge.**
+- [x] **3.2 `analysis.py` uniform/segmented merge.**
   - `_prepare_bloch_coefficients` (`~1071`) → `_prepare_bloch_segmented` (`~1505`) with n_seg = 1.
   - `_apply_edge_basis` (`~1273`) → `_apply_edge_basis_segmented` (`~1376`).
   - Stop computing the unused `coeffs_3wm`/`coeffs_4wm` on the forward–backward path (rebuilt at `~1356-1360`
@@ -503,3 +503,14 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
     (about 55 s and 80 s).
   - **Next:** WP3.2 (one preparation path in `analysis.py`). Then remove `general` and `bloch_no_reflections`
     (WP3.4–3.6) and rename `general_no_reflections` to `simple`.
+- 2026-11-06, WP3.2 on `bloch-cmes`:
+  - **One preparation path:** the Bloch forward–backward driver now has a single path. `_bloch_segments()` returns
+    `[self.twpa]` with bounds `[0, N_tot]` for a uniform device, the k table gets a length-1 segment axis, and
+    `_prepare_bloch_segmented`, `_apply_edge_basis_segmented` and `_fb_stopbands` run unchanged.
+  - **Removed:** `_apply_edge_basis` (uniform) and the uniform branches of `_fb_stopbands` and the driver.
+  - **Result dict:** `_drop_segment_axis` removes the length-1 axis, so uniform devices keep their shapes. The dict
+    loses `coeffs_3wm`, `coeffs_4wm` and `gamma_exact` (unused by the forward–backward kernel; no downstream reader)
+    and gains `edge_mode` and `seg_bounds`.
+  - **Numerics:** identical to WP3.1 on the whole regression set.
+  - **Still to remove:** `_prepare_bloch_coefficients` stays only for `bloch_no_reflections` and the RHS energy
+    tests; it goes with that model (WP3.4–3.6), and the energy tests then use the segmented preparation.
