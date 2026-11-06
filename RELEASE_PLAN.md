@@ -470,6 +470,8 @@ Decisions (Pietro, 2026-11-07):
 - The stopband guard (`simulate_stopband_modes=False`, D4) and `StubBaseCell(line=False)` stay.
 - Dependencies: only `sympy` is removed (5.3); `networkx`, `skrf` and `matplotlib` stay core; no extras.
 - Flatten the facade's base classes (4.3c).
+- Skipped: slimming `BlochSolverConfig` (all options, `save_all_passes` included, stay) and making `skrf` an
+  optional extra.
 
 Items (each step keeps golden gains bit-identical on the holotype, the segmented holotype and the 3-cell device):
 - [ ] **4.1 Move solver preparation to `cmes/bloch_prep.py`:** `_edge_basis_entries`, `_harmonic_limits`,
@@ -490,8 +492,8 @@ Items (each step keeps golden gains bit-identical on the holotype, the segmented
   relations; `Z0`/`Ze` duplicates removed.
 - [ ] **4.5b Result dataclasses** (`GainResult`, `PhaseMatchingResult`): every model has the same fields
   (`I_fwd`, `I_bwd` zeros for `simple`, `gain_db`, `gain_db_11/12/22` NaN for `simple`, `converged`,
-  `diagnostics`), one naming scheme, NaN-safe dB, optional per-pass history replaced by a residual-per-pass
-  array; `save`/`load` through `file_utils`, `plot` through `plotting`.
+  `diagnostics`, the optional per-pass history of `save_all_passes`), one naming scheme, NaN-safe dB;
+  `save`/`load` through `file_utils`, `plot` through `plotting`.
 - [ ] **4.6 Units:** user unit at the facade, Hz everywhere inside; express the Hz spans (`1e9/4e9/8e9`) in the
   user unit or document them.
 - [ ] **4.7 Residual metric:** document on the result that the forward–backward residual is relative and
