@@ -213,8 +213,11 @@ Each fix gets a test.
 - [x] **2.8 HDF5 save fails for every forward–backward result:** `gains_all_passes` is a list of dicts. Store it
   as arrays.
   - Done 2026-11-06 (audit-fixes) with 2.29. Test `test_twpanalysis_end_to_end`.
-- [ ] **2.9 `phase_matching` on segmented devices raises `IndexError`** (k is 2-D there). It also fills
+- [x] **2.9 `phase_matching` on segmented devices raises `IndexError`** (k is 2-D there). It also fills
   `np.empty` with garbage when `gamma` is None (`~1663`).
+  - Done 2026-11-06 (audit-fixes): `delta` is the length-weighted mean of the per-segment mismatch (own k,
+    gamma, and chi = Ip0² xi_s / 8 with the drive `twpa.Ip0`, as in `gain`); it used the outer `twpa.xi` before.
+    Test `test_phase_matching_segmented_is_length_weighted_mean`.
 - [x] **2.10 `k_star` fit guard:** `len(freqs_mask) > 2` (`~715`) should be `freqs_mask.sum() > 2`.
   - Done 2026-11-06 (audit-fixes). Test `test_k_star_guard_with_coarse_grid`.
 - [x] **2.11 Stopband detection from argmin/argmax of `diff(S21_db)`** (`~665-670`) can return start > end; it
@@ -230,11 +233,13 @@ Each fix gets a test.
     mean `|delta|`; unfilled `delta` columns are NaN, no longer `np.empty` garbage). Tests
     `test_stopbands_do_not_depend_on_grid_end`, `test_no_stopband_gives_empty_stopbands`, `test_gain_needs_pump`,
     `test_phase_matching_optimal_pump`.
-- [ ] **2.12 Base data is never computed automatically.** `gain()` on a fresh `TWPAnalysis` raises
+- [x] **2.12 Base data is never computed automatically.** `gain()` on a fresh `TWPAnalysis` raises
   `KeyError 'optimal_pump_freq'`, and edits to `twpa` leave stale data without warning. Call `update_base_data()`
   from the decorator, as it did before 6097a93. Exclude `Ip0` from the state check.
   - Rechecked 2026-11-06 (`888f01e`): still open; a fresh `gain()` now raises
     `ValueError: Mode array configuration 'basic_3wm' not found`.
+  - Done 2026-11-06 (audit-fixes): `analysis_function` calls `update_base_data()` (a no-op when the state is
+    unchanged). `Ip0` stays in the state check (only a recomputation cost). Test `test_base_data_computed_on_demand`.
 - [x] **2.13 `gain(Ip0=...)` permanently sets `self.twpa.Ip0`** (`~1816`). Use a local value instead.
   - Done 2026-11-06 (audit-fixes): `Ip0` is passed down to the initial conditions. Test `test_gain_ip0_does_not_change_twpa`.
 - [x] **2.14 Shared mutable default** `fb_config=FBSolverConfig()` (`~1738`): use `None`.
@@ -314,7 +319,7 @@ Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` da
 - [x] **2.34 `.s` vs `.to_network().s` disagree for complex Z0** (`mathutils.a2s` uses pseudo-waves, skrf
   power waves): 0.53 apart for `Z0_ref=30+20j`, 1.6e-16 for real Z0. Fix: `s_def="pseudo"` in `to_network`.
   - Done 2026-11-06 (audit-fixes): `to_network` passes our pseudo-wave S with `s_def="pseudo"` (skrf converts `a=` before `z0` is set); `.z` agrees too, skrf's own `.a` still assumes power waves. Test `test_network_s_matches_for_complex_z0`.
-- [ ] **2.35 Small ones:**
+- [x] **2.35 Small ones:**
   - `N=0` and `model * 0` crash on a bare `assert` in `matpow_2x2` (`N` is `NonNegativeInt`).
   - `Z0=0` passes the validator (`bonus_types.py:40`) and then fails the bare assert in `a2s`/`s2a`.
   - `Resistance.Z` truncates R on integer frequency arrays (`np.full_like`, `oneport.py:119`).
@@ -324,7 +329,11 @@ Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` da
   - A list-valued `port` fills only `Zout`; its ABCD stays the identity (`analysis.py:643-646`), read only.
   - CI venv cache key (`analysis.yml:26-27`) ignores `matrix.python-version`. **Done:** key has OS and Python.
   - `warmup` with `passes=1` logs a "did not converge" warning every time. **Done** with 3.8.
-  - Done 2026-11-06 (audit-fixes) for `N=0` (identity), `Z0=0`, `Resistance.Z`, arange step > 0 (tests `test_zero_repetitions_is_identity`, `test_impedance_must_have_positive_real_part`, `test_resistance_on_integer_freqs`, `test_frequencies_validation`). Still open: list-valued `port`.
+  - Done 2026-11-06 (audit-fixes) for `N=0` (identity), `Z0=0`, `Resistance.Z`, arange step > 0 (tests `test_zero_repetitions_is_identity`, `test_impedance_must_have_positive_real_part`, `test_resistance_on_integer_freqs`, `test_frequencies_validation`).
+  - Done 2026-11-06 (audit-fixes): list-valued `port`/`port_out` removed. A one-port impedance fixes the reflection
+    seen by the device but not the connector transmission, so drive, output coupling and prompt reflection were
+    those of an identity connector (forward gain off by 20 log10(Ze/Z_l) dB for a real Z_l). Ports must be a
+    `TwoPortModel`. Test `test_port_must_be_a_model`.
   - Done 2026-11-06 (audit-fixes): `TwoPortCell.interpolate` defaults to `polar=False`. Test `test_interpolate_default_handles_sign_changes`.
 - [x] **2.36 Test for `TWPAnalysis`:** no test runs `phase_matching`, `bandwidth`, stopband detection or a save and
   reload of a real result; the `twpanalysis_instance` fixture asks for a `twpa_model` fixture that does not exist.
@@ -815,13 +824,11 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
 
 ## Where to pick up (updated 2026-11-06, `audit-fixes`)
 
-WP0 is closed (PyPI, `0.1.0`, Python ≥3.10, any API break allowed). WP1, WP3 except 3.3, and most of WP2 are done;
-comments and docstrings are trimmed. Nothing is pushed. Next, roughly in order:
-1. **WP2 leftovers:** 2.12 (fresh `gain()` fails), 2.9 (segmented `phase_matching`, not rechecked), 2.35 list
-   `port`. 2.4 and 2.37 stay deferred.
-2. **WP4 (API, before the docs are written against it):** 4.2 one result dict, 4.4 ignored parameters, 4.1 split
+WP0 is closed (PyPI, `0.1.0`, Python ≥3.10, any API break allowed). WP1, WP2 and WP3 except 3.3 are done (2.4 and
+2.37 deferred); comments and docstrings are trimmed. Nothing is pushed. Next, roughly in order:
+1. **WP4 (API, before the docs are written against it):** 4.2 one result dict, 4.4 ignored parameters, 4.1 split
    `analysis.py` (about 1,860 lines), 4.6 units, 4.7 residual metric; 3.3 shared helpers fits here.
-3. **WP5:** 5.1 user models, 5.3 `modes_rwa`, 5.5 descriptor (5.2 can wait for WP8).
-4. **WP6:** rest of 6.1 (version and Python are set), CI (add 3.13), pre-commit pins, mypy.
-5. **WP7:** fix the Sphinx RST errors left in `gain`, `bloch_mode_tables`, `edge_basis_tables`, the `bloch_fb`
+2. **WP5:** 5.1 user models, 5.3 `modes_rwa`, 5.5 descriptor (5.2 can wait for WP8).
+3. **WP6:** rest of 6.1 (version and Python are set), CI (add 3.13), pre-commit pins, mypy.
+4. **WP7:** fix the Sphinx RST errors left in `gain`, `bloch_mode_tables`, `edge_basis_tables`, the `bloch_fb`
    module docstring and the `|…|` field descriptions; toctree, notebooks, README, changelog; tag and publish.

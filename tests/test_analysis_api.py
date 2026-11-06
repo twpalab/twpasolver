@@ -142,6 +142,14 @@ def test_update_base_data_follows_grid():
     np.testing.assert_array_equal(an.data["freqs"], an.f / an.unit_multiplier)
 
 
+def test_base_data_computed_on_demand():
+    an = TWPAnalysis(twpa=_small_twpa(), f_arange=(0.05, 20, 1e-2))
+    g = an.gain(SIGNALS, pump=PUMP)["gain_db"]
+    an.twpa.N = 40
+    g_long = an.gain(SIGNALS, pump=PUMP)["gain_db"]
+    assert np.all(np.isfinite(g)) and not np.allclose(g, g_long)
+
+
 def test_k_star_guard_with_coarse_grid():
     an = TWPAnalysis(twpa=_small_twpa(), f_arange=(3, 20, 1e-2))
     an.update_base_data()
@@ -256,6 +264,23 @@ def test_phase_matching_explicit_ranges(analysis):
     assert len(pm["pump_freqs"]) == 10
 
 
+def test_phase_matching_segmented_is_length_weighted_mean():
+    segs = [
+        TWPA(cells=[CELL_U, CELL_L, CELL_U], N=20, Istar=6.3e-3, Idc=1e-3, Ip0=1e-3),
+        TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10, Istar=9e-3, Idc=1e-3, Ip0=1e-3),
+    ]
+    kw = dict(pump_arange=[PUMP], signal_arange=SIGNALS, relative=False)
+    f = (0.05, 20, 1e-2)
+    dev = TWPA(cells=segs, Ip0=1e-3)
+    delta = TWPAnalysis(twpa=dev, f_arange=f).phase_matching(**kw)["delta"]
+    parts = [
+        TWPAnalysis(twpa=s, f_arange=f).phase_matching(**kw)["delta"] for s in segs
+    ]
+    w = np.array([s.N_tot for s in segs], dtype=float)
+    assert np.all(np.isfinite(delta))
+    np.testing.assert_allclose(delta, (w[0] * parts[0] + w[1] * parts[1]) / w.sum())
+
+
 def test_phase_matching_zero_pump_is_linear(analysis):
     kw = dict(pump_arange=[13.0], signal_arange=[3.0, 5.0], relative=False)
     lin = analysis.phase_matching(pump_Ip0=0.0, **kw)["delta"]
@@ -335,6 +360,11 @@ def test_log_does_not_reach_root_handler():
 def test_twpanalysis_rejects_unknown_fields():
     with pytest.raises(ValidationError):
         TWPAnalysis(twpa=_small_twpa(), freqs_arange=(0, 9, 1e-3))
+
+
+def test_port_must_be_a_model():
+    with pytest.raises(ValidationError, match="TwoPortModel"):
+        TWPAnalysis(twpa=_small_twpa(), port=[50.0, 50.0])
 
 
 def test_frequencies_validation():

@@ -357,12 +357,13 @@ def _drop_segment_axis(bloch: dict[str, Any], n_freq: int) -> dict[str, Any]:
 
 
 def analysis_function(func):
-    """Decorate analysis methods providing automatic result caching and management."""
+    """Decorate analysis methods: refresh base data, run, store the result."""
 
     @wraps(func)
     def wrapper(self, *args, save=True, save_name: Optional[str] = None, **kwargs):
         function_name = func.__name__
         log.info("Running %s", function_name)
+        self.update_base_data()
         result = func(self, *args, **kwargs)
         if save:
             if save_name is None:
@@ -439,9 +440,8 @@ class TWPAnalysis(Analyzer, Frequencies):
     port: Any = Field(
         default=None,
         description=(
-            "Connector model at x=0 (input boundary). Accepts either a "
-            "``TwoPortModel`` instance or a precomputed list of per-frequency "
-            "impedances. When ``port_out`` is None, this model is also used at x=L."
+            "Connector model (``TwoPortModel``) at x=0 (input boundary). When "
+            "``port_out`` is None, this model is also used at x=L."
         ),
     )
     port_out: Any = Field(
@@ -465,12 +465,10 @@ class TWPAnalysis(Analyzer, Frequencies):
     @field_validator("port", "port_out", mode="before")
     @classmethod
     def _accept_port_as_is(cls, v):
-        """Pass TwoPortModel instances and lists through without Pydantic coercion."""
-        if v is None or isinstance(v, (list, TwoPortModel)):
+        """Pass TwoPortModel instances through without Pydantic coercion."""
+        if v is None or isinstance(v, TwoPortModel):
             return v
-        raise ValueError(
-            f"port must be a TwoPortModel instance or a list of impedances, got {type(v)}"
-        )
+        raise ValueError(f"port must be a TwoPortModel instance, got {type(v)}")
 
     _previous_state: dict[str, Any] = PrivateAttr()
     _mode_arrays: Dict[str, ModeArray] = PrivateAttr(default_factory=dict)
@@ -592,19 +590,14 @@ class TWPAnalysis(Analyzer, Frequencies):
             ):
                 if port_model is None:
                     continue
-                if isinstance(port_model, TwoPortModel):
-                    abcd = np.asarray(port_model.get_abcd(freqs_m))
-                    A, B = abcd[:, 0, 0], abcd[:, 0, 1]
-                    C, D = abcd[:, 1, 0], abcd[:, 1, 1]
-                    table_Zout[:, m_idx] = (D * Ze + B) / (C * Ze + A)
-                    table_abcd[:, m_idx, 0] = A
-                    table_abcd[:, m_idx, 1] = B
-                    table_abcd[:, m_idx, 2] = C
-                    table_abcd[:, m_idx, 3] = D
-                else:
-                    table_Zout[:, m_idx] = np.interp(
-                        freqs_m, self.data["freqs"] * self.unit_multiplier, port_model
-                    )
+                abcd = np.asarray(port_model.get_abcd(freqs_m))
+                A, B = abcd[:, 0, 0], abcd[:, 0, 1]
+                C, D = abcd[:, 1, 0], abcd[:, 1, 1]
+                table_Zout[:, m_idx] = (D * Ze + B) / (C * Ze + A)
+                table_abcd[:, m_idx, 0] = A
+                table_abcd[:, m_idx, 1] = B
+                table_abcd[:, m_idx, 2] = C
+                table_abcd[:, m_idx, 3] = D
 
         return Zout_in, Zout_out, abcd_in, abcd_out
 
@@ -1246,8 +1239,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         Parameters
         ----------
         pump_Ip0 : float, optional
-            Pump current used for the Kerr term. None uses the model's ``chi``;
-            0 gives the linear mismatch.
+            Pump current used for the Kerr term. None uses ``twpa.Ip0``; 0 gives
+            the linear mismatch. Segmented devices give the length-weighted mean
+            of the per-segment mismatch.
         signal_arange, pump_arange : tuple or array_like
             A tuple ``(start, stop, step)`` is passed to ``numpy.arange``; a list
             or array is used as the explicit frequencies.
@@ -1273,7 +1267,13 @@ class TWPAnalysis(Analyzer, Frequencies):
             else np.asarray(signal_arange, dtype=float)
         )
 
-        chi = pump_Ip0**2 * self.twpa.xi / 8 if pump_Ip0 is not None else self.twpa.chi
+        Ip0 = self.twpa.Ip0 if pump_Ip0 is None else pump_Ip0
+        # Segmented devices: the accumulated mismatch is sum_s N_s dk_s, so delta
+        # is the length-weighted mean of the per-segment dk_s (own k, gamma, xi).
+        seg = self.data.get("segments")
+        weights = seg["N_tot"] / seg["N_tot"].sum() if seg else np.ones(1)
+        chi = Ip0**2 * (seg["xi"] if seg else np.array([self.twpa.xi])) / 8
+        n_seg = len(weights)
 
         f_triplets = []
         k_triplets = []
@@ -1292,39 +1292,29 @@ class TWPAnalysis(Analyzer, Frequencies):
             mode_array.update_frequencies({pump_mode: p_freq})
             mode_params = mode_array.process_frequency_array(signal_mode, signal_f)
 
-            signal_freqs_pm = mode_params[signal_mode]["freqs"]
-            idler_freqs_pm = mode_params[idler_mode]["freqs"]
-            pump_k = mode_array.get_mode(pump_mode).k
-            signal_k_array = mode_params[signal_mode]["k"]
-            idler_k_array = mode_params[idler_mode]["k"]
-            gamma = mode_array.get_mode(pump_mode).gamma
+            pump = mode_array.get_mode(pump_mode)
+            kp = np.asarray(pump.k).reshape(n_seg, 1)
+            g2 = np.abs(np.asarray(pump.gamma)).reshape(n_seg, 1) ** 2
+            ks = np.asarray(mode_params[signal_mode]["k"]).reshape(n_seg, -1)
+            ki = np.asarray(mode_params[idler_mode]["k"]).reshape(n_seg, -1)
 
-            for j, (s_freq, i_freq) in enumerate(zip(signal_freqs_pm, idler_freqs_pm)):
-                f_triplets.append([p_freq, s_freq, i_freq])
-                k_triplets.append(
-                    [np.asarray(pump_k).item(), signal_k_array[j], idler_k_array[j]]
-                )
+            dk = (
+                pump_coeff * kp
+                + signal_sign * ks
+                + idler_sign * ki
+                + (chi[:, None] * (1 + g2))
+                * (pump_coeff * kp + 2 * signal_sign * ks + 2 * idler_sign * ki)
+            )
+            deltas[:, i] = weights @ dk
+            ks_mean, ki_mean = weights @ ks, weights @ ki
+            if relative:
+                deltas[:, i] /= ks_mean
 
-            if (
-                gamma is not None
-                and pump_k is not None
-                and signal_k_array is not None
-                and idler_k_array is not None
+            for j, (s_freq, i_freq) in enumerate(
+                zip(mode_params[signal_mode]["freqs"], mode_params[idler_mode]["freqs"])
             ):
-                deltas[:, i] = (
-                    pump_coeff * pump_k
-                    + signal_sign * signal_k_array
-                    + idler_sign * idler_k_array
-                    + chi
-                    * (1 + np.abs(gamma) ** 2)
-                    * (
-                        pump_coeff * pump_k
-                        + 2 * signal_sign * signal_k_array
-                        + 2 * idler_sign * idler_k_array
-                    )
-                )
-                if relative:
-                    deltas[:, i] = deltas[:, i] / signal_k_array
+                f_triplets.append([p_freq, s_freq, i_freq])
+                k_triplets.append([(weights @ kp).item(), ks_mean[j], ki_mean[j]])
 
         # A pump inside a stopband does not propagate: no phase matching there.
         stopbands = self.data["stopbands"]
