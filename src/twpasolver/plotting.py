@@ -46,29 +46,22 @@ def plot_mode_currents(
         I_tuples = gain_result["I_tuples"]
     n_modes = I_tuples.shape[1]
 
-    # Mode names from the result if not given
     if mode_names is None:
         reverse_mode_map = gain_result.get("mode_info", {}).get("reverse_mode_map", {})
         mode_names = [reverse_mode_map.get(i, f"Mode {i}") for i in range(n_modes)]
 
-    # Mean current across all frequencies
     mean_currents = np.mean(np.abs(I_tuples), axis=0)
 
-    # Create figure
     fig, ax = plt.subplots(figsize=figsize)
 
-    # Define line styles and colors if not provided
     if line_styles is None:
         line_styles = ["-", "--", "-.", ":", "-", "--", "-."] * 3
 
     if colors is None:
-        # Use a colormap for many modes
         colors = plt.cm.tab10(np.linspace(0, 1, n_modes))
 
-    # Plot each mode
     for i in range(n_modes):
         if log_scale:
-            # Convert to dB
             currents_db = I_to_dBm(mean_currents[i])
             ax.plot(
                 x,
@@ -79,7 +72,6 @@ def plot_mode_currents(
                 lw=lw,
             )
         else:
-            # Linear scale
             ax.plot(
                 x,
                 mean_currents[i],
@@ -89,7 +81,6 @@ def plot_mode_currents(
                 lw=lw,
             )
 
-    # Set labels and title
     ax.set_xlabel("Cell Number")
 
     if log_scale:

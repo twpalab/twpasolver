@@ -234,7 +234,6 @@ class RWAAnalyzer:
         self.relations_idx = self._convert_relations_to_indices()
         self.modes_subs = self._compute_substitutions()
 
-        # Cache for RWA terms
         self._rwa_terms_cache: Dict[int, List[Tuple[Any, ...]]] = {}
 
     @property
@@ -335,7 +334,6 @@ class RWAAnalyzer:
         Returns:
             List of tuples (mode_idx, combination, mode_name, rhs_terms, coefficient)
         """
-        # Check if cached result exists
         if power in self._rwa_terms_cache:
             return self._rwa_terms_cache[power]
 
@@ -355,7 +353,6 @@ class RWAAnalyzer:
                     rwa_terms.append((j, comb, self.modes[j], rhs, coeff))
 
         result = sorted(rwa_terms, key=lambda x: x[0])
-        # Cache the result
         self._rwa_terms_cache[power] = result
 
         return result
@@ -384,10 +381,8 @@ class ModeArray:
 
         self.analyzer = RWAAnalyzer(list(self.modes.keys()), relations)
 
-        # Build symbolic expressions for efficient frequency propagation
         self._build_symbolic_expressions()
 
-        # Cache for computed mixing coefficients
         self._rwa_terms_3wm: Optional[List[Tuple[Any, ...]]] = None
         self._rwa_terms_4wm: Optional[List[Tuple[Any, ...]]] = None
 
@@ -432,11 +427,9 @@ class ModeArray:
         """Perform topological sort of dependencies."""
         in_degree = defaultdict(int)
 
-        # Calculate in-degrees
         for mode in self.modes.keys():
             in_degree[mode] = len(self.reverse_deps[mode])
 
-        # Start with modes that have no dependencies
         queue = deque([mode for mode in self.modes.keys() if in_degree[mode] == 0])
         result = []
 
@@ -444,7 +437,6 @@ class ModeArray:
             current = queue.popleft()
             result.append(current)
 
-            # Update in-degrees of dependent modes
             for dependent in self.dependency_graph[current]:
                 in_degree[dependent] -= 1
                 if in_degree[dependent] == 0:
@@ -458,29 +450,23 @@ class ModeArray:
 
         This enables O(n) frequency propagation instead of iterative solving.
         """
-        # Build dependency graph
         self._build_dependency_graph()
 
-        # Find independent modes (those not defined by relations)
         self.independent_modes = set(self.modes.keys())
         for result, _ in self.relations:
             self.independent_modes.discard(result)
 
-        # Initialize symbolic expressions
         self.symbolic_expressions = {}
 
-        # Independent modes have simple expressions
         for mode in self.independent_modes:
             self.symbolic_expressions[mode] = {mode: 1.0}
 
-        # Build expressions for dependent modes using topological order
         topo_order = self._topological_sort()
 
         for mode in topo_order:
             if mode in self.symbolic_expressions:
-                continue  # Already processed (independent mode)
+                continue
 
-            # Find the relation that defines this mode
             for result, expr in self.relations:
                 if result == mode:
                     terms = self._parse_expression_for_propagation(expr)
@@ -488,7 +474,6 @@ class ModeArray:
 
                     for dep_mode, coeff in terms:
                         if dep_mode in self.symbolic_expressions:
-                            # Add contribution from dependency
                             for base_mode, base_coeff in self.symbolic_expressions[
                                 dep_mode
                             ].items():
@@ -524,18 +509,15 @@ class ModeArray:
         Returns:
             Dictionary of all mode labels to their computed frequencies
         """
-        # Start with current frequencies
         frequencies: Dict[str, Optional[float]] = {
             label: mode.frequency for label, mode in self.modes.items()
         }
         frequencies.update(updated_freqs)
 
-        # Evaluate each mode using its symbolic expression
         for mode, expression in self.symbolic_expressions.items():
             if mode in updated_freqs:
                 continue  # Already set by user
 
-            # Check if all base modes are available
             all_available = True
             new_freq = 0.0
 
@@ -557,20 +539,16 @@ class ModeArray:
         Args:
             new_frequencies: Dictionary mapping mode labels to new frequencies
         """
-        # Validate input modes exist
         unknown_modes = set(new_frequencies.keys()) - set(self.modes.keys())
         if unknown_modes:
             raise ValueError(f"Unknown modes in frequency update: {unknown_modes}")
 
-        # Use symbolic propagation (much faster than iterative)
         all_frequencies = self._propagate_frequencies_symbolic(new_frequencies)
 
-        # Update modes with new frequencies and interpolated parameters
         for label, freq in all_frequencies.items():
             if freq is not None:
                 mode = self.modes[label]
                 mode.frequency = freq
-                # Get interpolated parameters (always returns kappa, gamma, alpha)
                 kappa, gamma, alpha, Zb = self.interpolator.get_parameters(abs(freq))
                 mode.alpha = alpha  # type: ignore
                 mode.gamma = gamma  # type: ignore
@@ -586,7 +564,6 @@ class ModeArray:
         """
         self.interpolator = interpolator
 
-        # Refresh all mode parameters with current frequencies
         current_freqs = {
             label: mode.frequency
             for label, mode in self.modes.items()
@@ -610,14 +587,11 @@ class ModeArray:
         Returns:
             Dictionary with mode parameters for all related modes
         """
-        # Validate mode exists
         if mode_label not in self.modes:
             raise ValueError(f"Unknown mode: {mode_label}")
 
-        # Initialize result containers
         mode_params: Dict[str, Dict[str, np.ndarray]] = {}
 
-        # For each mode, compute its frequency array using symbolic expressions
         for mode, expression in self.symbolic_expressions.items():
             if mode_label not in expression:
                 # Mode is independent of the swept frequency — broadcast its scalar
@@ -643,10 +617,8 @@ class ModeArray:
                 }
                 continue
 
-            # Compute frequency array for this mode
             mode_freqs = frequencies * expression[mode_label]
 
-            # Add contributions from other independent modes if they have values
             for base_mode, coeff in expression.items():
                 if (
                     base_mode != mode_label
@@ -654,14 +626,12 @@ class ModeArray:
                 ):
                     mode_freqs += coeff * self.modes[base_mode].frequency
 
-            # Get parameters for all frequencies of this mode
             kappas, gammas, alphas, Zbs = self.interpolator.get_parameters(
                 np.abs(mode_freqs)
             )
 
             kappas = np.asarray(kappas)
 
-            # Store parameters
             mode_params[mode] = {
                 "freqs": mode_freqs,
                 "k": kappas,
@@ -681,10 +651,8 @@ class ModeArray:
         return allmodes
 
     def _compute_mode_graph(self):
-        # Create directed graph
         G = nx.DiGraph()
 
-        # Add nodes for all modes
         for mode_label, mode in self.modes.items():
             node_attrs = {
                 "frequency": mode.frequency,
@@ -716,7 +684,6 @@ class ModeArray:
         """
         G = self.mode_graph
 
-        # Add edges based on relations
         edge_labels: dict[Tuple[str, str], str] = {}
         for result, expr in self.relations:
             terms = self._parse_expression_for_propagation(expr)
@@ -736,27 +703,23 @@ class ModeArray:
                     style=edge_style,
                 )
 
-                # Create edge label
                 coeff_str = f"+{coeff}" if coeff > 0 else str(coeff)
                 if (dep_mode, result) in edge_labels:
                     edge_labels[(dep_mode, result)] += f", {coeff_str}"
                 else:
                     edge_labels[(dep_mode, result)] = coeff_str
 
-        # Create figure
         fig, (ax1, ax2) = plt.subplots(
             1, 2, figsize=figsize, gridspec_kw={"width_ratios": [3, 1]}
         )
 
-        # Choose layout
         if layout == "hierarchical":
             pos = self._hierarchical_layout(G)
         elif layout == "circular":
             pos = nx.circular_layout(G)
-        else:  # spring layout
+        else:
             pos = nx.spring_layout(G, k=2, iterations=50)
 
-        # Node colors based on type
         node_colors = []
         for node in G.nodes():
             if G.nodes[node]["is_independent"]:
@@ -764,12 +727,10 @@ class ModeArray:
             else:
                 node_colors.append("lightblue")  # Dependent modes
 
-        # Draw nodes
         nx.draw_networkx_nodes(
             G, pos, node_color=node_colors, node_size=node_size, ax=ax1
         )
 
-        # Draw positive and negative edges separately for different styles
         pos_edges = [(u, v) for u, v, d in G.edges(data=True) if d["color"] == "blue"]
         neg_edges = [(u, v) for u, v, d in G.edges(data=True) if d["color"] == "red"]
 
@@ -796,7 +757,6 @@ class ModeArray:
                 ax=ax1,
             )
 
-        # Node labels
         if show_frequencies:
             labels = {}
             for mode_label, mode in self.modes.items():
@@ -807,7 +767,6 @@ class ModeArray:
 
         nx.draw_networkx_labels(G, pos, labels, font_size=font_size, ax=ax1)
 
-        # Edge labels (coefficients)
         nx.draw_networkx_edge_labels(
             G, pos, edge_labels, font_size=font_size - 2, ax=ax1
         )
@@ -815,7 +774,6 @@ class ModeArray:
         ax1.set_title("Mode Relationships", fontsize=font_size + 2, fontweight="bold")
         ax1.axis("off")
 
-        # Legend
         legend_elements = [
             mpatches.Patch(color="lightgreen", label="Independent modes"),
             mpatches.Patch(color="lightblue", label="Dependent modes"),
@@ -831,7 +789,6 @@ class ModeArray:
         ]
         ax1.legend(handles=legend_elements, loc="upper right")
 
-        # Relations text in second subplot
         ax2.axis("off")
         ax2.set_title("Relations", fontsize=font_size + 1, fontweight="bold")
 
@@ -869,24 +826,19 @@ class ModeArray:
         """Create hierarchical layout with independent modes at bottom."""
         levels = {}
 
-        # Independent modes at level 0
         for mode in self.independent_modes:
             levels[mode] = 0
 
-        # Assign levels based on dependencies
         max_level = 0
         for mode in nx.topological_sort(G):
             if mode not in levels:
-                # Find maximum level of predecessors
                 pred_levels = [levels.get(pred, 0) for pred in G.predecessors(mode)]
                 levels[mode] = max(pred_levels, default=0) + 1
                 max_level = max(max_level, levels[mode])
 
-        # Create positions
         level_counts: dict[int, int] = defaultdict(int)
         level_positions: dict[int, int] = defaultdict(int)
 
-        # Count nodes per level
         for level in levels.values():
             level_counts[level] += 1
 
@@ -922,7 +874,6 @@ class ModeArray:
                 self._rwa_terms_4wm = self.analyzer.find_rwa_terms(power)
             return self._rwa_terms_4wm
         else:
-            # For other powers, go directly to the analyzer without caching
             return self.analyzer.find_rwa_terms(power)
 
     def print_modes(self):
@@ -1015,21 +966,19 @@ class ModeArrayFactory:
         """
         interpolator = ModeArrayFactory._interpolator_from_data(base_data, interpolator)
 
-        # Create basic modes
         modes = [Mode(label="p"), Mode(label="s"), Mode(label="i")]
 
-        # Basic relation
-        relations = [["i", "p-s"]]  # Idler is pump minus signal
+        relations = [["i", "p-s"]]
 
         for n in range(1, n_frequency_conversion + 1):
             if n == 1:
-                modes.append(Mode(label="ps"))  # p+s
-                modes.append(Mode(label="pi"))  # p+i
+                modes.append(Mode(label="ps"))
+                modes.append(Mode(label="pi"))
                 relations.append(["ps", "p+s"])
                 relations.append(["pi", "p+i"])
             else:
-                modes.append(Mode(label=f"p{n}s"))  # p+s
-                modes.append(Mode(label=f"p{n}i"))  # p+i
+                modes.append(Mode(label=f"p{n}s"))
+                modes.append(Mode(label=f"p{n}i"))
                 relations.append([f"p{n}s", "p+" * (n - 1) + "p+s"])
                 relations.append([f"p{n}i", "p+" * (n - 1) + "p+i"])
 

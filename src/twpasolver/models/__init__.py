@@ -50,7 +50,6 @@ Example
     abcd_params = network.single_abcd(freqs)
 """
 
-# !/bin/python3
 # isort: skip_file
 from twpasolver.models.oneport import (
     Resistance,

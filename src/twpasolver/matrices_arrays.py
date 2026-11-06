@@ -19,10 +19,8 @@ class TwoByTwoArray:
             mat (numpy.ndarray): Input array of 2x2 matrices or [x11,x12,x21,x22], where each element is a 1D list.
         """
         mat = np.asarray(mat)
-        # Transform the input to array of 2x2 matrices
         if len(mat.shape) == 2 and len(mat) == 4:
             mat = mat.reshape(2, 2, mat.shape[1]).transpose(2, 0, 1)
-        # Check if the array has now the correct shape
         if len(mat.shape) != 3 or mat.shape[-2:] != (2, 2):
             raise ValueError(
                 "Input must be array of 2x2 matrices or [A, B, C, D], where each element is a list."

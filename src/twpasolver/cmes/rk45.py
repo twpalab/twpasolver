@@ -61,13 +61,8 @@ def rk45_solve(
     ``t_eval`` (the only way it is called); returns the solution interpolated
     on ``t_eval``, shape ``(y_size, t_eval.size)``.
     """
-    # Built via elementwise assignment into a pre-allocated array rather than
-    # np.array([...]) literal-list construction: under parallel=True, that
-    # literal-list form triggers Numba's constant-array-inlining rewrite
-    # pass, which hits an internal compiler bug for arrays built inside an
-    # inline="always" function ("AssertionError: key already in dictionary:
-    # '$np_typ_var.N'"). Plain elementwise assignment sidesteps that pass
-    # entirely.
+    # Elementwise assignment: an np.array([...]) literal inside an inline="always"
+    # function under parallel=True hits a Numba compiler bug.
     C = np.empty(6, dtype=np.float64)
     C[0] = 0.0
     C[1] = 1 / 5
@@ -110,7 +105,6 @@ def rk45_solve(
     E[5] = -22 / 525
     E[6] = 1 / 40
 
-    # Clean up and interpret inputs
     t_start = t_span[0]
     t_end = t_span[1]
     direction = np.sign(t_end - t_start) if t_end != t_start else 1
@@ -121,7 +115,6 @@ def rk45_solve(
 
     y_result_store = np.empty(y_size, dtype=dtype)
 
-    # Containers to store results during integration
     time_domain_list = [t_start]
     y_result_list = [np.copy(y0)]
 
@@ -142,18 +135,14 @@ def rk45_solve(
     if rtol < (100 * EPS):
         rtol = 100 * EPS
 
-    # Cap the number of accepted steps at the integration length in unit cells
-    # (times max_steps_per_cell): the CMEs describe envelopes that vary
-    # slowly on the scale of one cell, so needing more steps than cells means
-    # the solution is running away (e.g. an unguarded stopband-edge process).
-    # The run then stops with status -7 and the unreached points are NaN.
+    # Envelopes vary slowly on the cell scale, so more steps than cells means a
+    # runaway solution: stop with status -7, unreached points stay NaN.
     if max_steps_per_cell > 0:
         span_steps = int(np.ceil(np.abs(t_end - t_start) * max_steps_per_cell)) + 1
         if max_num_steps <= 0 or max_num_steps > span_steps:
             max_num_steps = span_steps
     use_max_steps = max_num_steps > 0
 
-    # Initialize variables for start of integration
     t_old = t_start
     t_new = t_start
     y_new = np.empty_like(y0)

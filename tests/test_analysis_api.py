@@ -69,7 +69,7 @@ def _assert_same(a, b):
             np.testing.assert_array_equal(a_arr, np.asarray(b))
 
 
-# TWPAnalysis end to end (2.36), HDF5 round trips (2.8, 2.29)
+# TWPAnalysis end to end, HDF5 round trips
 
 
 def test_twpanalysis_end_to_end(analysis, tmp_path):
@@ -128,7 +128,7 @@ def test_failed_save_keeps_previous_file(tmp_path):
     assert not os.path.exists(name + ".tmp")
 
 
-# Base data state (2.30), k_star guard (2.10)
+# Base data state, k_star guard
 
 
 def test_update_base_data_follows_grid():
@@ -148,7 +148,7 @@ def test_k_star_guard_with_coarse_grid():
     assert np.all(np.isfinite(an.data["k_star"]))
 
 
-# Stopband from the supercell half trace (2.11)
+# Stopband from the supercell half trace
 
 
 def test_stopbands_do_not_depend_on_grid_end():
@@ -190,7 +190,7 @@ def test_gain_needs_pump(analysis):
         analysis.gain(SIGNALS)
 
 
-# 4WM Kerr mismatch (2.2)
+# 4WM Kerr mismatch
 
 
 @pytest.mark.parametrize(
@@ -216,7 +216,7 @@ def test_phase_matching_kerr_mismatch_on_flat_line(mixing, config, pump, kerr):
     np.testing.assert_allclose((dk["delta"] - dk_lin) / (chi * k_p), kerr, rtol=1e-3)
 
 
-# gain(Ip0=...) is local (2.13), position grid (2.18)
+# gain(Ip0=...) is local, position grid
 
 
 def test_gain_ip0_does_not_change_twpa(analysis):
@@ -246,7 +246,7 @@ def test_gain_position_grid_has_two_points_at_least(analysis):
     assert len(res["x"]) == 2
 
 
-# phase_matching ranges (2.31)
+# phase_matching ranges
 
 
 def test_phase_matching_explicit_ranges(analysis):
@@ -266,7 +266,7 @@ def test_phase_matching_zero_pump_is_linear(analysis):
     assert not np.allclose(lin, kerr)
 
 
-# bloch with 2-D initial amplitudes (2.7)
+# bloch with 2-D initial amplitudes
 
 
 def test_bloch_2d_initial_amplitudes(analysis):
@@ -279,7 +279,7 @@ def test_bloch_2d_initial_amplitudes(analysis):
     np.testing.assert_array_equal(res["gain_db"], ref["gain_db"])
 
 
-# bandwidth (2.17)
+# bandwidth
 
 
 def test_bandwidth_errors():
@@ -295,7 +295,7 @@ def test_bandwidth_errors():
         an.bandwidth()
 
 
-# Decorator overwrite message (2.16)
+# Decorator overwrite message
 
 
 def test_overwrite_message_checks_save_name(analysis, caplog):
@@ -314,7 +314,7 @@ def test_overwrite_message_checks_save_name(analysis, caplog):
     assert "'custom' output already present" in caplog.text
 
 
-# Logging (5.4)
+# Logging
 
 
 def test_log_does_not_reach_root_handler():
@@ -329,7 +329,7 @@ def test_log_does_not_reach_root_handler():
     assert records == [] and log.handlers
 
 
-# Validation (2.19, 2.23, 2.35)
+# Validation
 
 
 def test_twpanalysis_rejects_unknown_fields():
@@ -357,7 +357,7 @@ def test_abcd_setter_rejects_wrong_length():
     np.testing.assert_array_equal(abcd.A, [3, 4])
 
 
-# Models (2.21, 2.22, 2.27, 2.33, 2.34, 2.35)
+# Models
 
 
 def test_twpa_slice_keeps_parameters():
@@ -403,7 +403,7 @@ def test_resistance_on_integer_freqs():
     np.testing.assert_array_equal(Resistance(R=2.5).Z(np.array([1, 2])), [2.5, 2.5])
 
 
-# modes_rwa (2.25)
+# modes_rwa
 
 
 def test_cyclic_relations_raise():
