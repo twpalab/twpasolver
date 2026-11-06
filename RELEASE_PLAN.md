@@ -556,6 +556,34 @@ cold compile time measured and noted here; the line count noted here.
     go too.
 - [ ] **7.9 Tag the release**; PyPI per D7.
 
+## WP8: General devices and user models (after the first release)
+
+Goal: any lumped/distributed ladder (left-handed, CRLH, shunt-JJ, SNAIL, mixed JJ/kinetic) and user models that
+are a plain `compose(...)` with no extra hooks. Today the nonlinearity is one device-wide `epsilon/xi/chi` on
+`TWPA`, its location is an `isinstance` chain in `series_nl_elements` (series elements only), `simple` scales the
+coupling by γ_n and `phase_matching` uses `2χk_p` (both right-handed continuum assumptions, wrong sign and
+scaling on left-handed bands), and built-in cells are opaque ABCD functions.
+
+- [ ] **8.1 Cells as primitive chains.** One `flatten(cell)` → ordered series Z / shunt Y / TL-section primitives
+  (`Inductance`, `Capacitance`, `Stub`, `LosslessTL`, `twoport_parallel`). It gives the ABCD, exact winding steps
+  (no `_t_split`; TL sections subdivided, closes the distributed-line winding item), nonlinear-element positions
+  and both V and I profiles. Rewrite `LCLfBaseCell`/`StubBaseCell` as compositions. Black-box `single_abcd`
+  cells stay valid for linear parts only (clear error if marked nonlinear). Useful alone.
+- [ ] **8.2 Per-element nonlinearity.** Optional nonlinear spec on `Inductance` (L0, I*, I*2, Idc or ε/ξ);
+  `TWPA` keeps the pump, its current fields become defaults. Removes the `isinstance` chain and the
+  `bloch_nl_elements` hook (supersedes 5.2).
+- [ ] **8.3 One coupling builder, series and shunt.** Series nonlinear L = voltage source projected with the I
+  profile (as now); shunt nonlinear L = current source projected with the V profile; distributed kinetic
+  nonlinearity by quadrature inside TL sections. Kernels unchanged (they take coefficient tables). Derivation of
+  the shunt term to be checked on a small lumped left-handed ladder.
+- [ ] **8.4 `simple` from the same tables, forward modes only.** Drop the γ-based coupling in `cmes/base.py`.
+  First measure the gap to the current form on the holotype (should be discreteness-level).
+- [ ] **8.5 `phase_matching` from the same tables** (pump-only SPM/XPM), removing `TWPA.chi`.
+- [ ] **8.6 Reference devices as tests** (right-handed ladder vs analytic, left-handed ladder, CRLH, KI stub, SNAIL 3WM;
+  ideally a harmonic-balance cross-check on short devices) and a "writing a model" docs page (left-handed example).
+
+Breaking: `TWPA` nonlinearity fields and the built-in cell classes.
+
 ---
 
 ## Suggested order and size
@@ -569,6 +597,7 @@ cold compile time measured and noted here; the line count noted here.
 | 5 | WP4 | large | medium | WP3, D8 |
 | 6 | WP5 | medium | low–medium | — (5.3 is independent) |
 | 7 | WP6, WP7 | medium | low | everything above |
+| 8 | WP8 (next release) | large | medium | first release |
 
 Expected net reduction: about 1,500 lines from WP3.1–3.5 and 4.x with no physics loss, plus about 1,850 if the
 `general` forward–backward model goes (D1), and about 1,800 if `quantum/` is held back (D3).
