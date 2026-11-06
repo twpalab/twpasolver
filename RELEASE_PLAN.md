@@ -138,7 +138,11 @@ Each fix gets a test.
   only to the linear k_p, so |Δk_Kerr| = 3χk_p on a flat line; the CMEs give 2χk_p (weak tones k(1+2χ), pump
   k(1+χ), χ = ξI_p²/8). `notebooks/amplification/uniform_line.py` has a reference implementation.
   - Done 2026-11-06 (audit-fixes): Kerr bracket uses `pump_coeff * k_p`; a flat line gives -2 chi k_p (4WM) and -chi k_p (3WM), as `uniform_line.py`. Test `test_phase_matching_kerr_mismatch_on_flat_line`.
-- [ ] **2.3 k unwrap above resonator notches.** `_bloch_params_for_cell` (`analysis.py:~528`) unwraps 2·Im γ and
+- [x] **2.3 k unwrap above resonator notches.** Done 2026-11-06 (audit-fixes): k is now the winding of the
+  forward-wave amplitude a = V + Z0·I of the forward Bloch mode, carried back through every series/shunt element of
+  the supercell (`cmes/bloch.py::bloch_wavenumber`), snapped to arg λ. Fixes k + π/d above notches, the sign of k in
+  left-handed bands and k on grids starting above a stopband; equal to the old k to 1e-16 on the holotype devices.
+  Old text: `_bloch_params_for_cell` (`analysis.py:~528`) unwraps 2·Im γ and
   halves it, so k is fixed only modulo π per supercell. Above an LC notch (cos kd passes +1), k lands on
   k + π/d.
   - Reference fix: `notebooks/amplification/dispersion_strategies.py::fix_k` picks 2πm ± arccos((A+D)/2) closest
@@ -375,6 +379,10 @@ cold compile time measured and noted here; the line count noted here.
 
 ## WP4: `analysis.py` restructuring and API consistency
 
+- Base data simplified 2026-11-06 (audit-fixes): one code path for uniform (one segment) and segmented
+  devices; `_segment_supercell_abcds` and `_segment_bloch_params` merged into `update_base_data` and
+  `_bloch_params_for_cell(cell, T=None)` (returns k, alpha, Zb, reflection_coeff only); `analysis.py` +55 -137
+  (net -82; with the winding in `bloch.py` +83, src net +1). No data key removed (all are read somewhere).
 - [ ] **4.1 Split into a package `twpasolver/analysis/`**, with `__init__` re-exporting `TWPAnalysis`,
   `GainModel` and `Analyzer`:
 
@@ -519,6 +527,9 @@ cold compile time measured and noted here; the line count noted here.
     `data["stopband_freqs"]` replaced by `data["stopbands"]` (all bands, `(n, 2)`); `data["optimal_pump_freq"]`
     removed, `phase_matching(...)["optimal_pump_freq"]` instead; `gain` `pump` required; `phase_matching`
     `signal_arange`/`pump_arange` required (keyword-only).
+  - `data["k"]` by winding (2.3): changes above resonator notches (was off by π per supercell), in
+    left-handed bands (now k < 0) and on grids starting above a stopband (was off by 2π per supercell);
+    `_bloch_params_for_cell` no longer returns `gamma_bloch`, `vg`, `N_tot` and drops `Z0_override`/`abcd_single`.
 - [ ] **7.8 Branches.**
   - Reconcile `origin/main` (4 commits, the simple_4wm PR: `create_basic(three_wave=)`, `basic_4wm` array,
     placeholder relations; already present in substance on `edge-basis`). `git merge-tree` shows conflicts in
@@ -722,6 +733,9 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
 - 2026-11-06, automatic pump estimate removed on `audit-fixes` (Pietro): `data["stopbands"]` lists all bands,
   `gain(pump)` and the `phase_matching` ranges are required, `optimal_pump_freq` moved to the `phase_matching`
   result. Gains and k_star bit-identical on the regression set.
+- 2026-11-06, winding k (2.3) and base-data simplification on `audit-fixes`: gains of the uniform regression
+  cases within 1.3e-11 dB, k within 1.1e-16 rad/cell on three devices; segmented edge case moves by up to 1e-3 dB,
+  which a 1e-15 relative perturbation of k already causes on the old code (ill-conditioned there). mypy 13 -> 10.
 
 ## Where to pick up (end of session 2026-11-06)
 

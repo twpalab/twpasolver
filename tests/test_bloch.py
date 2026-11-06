@@ -778,3 +778,61 @@ def _holotype_analysis():
             ),
         )
     return analysis
+
+
+# --------------------------------------------------------------------------- #
+# Bloch wavenumber by winding
+# --------------------------------------------------------------------------- #
+
+
+def _ladder_k(cells, f_arange):
+    analysis = TWPAnalysis(twpa=TWPA(cells=cells), f_arange=f_arange)
+    analysis.update_base_data()
+    return analysis
+
+
+def test_winding_k_starts_near_zero_above_notch(caplog):
+    """Series L, shunt C and a shunt series-LC notch: the band above the notch
+    gap starts at k ~ 0 (not pi), and the winding agrees with arg(lambda)."""
+    from twpasolver.logger import log
+    from twpasolver.models.oneport import Capacitance, Inductance, OnePortArray
+
+    notch = OnePortArray(
+        cells=[Inductance(L=1e-9), Capacitance(C=0.5e-12)], twoport_parallel=True
+    )
+    cells = [Inductance(L=0.5e-9), Capacitance(C=0.2e-12, twoport_parallel=True)]
+    log.addHandler(caplog.handler)
+    try:
+        an = _ladder_k([*cells, notch], (0.5, 20, 0.01))
+    finally:
+        log.removeHandler(caplog.handler)
+    assert not any("winding" in r.getMessage() for r in caplog.records)
+    above = an.data["freqs"] > an.data["stopbands"][-1, 1]
+    kd = an.data["k"][above] * an.twpa.N_tot
+    assert 0 < kd[0] < 0.1
+    assert np.all(np.diff(kd) > 0)
+
+
+def test_winding_k_independent_of_grid_start():
+    """A grid starting above the first stopbands gives the same k."""
+    low = TWPAnalysis(twpa=str(HOLOTYPE), f_arange=(0.2, 40, 0.1))
+    high = TWPAnalysis(twpa=str(HOLOTYPE), f_arange=(30.0, 40, 0.1))
+    low.update_base_data()
+    high.update_base_data()
+    i = np.searchsorted(low.data["freqs"], high.data["freqs"] - 1e-6)
+    assert np.allclose(low.data["freqs"][i], high.data["freqs"])
+    np.testing.assert_allclose(high.data["k"], low.data["k"][i], atol=1e-12)
+
+
+def test_winding_k_left_handed_line():
+    """Series C, shunt L: backward-wave band with k < 0 and dk/df > 0."""
+    from twpasolver.models.oneport import Capacitance, Inductance
+
+    an = _ladder_k(
+        [Capacitance(C=1e-12), Inductance(L=2.5e-9, twoport_parallel=True)],
+        (0.5, 20, 0.01),
+    )
+    band = an.data["freqs"] > an.data["stopbands"][0, 1]
+    k = an.data["k"][band]
+    assert np.all(k < 0)
+    assert np.all(np.diff(k) > 0)

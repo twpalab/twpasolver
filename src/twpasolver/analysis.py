@@ -16,6 +16,7 @@ from twpasolver.cmes import solver_config
 from twpasolver.cmes.base import no_reflections_cmes_solve
 from twpasolver.cmes.bloch import (
     bloch_mode_tables,
+    bloch_wavenumber,
     edge_basis_tables,
     edge_reference_frequency,
     in_stopband,
@@ -528,58 +529,28 @@ class TWPAnalysis(Analyzer, Frequencies):
             bounds = np.array([0.0, float(self.twpa.N_tot)])
         return segments, bounds
 
-    def _bloch_params_for_cell(
-        self,
-        cell: TWPA,
-        Z0_override: complex | float | None = None,
-        abcd_single: Any = None,
-    ) -> dict[str, Any]:
-        """Extract Bloch-mode propagation parameters for a single uniform TWPA segment.
-
-        Parameters
-        ----------
-        cell : TWPA
-            The cell whose ABCD matrix is used to compute Bloch parameters.
-        Z0_override : complex | float, optional
-            Reference impedance to use for the reflection coefficient and Bloch
-            impedance computation.  When provided it overrides ``cell.Z0_ref``.
-            This should be set to the parent TWPA's ``Z0_ref`` when computing
-            per-segment parameters so that all segments share the same reference
-            as the full device.
-        abcd_single : ABCDArray, optional
-            Precomputed ABCD matrix of one period of ``cell`` on ``self.f``
-            (``cell.single_abcd(self.f)``), to avoid computing it twice.
+    def _bloch_params_for_cell(self, cell: TWPA, T: Any = None) -> dict[str, Any]:
         """
-        Z0 = Z0_override if Z0_override is not None else cell.Z0_ref
-        if abcd_single is None:
-            abcd_single = cell.single_abcd(self.f)
-        A, B, C, D = abcd_single.A, abcd_single.B, abcd_single.C, abcd_single.D
-        ad = A + D
-        freqs = self.f / self.unit_multiplier
+        Bloch parameters of a uniform segment, per unit cell.
 
-        gamma_bloch = np.log((ad + np.sqrt(ad**2 - 4)) / 2)
-        Zb = -2 * B / (A - D - np.sqrt((A + D) ** 2 - 4))
-        gamma_bloch.real = np.abs(gamma_bloch.real) / int(cell.N_tot / cell.N)
-        gamma_bloch.imag = (
-            np.unwrap(gamma_bloch.imag * np.sign(Zb.real) * 2)
-            / 2
-            / int(cell.N_tot / cell.N)
-        )
+        ``k`` (winding rule, :func:`bloch_wavenumber`), ``alpha``, the Bloch
+        impedance ``Zb`` and its ``reflection_coeff`` against ``self.twpa.Z0_ref``.
+        ``T`` is the supercell ABCD of ``cell`` on ``self.f`` when already known.
+        """
+        if T is None:
+            T = cell.single_abcd(self.f)
+        T = np.asarray(T)
+        A, B, D = T[:, 0, 0], T[:, 0, 1], T[:, 1, 1]
+        n_cells = int(cell.N_tot / cell.N)
+        root = np.sqrt((A + D) ** 2 - 4)
+        Zb = -2 * B / (A - D - root)
         Zb.real = np.abs(Zb.real)
-
-        reflection_coeff = (Zb - Z0) / (Zb + Z0)
-        k = gamma_bloch.imag
-        alpha = gamma_bloch.real
-        vg = np.nan_to_num(np.gradient(k, freqs, axis=0), nan=0)
-
+        Z0 = self.twpa.Z0_ref
         return {
+            "k": bloch_wavenumber(cell, self.f, T, Z0) / n_cells,
+            "alpha": np.abs(np.log((A + D + root) / 2).real) / n_cells,
             "Zb": Zb,
-            "gamma_bloch": gamma_bloch,
-            "reflection_coeff": reflection_coeff,
-            "k": k,
-            "alpha": alpha,
-            "vg": vg,
-            "N_tot": cell.N_tot,
+            "reflection_coeff": (Zb - Z0) / (Zb + Z0),
         }
 
     def _build_port_tables(
@@ -675,86 +646,65 @@ class TWPAnalysis(Analyzer, Frequencies):
         ):
             log.info("Computing base parameters.")
             segmented = self._is_segmented()
-            if segmented:
-                # One supercell ABCD per distinct segment, reused for the device
-                # ABCD and for the segment's Bloch parameters.
-                segments = [c for c in self.twpa.cells if isinstance(c, TWPA)]
-                seg_abcd = self._segment_supercell_abcds(segments)
-                device_abcd = None
-                for seg, T in zip(segments, seg_abcd):
-                    T_seg = T if seg.N == 1 else T**seg.N
-                    device_abcd = T_seg if device_abcd is None else device_abcd @ T_seg
-                abcd_single = device_abcd
-            else:
-                abcd_single = self.twpa.single_abcd(self.f)
-            cell = TwoPortCell(
-                self.f,
-                abcd=abcd_single if self.twpa.N == 1 else abcd_single**self.twpa.N,
-                Z0=self.twpa.Z0_ref,
-            )
+            # A uniform device is one segment.
+            segments: list[Any] = list(self.twpa.cells) if segmented else [self.twpa]
+            # Segments with identical unit cells share one supercell ABCD and its
+            # Bloch parameters (N and the nonlinearity do not enter them).
+            cache: dict[str, Any] = {}
+            params: list[dict[str, Any]] = []
+            abcd: Any = None
+            for seg in segments:
+                key = repr([c.model_dump() for c in seg.cells])
+                if key not in cache:
+                    T = seg.single_abcd(self.f)
+                    cache[key] = (T, self._bloch_params_for_cell(seg, T))
+                T, p = cache[key]
+                params.append(p)
+                T_seg = T if seg.N == 1 else T**seg.N
+                abcd = T_seg if abcd is None else abcd @ T_seg
+            if segmented and self.twpa.N != 1:
+                abcd = abcd**self.twpa.N
+            cell = TwoPortCell(self.f, abcd=abcd, Z0=self.twpa.Z0_ref)
             freqs = self.f / self.unit_multiplier
 
-            # S-parameters: always from the full device.
             self.data["freqs"] = freqs
             self.data["abcd"] = np.asarray(cell.abcd)
             self.data["S21"] = cell.s.S21
             self.data["S11"] = cell.s.S11
-            s21_db = 20 * np.log10(np.abs(self.data["S21"]))
-            self.data["S21_db"] = s21_db
+            self.data["S21_db"] = 20 * np.log10(np.abs(self.data["S21"]))
 
             # Stopbands of the (first segment's) lossless supercell, one
             # [start, end] row (first and last grid point) per contiguous band.
-            gap = in_stopband(
-                lossless_copy(segments[0] if segmented else self.twpa), self.f
-            )
+            gap = in_stopband(lossless_copy(segments[0]), self.f)
             edges = np.flatnonzero(np.diff(np.concatenate([[0], gap, [0]])))
             stopbands = freqs[edges.reshape(-1, 2) - [0, 1]]
             if not len(stopbands):
                 log.warning("No stopband in the frequency grid.")
             self.data["stopbands"] = stopbands
 
-            # Bloch parameters: 2-D (n_segments, n_freq) for segmented devices,
-            # 1-D (n_freq,) for uniform ones. ParameterInterpolator handles both
-            # shapes identically, so _update_all_mode_arrays needs no branching.
+            # Bloch parameters: (n_segments, n_freq) for segmented devices,
+            # (n_freq,) for uniform ones.
+            for key in ("k", "alpha", "reflection_coeff", "Zb"):
+                stacked = np.stack([p[key] for p in params])
+                self.data[key] = stacked if segmented else stacked[0]
+            seg_N_tot = np.array([seg.N_tot for seg in segments], dtype=np.float64)
             if segmented:
-                log.info(
-                    "Detected %d TWPA segments, computing Bloch parameters per segment.",
-                    len(segments),
-                )
-                seg_results = self._segment_bloch_params(segments, seg_abcd)
-                seg_N_tot = np.array(
-                    [r["N_tot"] for r in seg_results], dtype=np.float64
-                )
-                seg_boundaries = np.concatenate([[0.0], np.cumsum(seg_N_tot)])
-
-                self.data["k"] = np.stack([r["k"] for r in seg_results])
-                self.data["alpha"] = np.stack([r["alpha"] for r in seg_results])
-                self.data["reflection_coeff"] = np.stack(
-                    [r["reflection_coeff"] for r in seg_results]
-                )
-                self.data["Zb"] = np.stack([r["Zb"] for r in seg_results])
+                log.info("Detected %d TWPA segments.", len(segments))
+                bounds = np.concatenate([[0.0], np.cumsum(seg_N_tot)])
                 self.data["segments"] = {
-                    "boundaries": seg_boundaries,
-                    "midpoints": 0.5 * (seg_boundaries[:-1] + seg_boundaries[1:]),
+                    "boundaries": bounds,
+                    "midpoints": 0.5 * (bounds[:-1] + bounds[1:]),
                     "N_tot": seg_N_tot,
-                    "epsilon": np.array([seg.epsilon for seg in segments]),  # type: ignore
-                    "xi": np.array([seg.xi for seg in segments]),  # type: ignore
+                    "epsilon": np.array([seg.epsilon for seg in segments]),
+                    "xi": np.array([seg.xi for seg in segments]),
                 }
-                # Device-averaged wavenumber (per unit cell) for k_star: the
-                # length-weighted mean of the segment
-                # wavenumbers. Unwrapping the phase of the whole device as a
-                # single "supercell" would lose 2*pi windings on any practical
-                # frequency grid.
-                k_full = (seg_N_tot @ self.data["k"]) / seg_N_tot.sum()
             else:
-                whole = self._bloch_params_for_cell(self.twpa, abcd_single=abcd_single)
-                self.data["k"] = whole["k"]
-                self.data["alpha"] = whole["alpha"]
-                self.data["reflection_coeff"] = whole["reflection_coeff"]
-                self.data["Zb"] = whole["Zb"]
                 self.data.pop("segments", None)
-                k_full = whole["k"]
 
+            # k_star from the length-weighted mean wavenumber per unit cell.
+            k_full = np.average(
+                np.atleast_2d(self.data["k"]), axis=0, weights=seg_N_tot
+            )
             freqs_mask = freqs < (stopbands[0, 0] / 10 if len(stopbands) else 0.0)
             if freqs_mask.sum() > 2:
                 k_pars = np.polyfit(freqs[freqs_mask], k_full[freqs_mask], 2)
@@ -767,38 +717,6 @@ class TWPAnalysis(Analyzer, Frequencies):
             self._update_all_mode_arrays()
             if "basic_3wm" not in self._mode_arrays:
                 self._initialize_standard_mode_arrays()
-
-    def _segment_supercell_abcds(self, segments: list) -> list:
-        """
-        Supercell ABCD matrix of every segment on ``self.f``.
-
-        Segments with identical unit cells share one computation (the
-        repetition count ``N`` and the nonlinearity do not enter the linear
-        supercell).
-        """
-        cache: dict[str, Any] = {}
-        out = []
-        for seg in segments:
-            key = repr([c.model_dump() for c in seg.cells])
-            if key not in cache:
-                cache[key] = seg.single_abcd(self.f)
-            out.append(cache[key])
-        return out
-
-    def _segment_bloch_params(self, segments: list, seg_abcd: list) -> list:
-        """Bloch parameters of every segment from its precomputed supercell ABCD."""
-        cache: dict[int, dict[str, Any]] = {}
-        out = []
-        for seg, T in zip(segments, seg_abcd):
-            key = id(T)  # identical cells share the same ABCD object
-            if key not in cache:
-                cache[key] = self._bloch_params_for_cell(
-                    seg, Z0_override=self.twpa.Z0_ref, abcd_single=T
-                )
-            res = dict(cache[key])
-            res["N_tot"] = seg.N_tot
-            out.append(res)
-        return out
 
     def _base_interpolator(self) -> ParameterInterpolator:
         """Interpolator of the current base data, shared by all mode arrays."""

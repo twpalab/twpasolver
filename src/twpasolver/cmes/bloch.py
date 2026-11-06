@@ -44,6 +44,7 @@ from typing import Any
 import numpy as np
 
 from twpasolver.bonus_types import ComplexArray, FloatArray
+from twpasolver.logger import log
 from twpasolver.models.twoportarrays import TwoPortArray
 from twpasolver.models.twpa_cells import LCLfBaseCell, StubBaseCell
 
@@ -119,6 +120,88 @@ def _inverse_2x2(T: np.ndarray) -> np.ndarray:
     Tinv[:, 1, 0] = -T[:, 1, 0]
     Tinv[:, 1, 1] = T[:, 0, 0]
     return Tinv / det[:, None, None]
+
+
+def _t_split(Tc: np.ndarray) -> list[tuple[np.ndarray, ...]]:
+    """
+    ``(A, B, C, D)`` of the series-shunt-series (T) network equal to ``Tc``.
+
+    Exact for any reciprocal two-port (det = 1); for the package lumped cells
+    these are their actual elements. Where ``C == 0`` (a pure series element)
+    the middle step is ``Tc`` itself.
+    """
+    A, B, C, D = Tc[:, 0, 0], Tc[:, 0, 1], Tc[:, 1, 0], Tc[:, 1, 1]
+    split = C != 0
+    one, zero = np.ones_like(A), np.zeros_like(A)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        Z1 = np.where(split, (A - 1) / C, 0)
+        Z2 = np.where(split, (D - 1) / C, 0)
+    mid = (np.where(split, 1, A), np.where(split, 0, B), C, np.where(split, 1, D))
+    return [(one, Z1, zero, one), mid, (one, Z2, zero, one)]
+
+
+def bloch_wavenumber(
+    twpa: TwoPortArray, freqs_hz: FloatArray, T: np.ndarray, Z0: complex
+) -> np.ndarray:
+    """
+    Bloch wavenumber ``k d`` per supercell of the forward mode, by winding.
+
+    The forward mode is the eigenvector of the supercell ABCD ``T`` carrying
+    power along +x (``Re Zb > 0``) in a passband and decaying along +x
+    (``|lambda| > 1``) in a stopband. Its forward-wave amplitude
+    ``a = V + Z0 I`` is carried from x = d back to x = 0 element by element
+    (series/shunt steps of every unit cell) and ``k d`` is the accumulated phase
+    of ``a``. Unlike unwrapping ``arg lambda`` along the frequency grid this does
+    not depend on the grid, gives ``k`` near 0 above a notch and ``k < 0`` in a
+    left-handed band. The result is snapped to ``arg lambda`` modulo 2 pi.
+    """
+    freqs_hz = np.atleast_1d(np.asarray(freqs_hz, dtype=np.float64))
+    T = np.asarray(T)
+    tr = T[:, 0, 0] + T[:, 1, 1]
+    root = np.sqrt(tr**2 - 4 + 0j)
+    lam1, lam2 = (tr + root) / 2, (tr - root) / 2
+    Zb1, Zb2 = _eigvec_ratio(T, lam1), _eigvec_ratio(T, lam2)
+    gap = np.abs(np.abs(lam1) - np.abs(lam2)) > 1e-9
+    pick1 = np.where(gap, np.abs(lam1) >= np.abs(lam2), Zb1.real > 0)
+    lam = np.where(pick1, lam1, lam2)
+    V = np.where(pick1, Zb1, Zb2)
+    I = np.ones_like(V)
+
+    steps: list[tuple[np.ndarray, ...]] = []
+    for cell, n in expand_unit_cells(twpa):
+        Tc = np.asarray(cell.single_abcd(freqs_hz)).astype(np.complex128)
+        steps += _t_split(Tc) * n
+
+    # Backward sweep with the plain ABCDs: the forward mode grows towards x = 0,
+    # so rounding never seeds the backward mode.
+    a = V + Z0 * I
+    kd = np.zeros(len(freqs_hz))
+    max_step = np.zeros(len(freqs_hz))
+    for A, B, C, D in reversed(steps):
+        V, I = A * V + B * I, C * V + D * I
+        norm = np.hypot(np.abs(V), np.abs(I))
+        V, I = V / norm, I / norm
+        a_new = V + Z0 * I
+        step = np.angle(a_new / a)
+        kd += step
+        max_step = np.maximum(max_step, np.abs(step))
+        a = a_new
+
+    arg = np.angle(lam)
+    m = np.round((kd - arg) / (2 * np.pi))
+    resid = np.abs(kd - arg - 2 * np.pi * m)
+    if np.nanmax(resid, initial=0) > 1e-8:
+        log.warning(
+            "Bloch winding differs from arg(lambda) by up to %.1e rad.",
+            np.nanmax(resid),
+        )
+    if np.nanmax(max_step, initial=0) > 0.95 * np.pi:
+        log.warning(
+            "Bloch winding: a single element turns the wave phase by %.2f rad; "
+            "k may be off by 2 pi there (split the element).",
+            np.nanmax(max_step),
+        )
+    return arg + 2 * np.pi * m
 
 
 def bloch_mode_tables(
