@@ -196,6 +196,12 @@ Each fix gets a test.
     `[19.06, 14.16]`, to 10 GHz `[6.79, 7.50]`, to 40 GHz `[39.55, 39.54]`. `_estimate_optimal_pump` then works
     on the single point `freqs[idx:-1]`.
   - Done 2026-11-06 (audit-fixes): lowest run of `in_stopband` on the lossless supercell (first segment for segmented devices); None plus a warning when the grid has none (`gain(pump=None)` and default `phase_matching` ranges then raise). The pump estimate searches the passband between that stopband and the next. Tests `test_stopband_does_not_depend_on_grid_end`, `test_no_stopband_needs_explicit_pump`.
+  - **Pietro, 2026-11-06:** automatic pump estimate removed (it depends on the device and the mixing process).
+    `data["stopbands"]` is an `(n, 2)` array of every stopband in the grid (`(0, 2)` without one); `gain` needs
+    `pump`; `phase_matching` needs both ranges and returns `optimal_pump_freq` (argmin over `pump_freqs` of the
+    mean `|delta|`; unfilled `delta` columns are NaN, no longer `np.empty` garbage). Tests
+    `test_stopbands_do_not_depend_on_grid_end`, `test_no_stopband_gives_empty_stopbands`, `test_gain_needs_pump`,
+    `test_phase_matching_optimal_pump`.
 - [ ] **2.12 Base data is never computed automatically.** `gain()` on a fresh `TWPAnalysis` raises
   `KeyError 'optimal_pump_freq'`, and edits to `twpa` leave stale data without warning. Call `update_base_data()`
   from the decorator, as it did before 6097a93. Exclude `Ip0` from the state check.
@@ -510,7 +516,9 @@ cold compile time measured and noted here; the line count noted here.
   - Breaking so far (audit-fixes): `phase_matching(thin=)` removed; `bloch_fb_cmes_solve` removed;
     `bloch_fb_segmented_cmes_solve` defaults are now those of `BlochSolverConfig` (m_max 2, anderson_depth 10);
     the `twpasolver` logger no longer propagates to the root logger; `interpolate` defaults to `polar=False`;
-    `stopband_freqs`/`optimal_pump_freq` come from the supercell half trace (None without a stopband).
+    `data["stopband_freqs"]` replaced by `data["stopbands"]` (all bands, `(n, 2)`); `data["optimal_pump_freq"]`
+    removed, `phase_matching(...)["optimal_pump_freq"]` instead; `gain` `pump` required; `phase_matching`
+    `signal_arange`/`pump_arange` required (keyword-only).
 - [ ] **7.8 Branches.**
   - Reconcile `origin/main` (4 commits, the simple_4wm PR: `create_basic(three_wave=)`, `basic_4wm` array,
     placeholder relations; already present in substance on `edge-basis`). `git merge-tree` shows conflicts in
@@ -711,6 +719,9 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
 - 2026-11-06, group B on `audit-fixes`: 2.2, 2.11, 2.13, 2.18, 3.7, 5.4, polar `interpolate` (2.35), and
   `bloch_fb_cmes_solve` removed. Gains bit-identical on the regression set (explicit pump); default pump,
   stopband and phase-matching results change as intended. mypy 19 -> 13.
+- 2026-11-06, automatic pump estimate removed on `audit-fixes` (Pietro): `data["stopbands"]` lists all bands,
+  `gain(pump)` and the `phase_matching` ranges are required, `optimal_pump_freq` moved to the `phase_matching`
+  result. Gains and k_star bit-identical on the regression set.
 
 ## Where to pick up (end of session 2026-11-06)
 

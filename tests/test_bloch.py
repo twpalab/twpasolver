@@ -89,6 +89,20 @@ def _mismatched_analysis(Ip0, Z_ext=70.0, N=100):
     return analysis
 
 
+def test_phase_matching_optimal_pump():
+    analysis = _mismatched_analysis(Ip0=1e-12)
+    pm = analysis.phase_matching(
+        process="PA",
+        mixing="3WM",
+        signal_arange=(2.0, 6.5, 0.25),
+        pump_arange=(14.25, 18.0, 0.25),
+    )
+    best = pm["optimal_pump_freq"]
+    assert best in pm["pump_freqs"]
+    mean = np.nanmean(np.abs(pm["delta"]), axis=0)
+    assert best == pm["pump_freqs"][np.argmin(mean)]
+
+
 def test_fb_linear_limit_matches_abcd():
     """Without pump, the Bloch FB model reproduces the exact device S-parameters."""
     analysis = _mismatched_analysis(Ip0=1e-12)

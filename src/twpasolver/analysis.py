@@ -702,18 +702,16 @@ class TWPAnalysis(Analyzer, Frequencies):
             s21_db = 20 * np.log10(np.abs(self.data["S21"]))
             self.data["S21_db"] = s21_db
 
-            # Lowest stopband of the (first segment's) lossless supercell.
+            # Stopbands of the (first segment's) lossless supercell, one
+            # [start, end] row (first and last grid point) per contiguous band.
             gap = in_stopband(
                 lossless_copy(segments[0] if segmented else self.twpa), self.f
             )
-            stopband = None
-            if gap.any():
-                i0 = int(np.argmax(gap))
-                i1 = i0 + int(np.argmin(np.append(gap[i0:], False))) - 1
-                stopband = [freqs[i0], freqs[i1]]
-            else:
+            edges = np.flatnonzero(np.diff(np.concatenate([[0], gap, [0]])))
+            stopbands = freqs[edges.reshape(-1, 2) - [0, 1]]
+            if not len(stopbands):
                 log.warning("No stopband in the frequency grid.")
-            self.data["stopband_freqs"] = stopband
+            self.data["stopbands"] = stopbands
 
             # Bloch parameters: 2-D (n_segments, n_freq) for segmented devices,
             # 1-D (n_freq,) for uniform ones. ParameterInterpolator handles both
@@ -742,8 +740,8 @@ class TWPAnalysis(Analyzer, Frequencies):
                     "epsilon": np.array([seg.epsilon for seg in segments]),  # type: ignore
                     "xi": np.array([seg.xi for seg in segments]),  # type: ignore
                 }
-                # Device-averaged wavenumber (per unit cell) for k_star and the
-                # pump estimate: the length-weighted mean of the segment
+                # Device-averaged wavenumber (per unit cell) for k_star: the
+                # length-weighted mean of the segment
                 # wavenumbers. Unwrapping the phase of the whole device as a
                 # single "supercell" would lose 2*pi windings on any practical
                 # frequency grid.
@@ -757,16 +755,13 @@ class TWPAnalysis(Analyzer, Frequencies):
                 self.data.pop("segments", None)
                 k_full = whole["k"]
 
-            freqs_mask = freqs < (stopband[0] / 10 if stopband else 0.0)
+            freqs_mask = freqs < (stopbands[0, 0] / 10 if len(stopbands) else 0.0)
             if freqs_mask.sum() > 2:
                 k_pars = np.polyfit(freqs[freqs_mask], k_full[freqs_mask], 2)
                 self.data["k_star"] = k_full - np.polyval(k_pars[1:], freqs)
             else:
                 self.data["k_star"] = k_full
 
-            self.data["optimal_pump_freq"] = (
-                self._estimate_optimal_pump(gap) if stopband else None
-            )
             self._previous_state = current_state
 
             self._update_all_mode_arrays()
@@ -844,28 +839,6 @@ class TWPAnalysis(Analyzer, Frequencies):
     def add_mode_array(self, name: str, mode_array: ModeArray) -> None:
         """Add a custom mode array to the analyzer."""
         self._mode_arrays[name] = mode_array
-
-    def _estimate_optimal_pump(self, gap: np.ndarray) -> float:
-        """
-        Estimate optimal pump frequency for 3WM.
-
-        The pump is searched in the passband just above the lowest stopband (up
-        to the next stopband or the end of the grid); ``gap`` flags the grid
-        points inside a stopband.
-        """
-        freqs = self.data["freqs"]
-        # k_star is always 1-D (whole-device, used for response/phase-matching plots).
-        ks = self.data["k_star"]
-        above = freqs > self.data["stopband_freqs"][1]
-        band = above & (np.cumsum(above & gap) == 0)
-        pump_f = freqs[band]
-        pump_k = ks[band]
-        signal_f = pump_f / 2
-        signal_k = np.interp(signal_f, freqs, ks)
-        deltas = np.abs(
-            pump_k - 2 * signal_k + 1 * self.twpa.chi * (pump_k - 4 * signal_k)
-        )
-        return pump_f[np.argmin(deltas)]
 
     # Shared CME helpers
 
@@ -1374,12 +1347,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         idler_mode: str = "i",
         mode_array_config: str = "basic_3wm",
         pump_Ip0: Optional[float] = None,
-        signal_arange: Optional[
-            Union[Tuple[float, float, float], List[float], np.ndarray]
-        ] = None,
-        pump_arange: Optional[
-            Union[Tuple[float, float, float], List[float], np.ndarray]
-        ] = None,
+        *,
+        signal_arange: Union[Tuple[float, float, float], List[float], np.ndarray],
+        pump_arange: Union[Tuple[float, float, float], List[float], np.ndarray],
         relative=True,
     ) -> dict[str, Any]:
         """
@@ -1390,42 +1360,35 @@ class TWPAnalysis(Analyzer, Frequencies):
         pump_Ip0 : float, optional
             Pump current used for the Kerr term. None uses the model's ``chi``;
             0 gives the linear mismatch.
-        signal_arange, pump_arange : tuple or array_like, optional
+        signal_arange, pump_arange : tuple or array_like
             A tuple ``(start, stop, step)`` is passed to ``numpy.arange``; a list
-            or array is used as the explicit frequencies. None takes the
-            frequency grid below (signal) or above (pump) the lowest stopband.
+            or array is used as the explicit frequencies.
+
+        Returns
+        -------
+        dict
+            Includes ``optimal_pump_freq``: the pump of ``pump_freqs`` with the
+            smallest mean ``|delta|`` over ``signal_freqs`` for the chosen process
+            and mixing (None if all NaN); restrict ``signal_arange`` to the band
+            of interest.
         """
         mode_array = self.get_mode_array(mode_array_config)
-        freqs = self.data["freqs"]
-        stopband: Any = self.data.get("stopband_freqs")
-        if stopband is None and (pump_arange is None or signal_arange is None):
-            raise ValueError(
-                "No stopband in the frequency grid: pass pump_arange and signal_arange."
-            )
-
-        if pump_arange is not None:
-            pump_f = (
-                np.arange(*pump_arange)
-                if isinstance(pump_arange, tuple)
-                else np.asarray(pump_arange, dtype=float)
-            )
-        else:
-            pump_f = freqs[freqs > stopband[1]]
-
-        if signal_arange is not None:
-            signal_f = (
-                np.arange(*signal_arange)
-                if isinstance(signal_arange, tuple)
-                else np.asarray(signal_arange, dtype=float)
-            )
-        else:
-            signal_f = freqs[freqs < stopband[0]]
+        pump_f = (
+            np.arange(*pump_arange)
+            if isinstance(pump_arange, tuple)
+            else np.asarray(pump_arange, dtype=float)
+        )
+        signal_f = (
+            np.arange(*signal_arange)
+            if isinstance(signal_arange, tuple)
+            else np.asarray(signal_arange, dtype=float)
+        )
 
         chi = pump_Ip0**2 * self.twpa.xi / 8 if pump_Ip0 is not None else self.twpa.chi
 
         f_triplets = []
         k_triplets = []
-        deltas = np.empty(shape=(len(signal_f), len(pump_f)))
+        deltas = np.full((len(signal_f), len(pump_f)), np.nan)
 
         if process == "PA":
             idler_sign, signal_sign = -1, -1
@@ -1474,10 +1437,14 @@ class TWPAnalysis(Analyzer, Frequencies):
                 if relative:
                     deltas[:, i] = deltas[:, i] / signal_k_array
 
+        mean_delta = np.nanmean(np.abs(deltas), axis=0)
         return {
             "delta": deltas,
             "triplets": {"f": f_triplets, "k": k_triplets},
             "pump_freqs": pump_f,
+            "optimal_pump_freq": (
+                None if np.isnan(mean_delta).all() else pump_f[np.nanargmin(mean_delta)]
+            ),
             "signal_freqs": signal_f,
             "mode_info": {
                 "signal": signal_mode,
@@ -1491,7 +1458,7 @@ class TWPAnalysis(Analyzer, Frequencies):
     def gain(
         self,
         signal_freqs: FloatArray,
-        pump: Optional[float] = None,
+        pump: float,
         Is0: float = 1e-7,
         Ip0: Optional[float] = None,
         model: Union[str, GainModel] = GainModel.SIMPLE,
@@ -1512,8 +1479,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         ----------
         signal_freqs : array_like
             Signal frequencies for gain calculation.
-        pump : float, optional
-            Pump frequency. If None, uses automatically determined optimal frequency.
+        pump : float
+            Pump frequency. There is no automatic choice; for an estimate use
+            ``phase_matching(...)["optimal_pump_freq"]``.
         Is0 : float, default 1e-6
             Initial signal current amplitude (A).
         Ip0 : float, optional
@@ -1575,13 +1543,6 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         if Ip0 is None:
             Ip0 = self.twpa.Ip0
-        if pump is None:
-            pump = self.data.get("optimal_pump_freq")
-            if pump is None:
-                raise ValueError(
-                    "No default pump (no stopband in the grid, or base data not "
-                    "computed): pass pump."
-                )
 
         signal_freqs = np.asarray(signal_freqs)
         N_tot = self.twpa.N_tot

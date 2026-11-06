@@ -151,14 +151,18 @@ def test_k_star_guard_with_coarse_grid():
 # Stopband from the supercell half trace (2.11)
 
 
-def test_stopband_does_not_depend_on_grid_end():
+def test_stopbands_do_not_depend_on_grid_end():
     bands = []
     for f_max in (10, 20, 40):
         an = TWPAnalysis(twpa=_small_twpa(), f_arange=(0.05, f_max, 1e-2))
         an.update_base_data()
-        bands.append((*an.data["stopband_freqs"], an.data["optimal_pump_freq"]))
-    assert bands[0][0] < bands[0][1] < bands[0][2]
-    assert bands[1] == bands[0] and bands[2] == bands[0]
+        bands.append(an.data["stopbands"])
+    # every band is listed; only the one cut by the grid end changes
+    assert bands[2].shape[1] == 2 and len(bands[2]) > 3
+    assert np.all(bands[2][:, 0] < bands[2][:, 1])
+    assert np.all(bands[2][:-1, 1] < bands[2][1:, 0])
+    np.testing.assert_array_equal(bands[0], bands[2][:1])
+    np.testing.assert_array_equal(bands[1][:2], bands[2][:2])
 
 
 def _flat_line_analysis():
@@ -175,13 +179,15 @@ def _flat_line_analysis():
     return an
 
 
-def test_no_stopband_needs_explicit_pump():
+def test_no_stopband_gives_empty_stopbands():
     an = _flat_line_analysis()
-    assert an.data["stopband_freqs"] is None
-    with pytest.raises(ValueError, match="pass pump"):
-        an.gain(SIGNALS)
-    with pytest.raises(ValueError, match="pump_arange"):
-        an.phase_matching()
+    assert an.data["stopbands"].shape == (0, 2)
+    assert np.all(np.isfinite(an.data["k_star"]))
+
+
+def test_gain_needs_pump(analysis):
+    with pytest.raises(TypeError):
+        analysis.gain(SIGNALS)
 
 
 # 4WM Kerr mismatch (2.2)
