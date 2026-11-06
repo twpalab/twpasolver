@@ -87,8 +87,7 @@ def _mismatched_analysis(Ip0, Z_ext=70.0, N=100):
         Ip0=Ip0,
         Z0_ref=Z_ext,
     )
-    analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-3), port_Z_ext=Z_ext)
-    analysis.update_base_data()
+    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-3), port_Z_ext=Z_ext)
     return analysis
 
 
@@ -115,7 +114,7 @@ def test_phase_matching_masks_stopband_pumps():
         signal_arange=(2.0, 6.5, 0.25),
         pump_arange=(12.5, 16.0, 0.05),
     )
-    sb = analysis.data["stopbands"]
+    sb = analysis.linear.stopbands
     pumps = pm["pump_freqs"]
     in_gap = ((pumps[:, None] >= sb[:, 0]) & (pumps[:, None] <= sb[:, 1])).any(axis=1)
     assert in_gap.any() and (~in_gap).any()
@@ -126,7 +125,7 @@ def test_phase_matching_masks_stopband_pumps():
 def test_fb_linear_limit_matches_abcd():
     """Without pump, the Bloch FB model reproduces the exact device S-parameters."""
     analysis = _mismatched_analysis(Ip0=1e-12)
-    freqs = analysis.data["freqs"]
+    freqs = analysis.linear.freqs
     idx = np.searchsorted(freqs, [2.0, 6.0, 10.0, 12.0])
     res = analysis.gain(
         freqs[idx],
@@ -136,8 +135,8 @@ def test_fb_linear_limit_matches_abcd():
         bloch_config=BlochSolverConfig(passes=40, convergence_threshold=1e-8),
         thin=20,
     )
-    s21 = 20 * np.log10(np.abs(analysis.data["S21"][idx]))
-    s11 = 20 * np.log10(np.abs(analysis.data["S11"][idx]))
+    s21 = 20 * np.log10(np.abs(analysis.linear.S21[idx]))
+    s11 = 20 * np.log10(np.abs(analysis.linear.S11[idx]))
     assert np.allclose(res["gain_db"], s21, atol=1e-3)
     assert np.allclose(res["gain_db_11"], s11, atol=1e-2)
 
@@ -185,19 +184,18 @@ def test_fb_linear_limit_with_connectors(segmented):
         device = base
     analysis = TWPAnalysis(
         twpa=device,
-        f_arange=(0.2, 40, 1e-3),
+        freqs=(0.2, 40, 1e-3),
         port_Z_ext=Ze,
         port=conn_in,
         port_out=conn_out,
     )
-    analysis.update_base_data()
-    idx = np.searchsorted(analysis.data["freqs"], [2.0, 5.0, 8.0, 11.0, 12.5])
-    f = analysis.data["freqs"][idx]
+    idx = np.searchsorted(analysis.linear.freqs, [2.0, 5.0, 8.0, 11.0, 12.5])
+    f = analysis.linear.freqs[idx]
 
     T_in = np.asarray(conn_in.get_abcd(f * 1e9))
     T_out = np.asarray(conn_out.get_abcd(f * 1e9))[:, ::-1, ::-1].copy()
     T_out[:, 0, 1], T_out[:, 1, 0] = T_out[:, 1, 0].copy(), T_out[:, 0, 1].copy()
-    T = T_in @ np.asarray(analysis.data["abcd"])[idx] @ T_out
+    T = T_in @ np.asarray(analysis.linear.abcd)[idx] @ T_out
     A, B, C, D = T[:, 0, 0], T[:, 0, 1], T[:, 1, 0], T[:, 1, 1]
     den = A + B / Ze + C * Ze + D
     ref = {
@@ -285,8 +283,7 @@ def test_fb_energy_balance_lossless(m_max):
 def test_backward_inputs_rejected_without_reflections():
     """The simple model propagates only +x waves: backward inputs must raise."""
     twpa = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10, Ip0=2.5e-4)
-    analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-2))
-    analysis.update_base_data()
+    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-2))
     with pytest.raises(ValueError, match="initial_amplitudes_bwd"):
         analysis.gain(
             [2.0], pump=14.3, model="simple", initial_amplitudes_bwd=[2.5e-4, 0.0, 0.0]
@@ -298,9 +295,8 @@ def test_mode_array_without_relations():
     from twpasolver.modes_rwa import ModeArrayFactory
 
     twpa = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10)
-    analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-2))
-    analysis.update_base_data()
-    mode_array = ModeArrayFactory.create_custom(analysis.data, ["s", "c"], [])
+    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-2))
+    mode_array = ModeArrayFactory.create_custom(analysis.linear, ["s", "c"], [])
     assert mode_array.independent_modes == {"s", "c"}
 
 
@@ -339,10 +335,9 @@ def test_mismatch_filter_keeps_partner_terms_together():
     from twpasolver.modes_rwa import ModeArrayFactory
 
     twpa = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10)
-    analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-2))
-    analysis.update_base_data()
+    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-2))
     mode_array = ModeArrayFactory.create_extended_3wm(
-        analysis.data, n_pump_harmonics=1, n_frequency_conversion=1
+        analysis.linear, n_pump_harmonics=1, n_frequency_conversion=1
     )
     rel3, rel4, _, _ = prepare_relations_coefficients(
         mode_array.get_rwa_terms(2), mode_array.get_rwa_terms(3), 1.0, 1.0
@@ -515,8 +510,7 @@ def test_anderson_converges_near_bragg_coupling():
         Ip0=Ip0,
         Z0_ref=Ze,
     )
-    analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-3), port_Z_ext=Ze)
-    analysis.update_base_data()
+    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-3), port_Z_ext=Ze)
     sig = np.array([7.46, 7.48, 7.50, 7.52])
     mode_array = analysis.get_mode_array("basic_3wm")
     ci = analysis._prepare_cme_inputs(mode_array, sig, pump, "s", "p")
@@ -552,7 +546,7 @@ def test_anderson_converges_near_bragg_coupling():
 def test_result_does_not_depend_on_anderson_depth():
     """Acceleration changes only the path to the fixed point, not the result."""
     analysis = _mismatched_analysis(Ip0=1.5e-4)
-    freqs = analysis.data["freqs"]
+    freqs = analysis.linear.freqs
     idx = np.searchsorted(freqs, [2.0, 6.0, 10.0])
     kw = dict(pump=14.3, Is0=1e-8, model=GainModel.BLOCH, thin=20)
     shallow = analysis.gain(
@@ -576,7 +570,7 @@ def test_result_does_not_depend_on_anderson_depth():
 def test_nan_iterate_stops_unconverged():
     """A NaN pass ends the iteration at once and is never flagged converged."""
     analysis = _mismatched_analysis(Ip0=1.5e-4)
-    freqs = analysis.data["freqs"]
+    freqs = analysis.linear.freqs
     idx = np.searchsorted(freqs, [2.0, 6.0])
     res = analysis.gain(
         freqs[idx],
@@ -618,7 +612,7 @@ def test_rk_config_step_cap_is_live_and_reported(caplog, model):
 def test_unconverged_points_are_reported(caplog):
     """A run that stops before convergence logs a warning with the indices."""
     analysis = _mismatched_analysis(Ip0=1.5e-4)
-    freqs = analysis.data["freqs"]
+    freqs = analysis.linear.freqs
     idx = np.searchsorted(freqs, [2.0, 6.0])
     from twpasolver.logger import log
 
@@ -663,10 +657,9 @@ def test_reactive_angle():
 def test_lossless_passband_W_is_real_for_asymmetric_cells():
     """W (unlike Zb) is real in a lossless passband for any supercell boundary."""
     twpa = TWPA(cells=[CELL_U, CELL_L], N=50, Istar=6.3e-3, Idc=1e-3, Ip0=1e-4)
-    analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-3))
-    analysis.update_base_data()
+    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-3))
     f = np.array([3.0, 6.0, 9.0])
-    k = np.interp(f, analysis.data["freqs"], analysis.data["k"])
+    k = np.interp(f, analysis.linear.freqs, analysis.linear.k[0])
     tab = bloch_mode_tables(twpa, f * 1e9, 1j * k)
     assert np.all(np.abs(tab["Zb_plus"].imag) > 1.0)  # Zb alone is reactive
     assert np.all(np.abs(np.angle(tab["W"])) < 1e-8)
@@ -765,15 +758,14 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
 def _holotype_analysis():
     from twpasolver.modes_rwa import ModeArrayFactory
 
-    analysis = TWPAnalysis(twpa=str(HOLOTYPE), f_arange=(0.2, 80, 2e-3))
+    analysis = TWPAnalysis(twpa=str(HOLOTYPE), freqs=(0.2, 80, 2e-3))
     for cell in analysis.twpa.cells:
         cell.delta = 2e-4
-    analysis.update_base_data()
     for nfc in (1, 2):
         analysis.add_mode_array(
             f"ext{nfc}",
             ModeArrayFactory.create_extended_3wm(
-                analysis.data,
+                analysis.linear,
                 n_pump_harmonics=3,
                 n_frequency_conversion=nfc,
                 n_signal_harmonics=0,
@@ -788,8 +780,7 @@ def _holotype_analysis():
 
 
 def _ladder_k(cells, f_arange):
-    analysis = TWPAnalysis(twpa=TWPA(cells=cells), f_arange=f_arange)
-    analysis.update_base_data()
+    analysis = TWPAnalysis(twpa=TWPA(cells=cells), freqs=f_arange)
     return analysis
 
 
@@ -809,21 +800,19 @@ def test_winding_k_starts_near_zero_above_notch(caplog):
     finally:
         log.removeHandler(caplog.handler)
     assert not any("winding" in r.getMessage() for r in caplog.records)
-    above = an.data["freqs"] > an.data["stopbands"][-1, 1]
-    kd = an.data["k"][above] * an.twpa.N_tot
+    above = an.linear.freqs > an.linear.stopbands[-1, 1]
+    kd = an.linear.k[0][above] * an.twpa.N_tot
     assert 0 < kd[0] < 0.1
     assert np.all(np.diff(kd) > 0)
 
 
 def test_winding_k_independent_of_grid_start():
     """A grid starting above the first stopbands gives the same k."""
-    low = TWPAnalysis(twpa=str(HOLOTYPE), f_arange=(0.2, 40, 0.1))
-    high = TWPAnalysis(twpa=str(HOLOTYPE), f_arange=(30.0, 40, 0.1))
-    low.update_base_data()
-    high.update_base_data()
-    i = np.searchsorted(low.data["freqs"], high.data["freqs"] - 1e-6)
-    assert np.allclose(low.data["freqs"][i], high.data["freqs"])
-    np.testing.assert_allclose(high.data["k"], low.data["k"][i], atol=1e-12)
+    low = TWPAnalysis(twpa=str(HOLOTYPE), freqs=(0.2, 40, 0.1))
+    high = TWPAnalysis(twpa=str(HOLOTYPE), freqs=(30.0, 40, 0.1))
+    i = np.searchsorted(low.linear.freqs, high.linear.freqs - 1e-6)
+    assert np.allclose(low.linear.freqs[i], high.linear.freqs)
+    np.testing.assert_allclose(high.linear.k[0], low.linear.k[0][i], atol=1e-12)
 
 
 def test_winding_k_left_handed_line():
@@ -834,7 +823,7 @@ def test_winding_k_left_handed_line():
         [Capacitance(C=1e-12), Inductance(L=2.5e-9, twoport_parallel=True)],
         (0.5, 20, 0.01),
     )
-    band = an.data["freqs"] > an.data["stopbands"][0, 1]
-    k = an.data["k"][band]
+    band = an.linear.freqs > an.linear.stopbands[0, 1]
+    k = an.linear.k[0][band]
     assert np.all(k < 0)
     assert np.all(np.diff(k) > 0)

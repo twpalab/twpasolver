@@ -306,12 +306,11 @@ def _segmented_holotype(scale=(1.0, 1.0, 1.0, 1.0)):
             cell.L, cell.Lf = cell.L * g, cell.Lf * g
         segs.append(seg)
     dev = TWPA(cells=segs, Z0_ref=base.Z0_ref, Ip0=base.Ip0)
-    analysis = TWPAnalysis(twpa=dev, f_arange=(0.2, 80, 2e-3))
-    analysis.update_base_data()
+    analysis = TWPAnalysis(twpa=dev, freqs=(0.2, 80, 2e-3))
     analysis.add_mode_array(
         "ext2",
         ModeArrayFactory.create_extended_3wm(
-            analysis.data,
+            analysis.linear,
             n_pump_harmonics=3,
             n_frequency_conversion=2,
             n_signal_harmonics=0,
@@ -357,11 +356,10 @@ def test_per_mode_harmonic_limits_in_filter():
     from twpasolver.modes_rwa import ModeArrayFactory
 
     analysis = TWPAnalysis(
-        twpa=TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10), f_arange=(0.05, 20, 1e-2)
+        twpa=TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10), freqs=(0.05, 20, 1e-2)
     )
-    analysis.update_base_data()
     ma = ModeArrayFactory.create_extended_3wm(
-        analysis.data, n_pump_harmonics=1, n_frequency_conversion=1
+        analysis.linear, n_pump_harmonics=1, n_frequency_conversion=1
     )
     rel3, rel4, _, _ = prepare_relations_coefficients(
         ma.get_rwa_terms(2), ma.get_rwa_terms(3), 1.0, 1.0
@@ -447,11 +445,10 @@ def test_mismatch_cutoff_capped_at_zone_edge():
     from twpasolver.modes_rwa import ModeArrayFactory
 
     analysis = TWPAnalysis(
-        twpa=TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10), f_arange=(0.05, 20, 1e-2)
+        twpa=TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10), freqs=(0.05, 20, 1e-2)
     )
-    analysis.update_base_data()
     ma = ModeArrayFactory.create_extended_3wm(
-        analysis.data, n_pump_harmonics=1, n_frequency_conversion=1
+        analysis.linear, n_pump_harmonics=1, n_frequency_conversion=1
     )
     rels = prepare_relations_coefficients(
         ma.get_rwa_terms(2), ma.get_rwa_terms(3), 1.0, 1.0
@@ -613,7 +610,6 @@ def _unfolded_holotype(q=3, nl_scale=None, delta=None):
                 cells.append(_NLCell(**d))
     tw.cells[:] = cells
     tw.N = tw.N // q
-    analysis.update_base_data()
     return analysis
 
 
@@ -623,7 +619,7 @@ def test_folding_point_is_not_an_edge():
 
     analysis = _unfolded_holotype()
     tw, D = analysis.twpa, 102
-    k = lambda f: np.interp(f, analysis.data["freqs"], analysis.data["k"])
+    k = lambda f: np.interp(f, analysis.linear.freqs, analysis.linear.k[0])
     # 22.736 GHz: k D = 5 pi, the 34-cell line has no gap there.
     # 26.25 GHz: passband side of the real gap starting at 26.253 GHz.
     f = np.array([[22.736, 26.25]]) * 1e9
@@ -647,7 +643,7 @@ def test_folding_point_modes_match_native_basis():
     analysis.add_mode_array(
         "ext2",
         ModeArrayFactory.create_extended_3wm(
-            analysis.data,
+            analysis.linear,
             n_pump_harmonics=3,
             n_frequency_conversion=2,
             n_signal_harmonics=0,
@@ -675,7 +671,7 @@ def test_contra_qpm_survives_edge_basis():
     analysis.add_mode_array(
         "c",
         ModeArrayFactory.create_custom(
-            analysis.data, ["p", "s", "ps"], [["ps", "p+s"]]
+            analysis.linear, ["p", "s", "ps"], [["ps", "p+s"]]
         ),
     )
     out = {}

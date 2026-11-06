@@ -499,13 +499,28 @@ Items (each step keeps golden gains bit-identical on the holotype, the segmented
     points (`thin`), while the phase of the piecewise-linear κ is piecewise quadratic, so segmented `simple`
     results depend slightly on `thin`. Exact fix: evaluate the quadratic phase in the RHS, or put the
     segment midpoints into the phase grid. Not measured yet.
-- [ ] **4.3b `linear.py` + lazy `an.linear`:** replaces `update_base_data`, the `data` dict and the
+- [x] **4.3b `linear.py` + lazy `an.linear`:** replaces `update_base_data`, the `data` dict and the
   `analysis_function` decorator. `parameter_sweep` becomes a loop that stacks results.
-- [ ] **4.3c Flatten the facade's base classes:** `TWPAnalysis` stops inheriting from `Analyzer` (an abstract
+- [x] **4.3c Flatten the facade's base classes:** `TWPAnalysis` stops inheriting from `Analyzer` (an abstract
   base with one subclass) and `Frequencies` (two ways to give the grid, `f_list` or `f_arange`). The facade
   takes `freqs` (array or arange tuple) and `unit`; `Analyzer` goes. `Frequencies` is used only as this base
   class but is exported from `twpasolver/__init__`: drop it, or keep it as a standalone grid helper the
   facade calls (decide when doing 4.3c).
+  - Done 2026-11-07 (audit-fixes), with Pietro's choices (return only; per-segment shapes; drop
+    `Frequencies`): frozen `LinearData` (`freqs`, `abcd`, `S21`, `S11`, `S21_db`, `stopbands`, `k`, `alpha`,
+    `Zb`, `reflection_coeff` as (n_seg, n_freq), `k_star`, `seg_bounds`/`seg_midpoints`/`seg_N_tot`/
+    `seg_epsilon`/`seg_xi`) from the pure `linear_data(twpa, f_hz, unit_multiplier)`; `an.linear` recomputes
+    it when `twpa`, `freqs` or `unit` change and refreshes the mode arrays. Removed: `data`, `data_file`,
+    `update_base_data`, `analysis_function`, `Analyzer`, `save_data`/`load_data`, `parameter_sweep`,
+    `Frequencies` (module, export, tests, fixtures). `TWPAnalysis(twpa, freqs, unit, ports...)`: `freqs` is an
+    arange tuple (validated: three values, positive step) or a list/array, stored as the explicit list so
+    JSON round trips keep the grid. `bandwidth(gain_result)`, `plot_gain(result)`,
+    `plot_mode_currents(result)`, `plot_phase_matching(result)` take the result; mode-array factories take
+    `an.linear`. Golden unchanged from 4.2. Found on the way: `warmup()` crashed (its `gain` call had no
+    `pump` since 2.11; the untyped decorator hid it from mypy); fixed, test `test_warmup_runs`. New tests
+    `test_linear_follows_grid_and_unit`, `test_twpanalysis_json_round_trip_keeps_grid`. 133 tests, mypy 9.
+  - **For 7.2:** docs notebooks and `implementing_models.rst` still use `f_arange`, `update_base_data`,
+    `an.data[...]`, `parameter_sweep`, `save_data` and argument-less `plot_*`.
 - [ ] **4.4 `problem.py`: one builder for both models**, computing relations and coefficients once per call;
   absorbs 3.3 (shared port tables and post-processing). Ignored parameters go: `idler_mode` is derived from the
   relations; `Z0`/`Ze` duplicates removed.

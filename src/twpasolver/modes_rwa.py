@@ -811,29 +811,29 @@ class ModeArrayFactory:
 
     @staticmethod
     def _interpolator_from_data(
-        base_data: Dict[str, Any],
+        base_data: Any,
         interpolator: Optional["ParameterInterpolator"] = None,
     ) -> "ParameterInterpolator":
-        """Build a ParameterInterpolator from a standard base_data dict.
+        """Build a ParameterInterpolator from linear data (``TWPAnalysis.linear``).
 
         If ``interpolator`` is given it is returned unchanged, so several mode
-        arrays built from the same base data can share one interpolator.
+        arrays built from the same linear data can share one interpolator.
         """
         if interpolator is not None:
             return interpolator
         return ParameterInterpolator(
-            base_data["freqs"],
+            base_data.freqs,
             {
-                "k": base_data["k"],
-                "gamma": base_data["reflection_coeff"],
-                "alpha": base_data["alpha"],
-                "Zb": base_data["Zb"],
+                "k": base_data.k,
+                "gamma": base_data.reflection_coeff,
+                "alpha": base_data.alpha,
+                "Zb": base_data.Zb,
             },
         )
 
     @staticmethod
     def create_basic(
-        base_data: Dict[str, Any],
+        base_data: Any,
         three_wave: bool = True,
         interpolator: Optional[ParameterInterpolator] = None,
     ) -> ModeArray:
@@ -841,7 +841,7 @@ class ModeArrayFactory:
         Create a ModeArray with pump, signal, and idler modes.
 
         Args:
-            base_data: Dictionary with 'freqs', 'k', 'reflection_coeff', 'alpha' and 'Zb' arrays
+            base_data: Linear data of the device (``TWPAnalysis.linear``)
             three_wave: Idler relation ``i = p - s`` if True, else ``i = 2p - s`` (4WM)
             interpolator: Optional shared ParameterInterpolator (built from
                 ``base_data`` when omitted)
@@ -857,7 +857,7 @@ class ModeArrayFactory:
 
     @staticmethod
     def create_extended_3wm(
-        base_data: Dict[str, Any],
+        base_data: Any,
         n_pump_harmonics: int = 1,
         n_frequency_conversion: int = 1,
         n_signal_harmonics: int = 1,
@@ -867,7 +867,7 @@ class ModeArrayFactory:
         Create an extended 3WM ModeArray with pump harmonics and conversion terms.
 
         Args:
-            base_data: Dictionary with 'freqs', 'k', 'reflection_coeff', 'alpha' and 'Zb' arrays
+            base_data: Linear data of the device (``TWPAnalysis.linear``)
             n_pump_harmonics: Number of pump harmonics (p2, p3, ...)
             n_frequency_conversion: Number of up-conversion pairs (ps/pi, p2s/p2i, ...)
             n_signal_harmonics: Number of signal and idler harmonics (s2/i2, ...)
@@ -906,7 +906,7 @@ class ModeArrayFactory:
 
     @staticmethod
     def create_custom(
-        base_data: Dict[str, Any],
+        base_data: Any,
         mode_labels: List[str],
         relations: List[List[str]],
         interpolator: Optional[ParameterInterpolator] = None,
@@ -915,7 +915,7 @@ class ModeArrayFactory:
         Create a custom ModeArray with user-defined modes and relations.
 
         Args:
-            base_data: Dictionary with 'freqs', 'k', 'reflection_coeff', 'alpha' and 'Zb' arrays
+            base_data: Linear data of the device (``TWPAnalysis.linear``)
             mode_labels: List of mode labels
             relations: List of [result, expression] pairs, e.g. ``["i", "p-s"]``
             interpolator: Optional shared ParameterInterpolator (built from

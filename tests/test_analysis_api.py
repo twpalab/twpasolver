@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from twpasolver.analysis import TWPAnalysis
 from twpasolver.cmes.solver_config import BlochSolverConfig
 from twpasolver.file_utils import read_file, save_to_file
-from twpasolver.frequency import Frequencies
 from twpasolver.logger import log
 from twpasolver.matrices_arrays import ABCDArray
 from twpasolver.models import TWPA, LCLfBaseCell
@@ -32,8 +31,7 @@ def _small_twpa(**kwargs):
 
 @pytest.fixture(scope="module")
 def analysis():
-    an = TWPAnalysis(twpa=_small_twpa(), f_arange=(0.05, 20, 1e-2))
-    an.update_base_data()
+    an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, 20, 1e-2))
     return an
 
 
@@ -81,35 +79,28 @@ def test_twpanalysis_end_to_end(analysis, tmp_path):
     assert "gains_all_passes" in bloch
     pm = an.phase_matching(pump_arange=PUMP + np.arange(3), signal_arange=SIGNALS)
     assert pm["delta"].shape == (len(pm["signal_freqs"]), len(pm["pump_freqs"]))
-    bw = an.bandwidth()
+    bw = an.bandwidth(bloch)
     assert bw["max_gain"] == np.max(bloch["gain_db"])
 
-    an.data_file = str(tmp_path / "run.hdf5")
-    an.save_data()
-    loaded = TWPAnalysis(twpa=_small_twpa(), f_arange=(0.05, 20, 1e-2))
-    loaded.load_data(an.data_file)
-    _assert_same(an.data, loaded.data)
+    name = str(tmp_path / "run.hdf5")
+    results = {"gain": bloch, "phase_matching": pm, "bandwidth": bw}
+    save_to_file(name, results, writer="hdf5")
+    loaded = read_file(name, writer="hdf5")
+    _assert_same(results, loaded)
     # Int dict keys come back as int, so plot_mode_currents keeps its labels.
-    reverse = loaded.data["gain"]["mode_info"]["reverse_mode_map"]
+    reverse = loaded["gain"]["mode_info"]["reverse_mode_map"]
     assert all(isinstance(k, int) for k in reverse)
-    assert isinstance(loaded.data["gain"]["gains_all_passes"], list)
+    assert isinstance(loaded["gain"]["gains_all_passes"], list)
 
 
-def test_parameter_sweep_over_gain_saves(analysis, tmp_path):
-    res = analysis.parameter_sweep(
-        "gain", "pump", [11.0, 12.0], SIGNALS[:1], Is0=1e-8, model="simple", thin=20
-    )
+def test_sweep_of_gain_results_saves(analysis, tmp_path):
+    res = [
+        analysis.gain(SIGNALS[:1], pump=p, Is0=1e-8, model="simple", thin=20)
+        for p in (11.0, 12.0)
+    ]
     name = str(tmp_path / "sweep.hdf5")
     save_to_file(name, {"sweep": res}, writer="hdf5")
     _assert_same({"sweep": res}, read_file(name, writer="hdf5"))
-
-
-def test_parameter_sweep_target_in_result_keys(analysis):
-    res = analysis.parameter_sweep(
-        "gain", "signal_freqs", [[3.0], [5.0]], pump=PUMP, model="simple", thin=20
-    )
-    assert res["signal_freqs_sweeped"] == [[3.0], [5.0]]
-    assert len(res["gain_db"]) == 2
 
 
 def test_digit_keyed_dict_stays_dict(tmp_path):
@@ -131,19 +122,21 @@ def test_failed_save_keeps_previous_file(tmp_path):
 # Base data state, k_star guard
 
 
-def test_update_base_data_follows_grid():
-    an = TWPAnalysis(twpa=_small_twpa(), f_arange=(0.05, 20, 1e-2))
-    an.update_base_data()
-    an.f_arange = (0.05, 20, 2e-2)
-    an.update_base_data()
-    np.testing.assert_array_equal(an.data["freqs"], an.f / an.unit_multiplier)
+def test_linear_follows_grid_and_unit():
+    an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, 20, 1e-2))
+    n = len(an.linear.freqs)
+    an.freqs = (0.05, 20, 2e-2)
+    np.testing.assert_array_equal(an.linear.freqs, an.f / an.unit_multiplier)
+    assert len(an.linear.freqs) < n
     an.unit = "MHz"
-    an.update_base_data()
-    np.testing.assert_array_equal(an.data["freqs"], an.f / an.unit_multiplier)
+    np.testing.assert_array_equal(an.linear.freqs, an.f / an.unit_multiplier)
+    an.freqs = np.array([1000.0, 2000.0])
+    np.testing.assert_array_equal(an.linear.freqs, [1000.0, 2000.0])
+    assert an.linear.k.shape == (1, 2)
 
 
 def test_base_data_computed_on_demand():
-    an = TWPAnalysis(twpa=_small_twpa(), f_arange=(0.05, 20, 1e-2))
+    an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, 20, 1e-2))
     g = an.gain(SIGNALS, pump=PUMP)["gain_db"]
     an.twpa.N = 40
     g_long = an.gain(SIGNALS, pump=PUMP)["gain_db"]
@@ -151,9 +144,8 @@ def test_base_data_computed_on_demand():
 
 
 def test_k_star_guard_with_coarse_grid():
-    an = TWPAnalysis(twpa=_small_twpa(), f_arange=(3, 20, 1e-2))
-    an.update_base_data()
-    assert np.all(np.isfinite(an.data["k_star"]))
+    an = TWPAnalysis(twpa=_small_twpa(), freqs=(3, 20, 1e-2))
+    assert np.all(np.isfinite(an.linear.k_star))
 
 
 # Stopband from the supercell half trace
@@ -162,9 +154,8 @@ def test_k_star_guard_with_coarse_grid():
 def test_stopbands_do_not_depend_on_grid_end():
     bands = []
     for f_max in (10, 20, 40):
-        an = TWPAnalysis(twpa=_small_twpa(), f_arange=(0.05, f_max, 1e-2))
-        an.update_base_data()
-        bands.append(an.data["stopbands"])
+        an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, f_max, 1e-2))
+        bands.append(an.linear.stopbands)
     # every band is listed; only the one cut by the grid end changes
     assert bands[2].shape[1] == 2 and len(bands[2]) > 3
     assert np.all(bands[2][:, 0] < bands[2][:, 1])
@@ -182,15 +173,14 @@ def _flat_line_analysis():
         Idc=1e-3,
         Ip0=1e-3,
     )
-    an = TWPAnalysis(twpa=twpa, f_arange=(0.05, 30, 1e-2))
-    an.update_base_data()
+    an = TWPAnalysis(twpa=twpa, freqs=(0.05, 30, 1e-2))
     return an
 
 
 def test_no_stopband_gives_empty_stopbands():
     an = _flat_line_analysis()
-    assert an.data["stopbands"].shape == (0, 2)
-    assert np.all(np.isfinite(an.data["k_star"]))
+    assert an.linear.stopbands.shape == (0, 2)
+    assert np.all(np.isfinite(an.linear.k_star))
 
 
 def test_gain_needs_pump(analysis):
@@ -215,7 +205,6 @@ def test_phase_matching_kerr_mismatch_on_flat_line(mixing, config, pump, kerr):
         pump_arange=[pump],
         signal_arange=[5.0, 6.0],
         relative=False,
-        save=False,
     )
     dk = an.phase_matching(pump_Ip0=Ip, **kw)
     dk_lin = an.phase_matching(pump_Ip0=0.0, **kw)["delta"]
@@ -229,11 +218,10 @@ def test_phase_matching_kerr_mismatch_on_flat_line(mixing, config, pump, kerr):
 
 def test_gain_ip0_does_not_change_twpa(analysis):
     ref = TWPAnalysis(
-        twpa=_small_twpa().model_copy(update={"Ip0": 5e-4}), f_arange=(0.05, 20, 1e-2)
+        twpa=_small_twpa().model_copy(update={"Ip0": 5e-4}), freqs=(0.05, 20, 1e-2)
     )
-    ref.update_base_data()
     for model in ("simple", "bloch"):
-        kw = dict(pump=PUMP, Is0=1e-8, model=model, thin=20, save=False)
+        kw = dict(pump=PUMP, Is0=1e-8, model=model, thin=20)
         if model == "bloch":
             kw["bloch_config"] = BlochSolverConfig(passes=10)
         res = analysis.gain(SIGNALS, Ip0=5e-4, **kw)
@@ -249,7 +237,6 @@ def test_gain_position_grid_has_two_points_at_least(analysis):
         pump=PUMP,
         model="simple",
         thin=10 * analysis.twpa.N_tot,
-        save=False,
     )
     assert len(res["x"]) == 2
 
@@ -272,10 +259,8 @@ def test_phase_matching_segmented_is_length_weighted_mean():
     kw = dict(pump_arange=[PUMP], signal_arange=SIGNALS, relative=False)
     f = (0.05, 20, 1e-2)
     dev = TWPA(cells=segs, Ip0=1e-3)
-    delta = TWPAnalysis(twpa=dev, f_arange=f).phase_matching(**kw)["delta"]
-    parts = [
-        TWPAnalysis(twpa=s, f_arange=f).phase_matching(**kw)["delta"] for s in segs
-    ]
+    delta = TWPAnalysis(twpa=dev, freqs=f).phase_matching(**kw)["delta"]
+    parts = [TWPAnalysis(twpa=s, freqs=f).phase_matching(**kw)["delta"] for s in segs]
     w = np.array([s.N_tot for s in segs], dtype=float)
     assert np.all(np.isfinite(delta))
     np.testing.assert_allclose(delta, (w[0] * parts[0] + w[1] * parts[1]) / w.sum())
@@ -307,36 +292,14 @@ def test_bloch_2d_initial_amplitudes(analysis):
 # bandwidth
 
 
-def test_bandwidth_errors():
-    an = TWPAnalysis(twpa=_small_twpa(), f_arange=(0.05, 20, 1e-2))
-    with pytest.raises(ValueError, match="gain"):
-        an.bandwidth()
-    an.data["gain"] = {
+def test_bandwidth_of_nan_gain_raises():
+    nan_gain = {
         "gain_db": np.full(3, np.nan),
         "signal_freqs": SIGNALS,
         "pump_freq": PUMP,
     }
     with pytest.raises(ValueError, match="NaN"):
-        an.bandwidth()
-
-
-# Decorator overwrite message
-
-
-def test_overwrite_message_checks_save_name(analysis, caplog):
-    analysis.data.pop("custom", None)
-    log.addHandler(caplog.handler)
-    try:
-        analysis.phase_matching(
-            pump_arange=[13.0], signal_arange=[3.0], save_name="custom"
-        )
-        assert "already present" not in caplog.text
-        analysis.phase_matching(
-            pump_arange=[13.0], signal_arange=[3.0], save_name="custom"
-        )
-    finally:
-        log.removeHandler(caplog.handler)
-    assert "'custom' output already present" in caplog.text
+        TWPAnalysis.bandwidth(nan_gain)
 
 
 # Logging
@@ -359,19 +322,34 @@ def test_log_does_not_reach_root_handler():
 
 def test_twpanalysis_rejects_unknown_fields():
     with pytest.raises(ValidationError):
-        TWPAnalysis(twpa=_small_twpa(), freqs_arange=(0, 9, 1e-3))
+        TWPAnalysis(twpa=_small_twpa(), freqs=(0, 9, 1e-3), freqs_arange=(0, 9, 1e-3))
 
 
 def test_port_must_be_a_model():
     with pytest.raises(ValidationError, match="TwoPortModel"):
-        TWPAnalysis(twpa=_small_twpa(), port=[50.0, 50.0])
+        TWPAnalysis(twpa=_small_twpa(), freqs=(1, 2, 0.5), port=[50.0, 50.0])
+
+
+def test_twpanalysis_json_round_trip_keeps_grid(tmp_path):
+    an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, 20, 1e-2), unit="GHz")
+    path = str(tmp_path / "analysis.json")
+    an.dump_to_file(path)
+    np.testing.assert_array_equal(TWPAnalysis.from_file(path).f, an.f)
+
+
+def test_warmup_runs():
+    from twpasolver.cmes.warmup import warmup
+
+    warmup(verbose=False)
 
 
 def test_frequencies_validation():
     with pytest.raises(ValidationError):
-        Frequencies(f_list=[1.0, 2.0], f_arange=(1, 2, 0.5))
+        TWPAnalysis(twpa=_small_twpa(), freqs=(1, 2, 0))
+    with pytest.raises(ValidationError, match="empty"):
+        TWPAnalysis(twpa=_small_twpa(), freqs=(2, 1, 0.5))
     with pytest.raises(ValidationError):
-        Frequencies(f_arange=(1, 2, 0))
+        TWPAnalysis(twpa=_small_twpa())
 
 
 def test_impedance_must_have_positive_real_part():

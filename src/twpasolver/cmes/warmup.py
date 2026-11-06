@@ -59,6 +59,7 @@ _TWPA_KWARGS = {
 }
 _F_ARANGE = (0.05, 20, 1e-3)
 _SIGNAL_FREQS = np.array([2.0, 3.0])
+_PUMP = 12.0
 
 
 def _warm_analysis(twpa: TWPA, label: str, models: tuple, verbose: bool) -> None:
@@ -66,8 +67,7 @@ def _warm_analysis(twpa: TWPA, label: str, models: tuple, verbose: bool) -> None
         print(
             f"twpasolver warmup: compiling CME kernels for the {label} device path..."
         )
-    analysis = TWPAnalysis(twpa=twpa, f_arange=_F_ARANGE)
-    analysis.update_base_data()
+    analysis = TWPAnalysis(twpa=twpa, freqs=_F_ARANGE)
     level = log.level
     # One pass only compiles the kernels; its "did not converge" warning is noise.
     log.setLevel(logging.ERROR)
@@ -79,6 +79,7 @@ def _warm_analysis(twpa: TWPA, label: str, models: tuple, verbose: bool) -> None
             for model in models:
                 analysis.gain(
                     _SIGNAL_FREQS,
+                    pump=_PUMP,
                     model=model,
                     bloch_config=BlochSolverConfig(passes=1),
                 )

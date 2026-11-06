@@ -1,17 +1,15 @@
 """Main class used to simulate the response of TWPAs."""
 
 import enum
-from abc import ABC, abstractmethod
-from functools import partial, wraps
-from time import strftime
+from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 from matplotlib.axes import Axes
-from pydantic import ConfigDict, Field, PrivateAttr, field_validator
+from pydantic import ConfigDict, Field, PrivateAttr, TypeAdapter, field_validator
 
 from twpasolver.basemodel import BaseModel
-from twpasolver.bonus_types import FloatArray
+from twpasolver.bonus_types import FloatArray, FrequencyArange, FrequencyList
 from twpasolver.cmes.base import no_reflections_cmes_solve
 from twpasolver.cmes.bloch import bloch_wavenumber, in_stopband, lossless_copy
 from twpasolver.cmes.bloch_fb import bloch_fb_segmented_cmes_solve, segmented_phase
@@ -21,8 +19,6 @@ from twpasolver.cmes.prep import (
     prepare_relations_coefficients,
 )
 from twpasolver.cmes.solver_config import BlochSolverConfig, RKSolverConfig
-from twpasolver.file_utils import read_file, save_to_file
-from twpasolver.frequency import Frequencies
 from twpasolver.logger import log
 from twpasolver.mathutils import to_dB
 from twpasolver.models import TWPA
@@ -116,87 +112,166 @@ def _drop_segment_axis(bloch: dict[str, Any], n_freq: int) -> dict[str, Any]:
     return out
 
 
-def analysis_function(func):
-    """Decorate analysis methods: refresh base data, run, store the result."""
-
-    @wraps(func)
-    def wrapper(self, *args, save=True, save_name: Optional[str] = None, **kwargs):
-        function_name = func.__name__
-        log.info("Running %s", function_name)
-        self.update_base_data()
-        result = func(self, *args, **kwargs)
-        if save:
-            if save_name is None:
-                save_name = function_name
-            if save_name in self.data.keys():
-                log.info(
-                    "Data for '%s' output already present in analysis data, will be overwritten.",
-                    save_name,
-                )
-            self.data[save_name] = result
-        return result
-
-    return wrapper
+_UNIT_MULTIPLIERS = {"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9, "THz": 1e12}
 
 
-class Analyzer(BaseModel, ABC):
-    """Base class for structured analysis."""
+@dataclass(frozen=True)
+class LinearData:
+    """
+    Linear response of a TWPA on the analysis frequency grid.
 
-    data_file: str = Field(default_factory=partial(strftime, "data_%m_%d_%H_%M_%S"))
-    data: dict[str, Any] = Field(default_factory=dict, exclude=True)
+    Frequencies are in the analysis unit. Per-segment arrays have shape
+    ``(n_segments, n_freq)``; a uniform device is one segment.
 
-    @abstractmethod
-    def update_base_data(self) -> None:
-        """Check and update base data of the class if necessary."""
+    Attributes:
+        freqs: Frequency grid, shape (n_freq,).
+        abcd: ABCD matrices of the whole device, shape (n_freq, 2, 2).
+        S21, S11: Scattering parameters of the whole device against ``twpa.Z0_ref``.
+        stopbands: ``[start, end]`` of every stopband of the (first segment's)
+            lossless supercell in the grid, shape (n_bands, 2).
+        k, alpha: Bloch wavenumber and attenuation per unit cell.
+        Zb: Bloch impedance.
+        reflection_coeff: Reflection coefficient of ``Zb`` against ``twpa.Z0_ref``.
+        k_star: Length-weighted mean ``k`` minus the linear part of a quadratic fit
+            below a tenth of the first stopband (the bare ``k`` without stopband),
+            shape (n_freq,).
+        seg_bounds: Segment boundaries in unit cells, shape (n_segments + 1,).
+        seg_N_tot: Unit cells per segment.
+        seg_epsilon, seg_xi: Nonlinearity coefficients per segment.
+    """
 
-    def save_data(self, writer: str = "hdf5") -> None:
-        """Save data to file."""
-        save_to_file(self.data_file, self.data, writer=writer)
+    freqs: np.ndarray
+    abcd: np.ndarray
+    S21: np.ndarray
+    S11: np.ndarray
+    stopbands: np.ndarray
+    k: np.ndarray
+    alpha: np.ndarray
+    Zb: np.ndarray
+    reflection_coeff: np.ndarray
+    k_star: np.ndarray
+    seg_bounds: np.ndarray
+    seg_N_tot: np.ndarray
+    seg_epsilon: np.ndarray
+    seg_xi: np.ndarray
 
-    def load_data(self, filename: str, writer="hdf5") -> None:
-        """Load data from file."""
-        self.data = read_file(filename, writer=writer)
+    @property
+    def S21_db(self) -> np.ndarray:
+        """``|S21|`` in dB."""
+        return 20 * np.log10(np.abs(self.S21))
 
-    @analysis_function
-    def parameter_sweep(
-        self, function: str, target: str, values: list, *args, **kwargs
-    ) -> dict[str, list[Any]]:
-        """Run an analysis function multiple times for different values of a parameter."""
-        results: dict[str, list[Any]] = {}
-        kwargs.update({"save": False})
-        fn = getattr(self, function)
-        target_savename = target
-        for i, value in enumerate(values):
-            kwargs.update({target: value})
-            fn_res = fn(*args, **kwargs)
-            if i == 0:
-                if target in fn_res.keys():
-                    target_savename = target + "_sweeped"
-                    log.warning(
-                        "Results dictionary contains key with target variable name, "
-                        "sweep values saved as '%s'.",
-                        target_savename,
-                    )
-                results.update({key: [item] for key, item in fn_res.items()})
-                results[target_savename] = []
-            else:
-                for key, item in fn_res.items():
-                    results[key].append(item)
-            results[target_savename].append(value)
-        return results
+    @property
+    def seg_midpoints(self) -> np.ndarray:
+        """Segment midpoints in unit cells."""
+        return 0.5 * (self.seg_bounds[:-1] + self.seg_bounds[1:])
 
 
-class TWPAnalysis(Analyzer, Frequencies):
+def is_segmented(twpa: TWPA) -> bool:
+    """Whether ``twpa`` is a chain of ``TWPA`` segments."""
+    return bool(twpa.cells) and all(isinstance(cell, TWPA) for cell in twpa.cells)
+
+
+def _bloch_params(cell: TWPA, f: np.ndarray, Z0: Any, T: Any) -> dict[str, Any]:
+    """
+    Bloch parameters per unit cell of a uniform segment with supercell ABCD ``T``.
+
+    ``k`` (winding rule, :func:`bloch_wavenumber`), ``alpha``, the Bloch impedance
+    ``Zb`` and its ``reflection_coeff`` against ``Z0``; ``f`` in Hz.
+    """
+    T = np.asarray(T)
+    A, B, D = T[:, 0, 0], T[:, 0, 1], T[:, 1, 1]
+    n_cells = int(cell.N_tot / cell.N)
+    root = np.sqrt((A + D) ** 2 - 4)
+    Zb = -2 * B / (A - D - root)
+    Zb.real = np.abs(Zb.real)
+    return {
+        "k": bloch_wavenumber(cell, f, T, Z0) / n_cells,
+        "alpha": np.abs(np.log((A + D + root) / 2).real) / n_cells,
+        "Zb": Zb,
+        "reflection_coeff": (Zb - Z0) / (Zb + Z0),
+    }
+
+
+def linear_data(twpa: TWPA, f: np.ndarray, unit_multiplier: float) -> LinearData:
+    """Linear response of ``twpa`` on the grid ``f`` (Hz), reported in ``f / unit_multiplier``."""
+    segmented = is_segmented(twpa)
+    segments: list[Any] = list(twpa.cells) if segmented else [twpa]
+    if segmented:
+        log.info("Detected %d TWPA segments.", len(segments))
+    # Segments with identical unit cells share one supercell ABCD and its
+    # Bloch parameters (N and the nonlinearity do not enter them).
+    cache: dict[str, Any] = {}
+    params: list[dict[str, Any]] = []
+    abcd: Any = None
+    for seg in segments:
+        key = repr([c.model_dump() for c in seg.cells])
+        if key not in cache:
+            T = seg.single_abcd(f)
+            cache[key] = (T, _bloch_params(seg, f, twpa.Z0_ref, T))
+        T, p = cache[key]
+        params.append(p)
+        T_seg = T if seg.N == 1 else T**seg.N
+        abcd = T_seg if abcd is None else abcd @ T_seg
+    if segmented and twpa.N != 1:
+        abcd = abcd**twpa.N
+    cell = TwoPortCell(f, abcd=abcd, Z0=twpa.Z0_ref)
+    freqs = f / unit_multiplier
+
+    # One [start, end] row (first and last grid point) per contiguous band.
+    gap = in_stopband(lossless_copy(segments[0]), f)
+    edges = np.flatnonzero(np.diff(np.concatenate([[0], gap, [0]])))
+    stopbands = freqs[edges.reshape(-1, 2) - [0, 1]]
+    if not len(stopbands):
+        log.warning("No stopband in the frequency grid.")
+
+    tables = {
+        key: np.stack([p[key] for p in params])
+        for key in ("k", "alpha", "reflection_coeff", "Zb")
+    }
+    seg_N_tot = np.array([seg.N_tot for seg in segments], dtype=np.float64)
+    k_full = np.average(tables["k"], axis=0, weights=seg_N_tot)
+    freqs_mask = freqs < (stopbands[0, 0] / 10 if len(stopbands) else 0.0)
+    k_star = k_full
+    if freqs_mask.sum() > 2:
+        k_pars = np.polyfit(freqs[freqs_mask], k_full[freqs_mask], 2)
+        k_star = k_full - np.polyval(k_pars[1:], freqs)
+
+    return LinearData(
+        freqs=freqs,
+        abcd=np.asarray(cell.abcd),
+        S21=cell.s.S21,
+        S11=cell.s.S11,
+        stopbands=stopbands,
+        k_star=k_star,
+        seg_bounds=np.concatenate([[0.0], np.cumsum(seg_N_tot)]),
+        seg_N_tot=seg_N_tot,
+        seg_epsilon=np.array([seg.epsilon for seg in segments]),
+        seg_xi=np.array([seg.xi for seg in segments]),
+        **tables,
+    )
+
+
+class TWPAnalysis(BaseModel):
     """
     TWPA Analysis Engine with Extended Coupled Mode Equations.
 
     Main interface for simulating TWPA nonlinear behavior. Solves coupled mode
     equations (CMEs) with support for arbitrary numbers of modes and automatic
-    mode relationship management.
+    mode relationship management. The linear response is computed on demand
+    (:attr:`linear`) and recomputed when ``twpa``, ``freqs`` or ``unit`` change;
+    analysis methods return their results without storing them.
     """
 
     model_config = ConfigDict(validate_assignment=True, extra="forbid")
     twpa: TWPA
+    freqs: Union[FrequencyArange, FrequencyList] = Field(
+        description=(
+            "Frequency grid in ``unit``: a tuple ``(start, stop, step)`` passed to "
+            "``numpy.arange``, or a list or array of frequencies. Stored as the "
+            "explicit list."
+        )
+    )
+    unit: Literal["Hz", "kHz", "MHz", "GHz", "THz"] = "GHz"
     port: Any = Field(
         default=None,
         description=(
@@ -230,9 +305,6 @@ class TWPAnalysis(Analyzer, Frequencies):
             return v
         raise ValueError(f"port must be a TwoPortModel instance, got {type(v)}")
 
-    _previous_state: dict[str, Any] = PrivateAttr()
-    _mode_arrays: Dict[str, ModeArray] = PrivateAttr(default_factory=dict)
-
     @field_validator("twpa", mode="before", check_fields=True)
     @classmethod
     def load_model_from_file(cls, twpa: str | TWPA) -> TWPA:
@@ -246,44 +318,71 @@ class TWPAnalysis(Analyzer, Frequencies):
                 ) from exc
         return twpa
 
-    def _is_segmented(self) -> bool:
-        """Check whether the twpa is composed entirely of TWPA-instance segments."""
-        return bool(self.twpa.cells) and all(
-            isinstance(cell, TWPA) for cell in self.twpa.cells
+    @field_validator("freqs", mode="before")
+    @classmethod
+    def _expand_grid(cls, v):
+        """Expand an arange tuple and accept arrays; reject an empty grid."""
+        if isinstance(v, tuple):
+            start, stop, step = TypeAdapter(FrequencyArange).validate_python(v)
+            v = np.arange(start, stop, step, dtype=np.float64)
+        if isinstance(v, np.ndarray):
+            v = v.tolist()
+        if isinstance(v, list) and not v:
+            raise ValueError("The frequency grid is empty.")
+        return v
+
+    _linear: Optional[LinearData] = PrivateAttr(default=None)
+    _linear_key: Any = PrivateAttr(default=None)
+    _mode_arrays: Dict[str, ModeArray] = PrivateAttr(default_factory=dict)
+
+    @property
+    def unit_multiplier(self) -> float:
+        """Multiplier converting ``unit`` to Hz."""
+        return _UNIT_MULTIPLIERS[self.unit]
+
+    @property
+    def f(self) -> np.ndarray:
+        """Frequency grid in Hz."""
+        return self.unit_multiplier * np.array(self.freqs, dtype=np.float64)
+
+    @property
+    def linear(self) -> LinearData:
+        """Linear response on the grid, recomputed when ``twpa``, ``freqs`` or ``unit`` change."""
+        key = (self.twpa.model_dump(), self.freqs, self.unit)
+        if self._linear is None or key != self._linear_key:
+            log.info("Computing base parameters.")
+            self._linear = linear_data(self.twpa, self.f, self.unit_multiplier)
+            self._linear_key = key
+            interpolator = self._base_interpolator()
+            for mode_array in self._mode_arrays.values():
+                mode_array.update_base_data(interpolator)
+            if "basic_3wm" not in self._mode_arrays:
+                self._mode_arrays["basic_3wm"] = ModeArrayFactory.create_basic(
+                    self._linear, interpolator=interpolator
+                )
+                self._mode_arrays["basic_4wm"] = ModeArrayFactory.create_basic(
+                    self._linear, three_wave=False, interpolator=interpolator
+                )
+        return self._linear
+
+    def _base_interpolator(self) -> ParameterInterpolator:
+        """Interpolator of the current linear data, shared by all mode arrays."""
+        lin = self._linear
+        assert lin is not None
+        return ParameterInterpolator(
+            lin.freqs,
+            {
+                "k": lin.k,
+                "gamma": lin.reflection_coeff,
+                "alpha": lin.alpha,
+                "Zb": lin.Zb,
+            },
         )
 
     def _bloch_segments(self) -> tuple[list, np.ndarray]:
-        """
-        Segments and segment boundaries (unit cells) seen by the Bloch FB model.
-
-        A uniform device is a single segment spanning the whole line.
-        """
-        segments = list(self.twpa.cells) if self._is_segmented() else [self.twpa]
-        return segments, np.asarray(self.data["segments"]["boundaries"], dtype=float)
-
-    def _bloch_params_for_cell(self, cell: TWPA, T: Any = None) -> dict[str, Any]:
-        """
-        Bloch parameters of a uniform segment, per unit cell.
-
-        ``k`` (winding rule, :func:`bloch_wavenumber`), ``alpha``, the Bloch
-        impedance ``Zb`` and its ``reflection_coeff`` against ``self.twpa.Z0_ref``.
-        ``T`` is the supercell ABCD of ``cell`` on ``self.f`` when already known.
-        """
-        if T is None:
-            T = cell.single_abcd(self.f)
-        T = np.asarray(T)
-        A, B, D = T[:, 0, 0], T[:, 0, 1], T[:, 1, 1]
-        n_cells = int(cell.N_tot / cell.N)
-        root = np.sqrt((A + D) ** 2 - 4)
-        Zb = -2 * B / (A - D - root)
-        Zb.real = np.abs(Zb.real)
-        Z0 = self.twpa.Z0_ref
-        return {
-            "k": bloch_wavenumber(cell, self.f, T, Z0) / n_cells,
-            "alpha": np.abs(np.log((A + D + root) / 2).real) / n_cells,
-            "Zb": Zb,
-            "reflection_coeff": (Zb - Z0) / (Zb + Z0),
-        }
+        """Segments and their boundaries (unit cells); a uniform device is one segment."""
+        segments = list(self.twpa.cells) if is_segmented(self.twpa) else [self.twpa]
+        return segments, np.asarray(self.linear.seg_bounds, dtype=float)
 
     def _build_port_tables(
         self,
@@ -356,122 +455,9 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         return Zout_in, Zout_out, abcd_in, abcd_out
 
-    def update_base_data(self) -> None:
-        """Update data extracted from the twpa model."""
-        current_state = {
-            "twpa": self.twpa.model_dump(),
-            "f_list": self.f_list,
-            "f_arange": self.f_arange,
-            "unit": self.unit,
-        }
-        if (
-            not hasattr(self, "_previous_state")
-            or current_state != self._previous_state
-        ):
-            log.info("Computing base parameters.")
-            segmented = self._is_segmented()
-            # A uniform device is one segment.
-            segments: list[Any] = list(self.twpa.cells) if segmented else [self.twpa]
-            # Segments with identical unit cells share one supercell ABCD and its
-            # Bloch parameters (N and the nonlinearity do not enter them).
-            cache: dict[str, Any] = {}
-            params: list[dict[str, Any]] = []
-            abcd: Any = None
-            for seg in segments:
-                key = repr([c.model_dump() for c in seg.cells])
-                if key not in cache:
-                    T = seg.single_abcd(self.f)
-                    cache[key] = (T, self._bloch_params_for_cell(seg, T))
-                T, p = cache[key]
-                params.append(p)
-                T_seg = T if seg.N == 1 else T**seg.N
-                abcd = T_seg if abcd is None else abcd @ T_seg
-            if segmented and self.twpa.N != 1:
-                abcd = abcd**self.twpa.N
-            cell = TwoPortCell(self.f, abcd=abcd, Z0=self.twpa.Z0_ref)
-            freqs = self.f / self.unit_multiplier
-
-            self.data["freqs"] = freqs
-            self.data["abcd"] = np.asarray(cell.abcd)
-            self.data["S21"] = cell.s.S21
-            self.data["S11"] = cell.s.S11
-            self.data["S21_db"] = 20 * np.log10(np.abs(self.data["S21"]))
-
-            # Stopbands of the (first segment's) lossless supercell, one
-            # [start, end] row (first and last grid point) per contiguous band.
-            gap = in_stopband(lossless_copy(segments[0]), self.f)
-            edges = np.flatnonzero(np.diff(np.concatenate([[0], gap, [0]])))
-            stopbands = freqs[edges.reshape(-1, 2) - [0, 1]]
-            if not len(stopbands):
-                log.warning("No stopband in the frequency grid.")
-            self.data["stopbands"] = stopbands
-
-            # Bloch parameters: (n_segments, n_freq) for segmented devices,
-            # (n_freq,) for uniform ones.
-            for key in ("k", "alpha", "reflection_coeff", "Zb"):
-                stacked = np.stack([p[key] for p in params])
-                self.data[key] = stacked if segmented else stacked[0]
-            seg_N_tot = np.array([seg.N_tot for seg in segments], dtype=np.float64)
-            if segmented:
-                log.info("Detected %d TWPA segments.", len(segments))
-            bounds = np.concatenate([[0.0], np.cumsum(seg_N_tot)])
-            self.data["segments"] = {
-                "boundaries": bounds,
-                "midpoints": 0.5 * (bounds[:-1] + bounds[1:]),
-                "N_tot": seg_N_tot,
-                "epsilon": np.array([seg.epsilon for seg in segments]),
-                "xi": np.array([seg.xi for seg in segments]),
-            }
-
-            # k_star from the length-weighted mean wavenumber per unit cell.
-            k_full = np.average(
-                np.atleast_2d(self.data["k"]), axis=0, weights=seg_N_tot
-            )
-            freqs_mask = freqs < (stopbands[0, 0] / 10 if len(stopbands) else 0.0)
-            if freqs_mask.sum() > 2:
-                k_pars = np.polyfit(freqs[freqs_mask], k_full[freqs_mask], 2)
-                self.data["k_star"] = k_full - np.polyval(k_pars[1:], freqs)
-            else:
-                self.data["k_star"] = k_full
-
-            self._previous_state = current_state
-
-            self._update_all_mode_arrays()
-            if "basic_3wm" not in self._mode_arrays:
-                self._initialize_standard_mode_arrays()
-
-    def _base_interpolator(self) -> ParameterInterpolator:
-        """Interpolator of the current base data, shared by all mode arrays."""
-        return ParameterInterpolator(
-            self.data["freqs"],
-            {
-                "k": self.data["k"],
-                "gamma": self.data["reflection_coeff"],
-                "alpha": self.data["alpha"],
-                "Zb": self.data["Zb"],
-            },
-        )
-
-    def _initialize_standard_mode_arrays(self) -> None:
-        """Initialize standard mode arrays using the computed base data."""
-        interpolator = self._base_interpolator()
-        self._mode_arrays["basic_3wm"] = ModeArrayFactory.create_basic(
-            self.data, interpolator=interpolator
-        )
-        self._mode_arrays["basic_4wm"] = ModeArrayFactory.create_basic(
-            self.data, three_wave=False, interpolator=interpolator
-        )
-
-    def _update_all_mode_arrays(self) -> None:
-        """Update all registered mode arrays with current base data."""
-        if not self._mode_arrays:
-            return
-        interpolator = self._base_interpolator()
-        for mode_array in self._mode_arrays.values():
-            mode_array.update_base_data(interpolator)
-
     def get_mode_array(self, config: str = "basic_3wm") -> ModeArray:
-        """Get a mode array by configuration name."""
+        """Get a mode array by configuration name, up to date with :attr:`linear`."""
+        _ = self.linear
         if config not in self._mode_arrays:
             raise ValueError(f"Mode array configuration '{config}' not found")
         return self._mode_arrays[config]
@@ -572,8 +558,8 @@ class TWPAnalysis(Analyzer, Frequencies):
         terms_3wm = mode_array.get_rwa_terms(power=2)
         terms_4wm = mode_array.get_rwa_terms(power=3)
 
-        segments = self.data["segments"]
-        n_seg = len(segments["N_tot"])
+        lin = self.linear
+        n_seg = len(lin.seg_N_tot)
 
         def table(key):
             """(n_freq, n_modes, n_seg) from per-mode (n_seg, n_freq) parameters."""
@@ -584,12 +570,12 @@ class TWPAnalysis(Analyzer, Frequencies):
         relations_3wm, relations_4wm, c3_unit, c4_unit = prepare_relations_coefficients(
             terms_3wm, terms_4wm, 1.0, 1.0
         )
-        coeffs_3wm = np.stack([c3_unit * eps for eps in segments["epsilon"]], axis=-1)
-        coeffs_4wm = np.stack([c4_unit * xi for xi in segments["xi"]], axis=-1)
+        coeffs_3wm = np.stack([c3_unit * eps for eps in lin.seg_epsilon], axis=-1)
+        coeffs_4wm = np.stack([c4_unit * xi for xi in lin.seg_xi], axis=-1)
         gammas = -table("alpha") - 1j * table("k")
         reflections = table("gamma")
         Zb_table = table("Zb")
-        segment_midpoints = segments["midpoints"]
+        segment_midpoints = lin.seg_midpoints
 
         return {
             "mode_params": mode_params,
@@ -608,7 +594,6 @@ class TWPAnalysis(Analyzer, Frequencies):
 
     # Public analysis methods
 
-    @analysis_function
     def phase_matching(
         self,
         process: Literal["PA", "FCU", "FCD"] = "PA",
@@ -660,9 +645,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         Ip0 = self.twpa.Ip0 if pump_Ip0 is None else pump_Ip0
         # Segmented devices: the accumulated mismatch is sum_s N_s dk_s, so delta
         # is the length-weighted mean of the per-segment dk_s (own k, gamma, xi).
-        seg = self.data["segments"]
-        weights = seg["N_tot"] / seg["N_tot"].sum()
-        chi = Ip0**2 * seg["xi"] / 8
+        lin = self.linear
+        weights = lin.seg_N_tot / lin.seg_N_tot.sum()
+        chi = Ip0**2 * lin.seg_xi / 8
         n_seg = len(weights)
 
         f_triplets = []
@@ -707,7 +692,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 k_triplets.append([(weights @ kp).item(), ks_mean[j], ki_mean[j]])
 
         # A pump inside a stopband does not propagate: no phase matching there.
-        stopbands = self.data["stopbands"]
+        stopbands = lin.stopbands
         in_gap = (
             (pump_f[:, None] >= stopbands[:, 0]) & (pump_f[:, None] <= stopbands[:, 1])
         ).any(axis=1)
@@ -732,7 +717,6 @@ class TWPAnalysis(Analyzer, Frequencies):
             },
         }
 
-    @analysis_function
     def gain(
         self,
         signal_freqs: FloatArray,
@@ -949,7 +933,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         Bloch impedances Zb+ (forward) and Zb- (backward). See
         :mod:`twpasolver.cmes.bloch_fb`.
         """
-        segmented = self._is_segmented()
+        segmented = is_segmented(self.twpa)
         bloch_config = bloch_config if bloch_config is not None else BlochSolverConfig()
         mode_array = self.get_mode_array(mode_array_config)
 
@@ -1127,34 +1111,24 @@ class TWPAnalysis(Analyzer, Frequencies):
 
     # Bandwidth
 
-    @analysis_function
+    @staticmethod
     def bandwidth(
-        self,
-        gain_reduction: float = 3,
-        **gain_kwargs,
+        gain_result: dict[str, Any], gain_reduction: float = 3
     ) -> dict[str, Any]:
         """
-        Compound gain bandwidth of the stored (or newly computed) gain.
+        Compound gain bandwidth of a ``gain()`` result.
 
         Parameters
         ----------
+        gain_result : dict
+            Result of :meth:`gain`.
         gain_reduction : float
             Threshold in dB below the maximum gain.
-        **gain_kwargs : dict
-            If given, ``gain()`` is run with them first.
         """
-        if gain_kwargs:
-            self.gain(**gain_kwargs)
-        elif "gain" not in self.data.keys():
-            raise ValueError(
-                "No stored gain: run gain() first or pass its arguments to bandwidth()."
-            )
-
-        gain_data = self.data["gain"]
-        gain_db = gain_data["gain_db"]
-        signal_freqs = gain_data["signal_freqs"]
+        gain_db = gain_result["gain_db"]
+        signal_freqs = gain_result["signal_freqs"]
         if np.all(np.isnan(gain_db)):
-            raise ValueError("Stored gain is NaN at every frequency.")
+            raise ValueError("Gain is NaN at every frequency.")
 
         max_g = gain_db[np.nanargmax(gain_db)]
         ok_idx = np.where(gain_db >= max_g - gain_reduction)[0]
@@ -1168,7 +1142,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         all_roots.append(ok_freqs[-1])
 
         return {
-            "pump_freq": gain_data["pump_freq"],
+            "pump_freq": gain_result["pump_freq"],
             "bandwidth_edges": all_roots,
             "total_bw": len(ok_freqs) * df,
             "max_gain": max_g,
@@ -1180,46 +1154,32 @@ class TWPAnalysis(Analyzer, Frequencies):
     # Plotting helpers
 
     def plot_response(self, **kwargs) -> Axes:
-        """Plot response of twpa."""
-        if "k_star" not in self.data:
-            self.update_base_data()
+        """Plot ``|S21|`` and ``k_star`` of the linear response."""
+        lin = self.linear
         return plot_response(
-            self.data["freqs"],
-            self.data["S21_db"],
-            self.data["k_star"],
-            freqs_unit=self.unit,
-            **kwargs,
+            lin.freqs, lin.S21_db, lin.k_star, freqs_unit=self.unit, **kwargs
         )
 
-    def plot_gain(self, **kwargs) -> Axes:
-        """Plot gain of twpa."""
-        if "gain" not in self.data:
-            raise RuntimeError("Gain data not found, please run analysis function.")
-        gain_data = self.data["gain"]
+    def plot_gain(self, gain_result: dict[str, Any], **kwargs) -> Axes:
+        """Plot the gain of a ``gain()`` result."""
         return plot_gain(
-            gain_data["signal_freqs"],
-            gain_data["gain_db"],
+            gain_result["signal_freqs"],
+            gain_result["gain_db"],
             freqs_unit=self.unit,
             **kwargs,
         )
 
-    def plot_mode_currents(self, **kwargs) -> Axes:
-        """Plot mean currents of modes as a function of position along the TWPA line."""
-        if "gain" not in self.data:
-            raise RuntimeError("Gain data not found, please run analysis function.")
-        return plot_mode_currents(self.data["gain"], **kwargs)
+    @staticmethod
+    def plot_mode_currents(gain_result: dict[str, Any], **kwargs) -> Axes:
+        """Plot mean mode currents along the line for a ``gain()`` result."""
+        return plot_mode_currents(gain_result, **kwargs)
 
-    def plot_phase_matching(self, **kwargs) -> Axes:
-        """Plot phase matching profile of twpa."""
-        if "phase_matching" not in self.data:
-            raise RuntimeError(
-                "Phase matching data not found, please run analysis function."
-            )
-        pm = self.data["phase_matching"]
+    def plot_phase_matching(self, pm_result: dict[str, Any], **kwargs) -> Axes:
+        """Plot the mismatch of a ``phase_matching()`` result."""
         return plot_phase_matching(
-            pm["pump_freqs"],
-            pm["signal_freqs"],
-            pm["delta"],
+            pm_result["pump_freqs"],
+            pm_result["signal_freqs"],
+            pm_result["delta"],
             freqs_unit=self.unit,
             **kwargs,
         )
