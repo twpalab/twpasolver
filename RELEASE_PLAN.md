@@ -313,6 +313,12 @@ Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` da
   a mode is on the fixed edge basis (nearly singular basis change), or the per-segment edge-basis K. To do: find
   which input the gain is sensitive to (k vs Zb vs edge_K, per segment), check the conditioning of the junction
   matrices, and fix or at least document the accuracy limit.
+  - **Narrowed 2026-11-06** (script `sens.py`, k x (1 + 1e-15), signals 2-12 GHz, ext2, pump 16 GHz, passes 80,
+    anderson_depth 15): only segmented + edge basis is sensitive (max |dG21| 3.6e-3 dB, at every signal, largest at
+    12 GHz). Segmented with `simulate_stopband_modes=False`: 4e-12 dB; segmented without stopband treatment
+    (`edge_threshold=None`): 3e-11 dB; uniform in all three modes: <= 2e-11 dB. So the junctions and the Anderson
+    iteration are fine; the culprit is the fixed edge basis across segment junctions (edge-mode junction step or
+    per-segment `edge_K`). Start there.
 
 **Acceptance:** each item has a test; the full suite is green; mypy errors go down.
 
