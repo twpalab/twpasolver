@@ -15,13 +15,8 @@ from twpasolver.bonus_types import FloatArray
 from twpasolver.cmes import solver_config
 from twpasolver.cmes.base import no_reflections_cmes_solve
 from twpasolver.cmes.bloch import (
-    bloch_coefficients,
     bloch_mode_tables,
-    bloch_no_reflections_cmes_solve,
-    cell_phase_mask,
     edge_basis_tables,
-    edge_guard_mode_weights,
-    edge_proximity_mode_weights,
     edge_reference_frequency,
     in_stopband,
     lossless_copy,
@@ -30,7 +25,6 @@ from twpasolver.cmes.bloch import (
     stopband_edges,
 )
 from twpasolver.cmes.bloch_fb import bloch_fb_segmented_cmes_solve, segmented_phase
-from twpasolver.cmes.cmes_fb import general_cmes_solve_fb_cutoff
 from twpasolver.cmes.solver_config import FBSolverConfig
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.frequency import Frequencies
@@ -51,34 +45,40 @@ class GainModel(str, enum.Enum):
     """
     Available CME models for gain analysis.
 
-    Args
-    ----
-    GENERAL_NO_REFLECTIONS : str
-        Extended mode system without reflections.
-        Fast and useful for initial assessment of the main nonlinear processes.
+    SIMPLE : "simple"
+        Traditional coupled mode equations of a homogeneous line, forward waves
+        only. The supercell enters only through the Bloch wavenumber; the
+        couplings are those of a uniform medium (scaled by k), without the
+        intracell current profiles, so they are not exact for loaded lines,
+        especially near stopbands. Ignores reflections and the port/connector
+        models. Fast; useful for quick sweeps and comparisons with the
+        literature. Segmented devices are interpolated linearly between segment
+        midpoints (a smooth taper).
 
-    GENERAL : str
-        Forward-backward propagation model with iterative solving for reflections.
-        Most complete model modeling impedance mismatched at the edges of the device.
+    BLOCH : "bloch"
+        Forward-backward model in the Bloch-mode basis: exact Bloch couplings
+        with the intracell current profiles, counter-propagating waves and
+        reflections, exact boundary conditions with the port/connector models,
+        fixed edge basis for modes close to a stopband edge. Segmented devices
+        (whole supercells per segment) are solved on per-segment Bloch modes
+        joined by exact junction conditions. Configured by ``FBSolverConfig``.
 
-    BLOCH_NO_REFLECTIONS : str
-        Extended mode system without reflections, written in the Bloch-mode basis.
-        Coupling coefficients include the Bloch-impedance normalization and the
-        intracell current profiles of the modes (relevant close to stopbands).
-        Currently available only for non-segmented devices.
-
-    BLOCH : str
-        Forward-backward model in the Bloch-mode basis. Same couplings as
-        BLOCH_NO_REFLECTIONS, plus exact boundary conditions at the device ends
-        (Bloch impedances of the forward and backward modes, no derivative
-        correction). Segmented devices are solved piecewise, each segment on
-        its own Bloch modes, joined by exact junction conditions.
+    The name ``"general_no_reflections"`` of earlier versions is accepted for
+    ``"simple"`` with a deprecation warning.
     """
 
-    GENERAL_NO_REFLECTIONS = "general_no_reflections"
-    GENERAL = "general"
-    BLOCH_NO_REFLECTIONS = "bloch_no_reflections"
+    SIMPLE = "simple"
     BLOCH = "bloch"
+
+    @classmethod
+    def _missing_(cls, value):
+        if value == "general_no_reflections":
+            log.warning(
+                "Gain model 'general_no_reflections' is now called 'simple'; "
+                "the old name will be removed in a future version."
+            )
+            return cls.SIMPLE
+        return None
 
 
 def _ratio_db(out: np.ndarray, ref: np.ndarray) -> np.ndarray:
@@ -140,21 +140,6 @@ def _stopband_guard_weights(
     w = t * t * (3.0 - 2.0 * t)
     w = np.where(reactive_angle_deg(W) > 45.0, 0.0, w)
     return np.where(zone_centre, 1.0, w)
-
-
-def _process_weights_nd(relations: np.ndarray, mode_weights: np.ndarray) -> np.ndarray:
-    """
-    Weight of every relation row, the product of the weights of its modes.
-
-    ``mode_weights`` has shape ``(..., n_modes)``; the result ``(..., n_rel)``.
-    Partner rows of a process contain the same modes and get the same weight.
-    """
-    n_modes = mode_weights.shape[-1]
-    out = np.ones(mode_weights.shape[:-1] + (len(relations),), dtype=np.float64)
-    for r, rel in enumerate(relations):
-        for idx in rel:
-            out[..., r] *= mode_weights[..., int(idx) % n_modes]
-    return out
 
 
 def _edge_basis_entries(
@@ -1004,202 +989,6 @@ class TWPAnalysis(Analyzer, Frequencies):
             "segment_midpoints": segment_midpoints,
         }
 
-    def _bloch_mode_weights(
-        self,
-        bloch: dict[str, Any],
-        mode_labels: list[str],
-        signal_freqs: FloatArray,
-        injected: np.ndarray,
-        forward_only: bool,
-    ) -> np.ndarray:
-        """
-        Per-mode stopband-edge weights of the guarded Bloch models.
-
-        Used by the no-reflections model; the forward-backward models use the
-        fixed edge basis instead (:meth:`_apply_edge_basis_segmented`,
-        :meth:`_apply_edge_basis_segmented`). Works on tables of shape (n_freq, n_modes) or (n_freq, n_seg, n_modes).
-
-        * Edge guard (``solver_config.BLOCH_EDGE_GUARD``):
-          weight from the Bloch splitting ``|sinh(gamma d)|``, which vanishes
-          only at the band edges (exceptional points). Modes inside a stopband,
-          away from its edges, keep weight 1.
-        * Reactive-angle guard (forward-only model only,
-          ``solver_config.BLOCH_EDGE_GUARD_DEG``): weight from ``|arg W|``,
-          which switches off a whole stopband, since a single evanescent Bloch
-          mode cannot be described without its partner.
-
-        Modes with an input amplitude (``injected``) are never attenuated; a
-        warning is logged when they would have been. The weights, splittings
-        and angles are stored in ``bloch`` (``edge_weights``, ``edge_split``,
-        ``reactive_angle_deg``).
-        """
-        W = bloch["W"]
-        split = bloch["split"]
-        angle = reactive_angle_deg(W)
-        weights = np.ones(W.shape, dtype=np.float64)
-        edge = solver_config.BLOCH_EDGE_GUARD
-        if edge is not None:
-            weights *= edge_proximity_mode_weights(split, *edge)
-        reactive = solver_config.BLOCH_EDGE_GUARD_DEG
-        if forward_only and reactive is not None:
-            weights *= edge_guard_mode_weights(W, *reactive)
-
-        lead = tuple(range(W.ndim - 1))  # frequency (and segment) axes
-        flagged_inj = injected & (weights < 1.0).any(axis=lead)
-        if np.any(flagged_inj):
-            cols = np.flatnonzero(flagged_inj)
-            log.warning(
-                "Bloch stopband-edge guard: injected mode(s) %s lie close to a "
-                "stopband edge (min |sinh(gamma d)| = %s, max |arg W| = %s deg) "
-                "and are kept; their description there is unreliable.",
-                [mode_labels[j] for j in cols],
-                [float(f"{split[..., j].min():.3g}") for j in cols],
-                [round(float(angle[..., j].max()), 1) for j in cols],
-            )
-        weights[..., injected] = 1.0
-
-        sig = np.asarray(signal_freqs, dtype=np.float64)
-        for j in np.flatnonzero((weights < 1.0).any(axis=lead)):
-            hit = weights[..., j] < 1.0
-            f_hit = hit.reshape(len(sig), -1).any(axis=1)
-            dropped = (weights[..., j] == 0.0).reshape(len(sig), -1).any(axis=1)
-            log.warning(
-                "Bloch stopband-edge guard: mode %s attenuated at %d of %d signal "
-                "frequencies (%.4g-%.4g), dropped at %d (min |sinh(gamma d)| = "
-                "%.3g, max |arg W| = %.1f deg).",
-                mode_labels[j],
-                int(f_hit.sum()),
-                len(sig),
-                sig[f_hit].min(),
-                sig[f_hit].max(),
-                int(dropped.sum()),
-                float(split[..., j][hit].min()),
-                float(angle[..., j][hit].max()),
-            )
-        bloch["edge_weights"] = weights
-        bloch["edge_split"] = split
-        bloch["reactive_angle_deg"] = angle
-        return weights
-
-    def _bloch_edge_guard(
-        self,
-        bloch: dict[str, Any],
-        cme_inputs: dict[str, Any],
-        signal_freqs: FloatArray,
-        injected: np.ndarray,
-        forward_only: bool = False,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Stopband-edge guard of the uniform no-reflections Bloch model.
-
-        Per-mode weights from :meth:`_bloch_mode_weights`; returns the
-        per-process weights (product over the modes of each relation row) for
-        the 3WM and 4WM relation rows, shape (n_freq, n_rel).
-        """
-        weights = self._bloch_mode_weights(
-            bloch, cme_inputs["mode_labels"], signal_freqs, injected, forward_only
-        )
-        return (
-            process_weights(cme_inputs["relations_3wm"], weights),
-            process_weights(cme_inputs["relations_4wm"], weights),
-        )
-
-    def _prepare_bloch_coefficients(
-        self,
-        mode_array: ModeArray,
-        cme_inputs: dict[str, Any],
-    ) -> dict[str, Any]:
-        """
-        Compute Bloch-basis coupling coefficients for a non-segmented device.
-
-        Evaluated once per frequency point, after the mode frequencies are fixed:
-        the coefficients depend only on the linear Bloch modes, not on the
-        amplitudes or the position.
-
-        Returns
-        -------
-        dict
-            ``coeffs_3wm``, ``coeffs_4wm`` with shape (n_freq, n_relations), plus
-            the Bloch tables used to build them (``W``, ``split``, ``Zb_plus``,
-            ``Zb_minus``, ``phi_plus``, ``phi_minus``, ``L_nl``, ``n_cells``)
-            and the diagnostics ``eig_residual`` and ``gamma_mismatch``
-            (per-unit-cell |gamma_exact - gamma_interpolated|).
-        """
-        mode_labels = cme_inputs["mode_labels"]
-        mode_params = cme_inputs["mode_params"]
-        n_freq = cme_inputs["n_freq"]
-        n_modes = cme_inputs["n_modes"]
-        gammas = cme_inputs["gammas"]
-
-        # Unit coefficients (RWA multiplicity / 4), same relation rows as cme_inputs.
-        _, _, unit_3wm, unit_4wm = prepare_relations_coefficients(
-            mode_array.get_rwa_terms(power=2),
-            mode_array.get_rwa_terms(power=3),
-            1.0,
-            1.0,
-        )
-
-        freqs_hz = (
-            np.stack([np.abs(mode_params[m]["freqs"]) for m in mode_labels], axis=-1)
-            * self.unit_multiplier
-        )
-        # Kernel convention: gammas = -alpha - j k, so the propagation constant
-        # of the forward Bloch mode is -gammas = alpha + j k.
-        tables = bloch_mode_tables(self.twpa, freqs_hz.ravel(), -gammas.ravel())
-        n_nl = tables["L_nl"].size
-        shaped = {
-            key: tables[key].reshape(n_freq, n_modes)
-            for key in (
-                "W",
-                "Zb_plus",
-                "Zb_minus",
-                "gamma_exact",
-                "eig_residual",
-                "split",
-            )
-        }
-        phi_plus = tables["phi_plus"].reshape(n_freq, n_modes, n_nl)
-        phi_minus = tables["phi_minus"].reshape(n_freq, n_modes, n_nl)
-        omegas = 2 * np.pi * freqs_hz
-
-        coeff_args = (
-            omegas,
-            phi_plus,
-            phi_minus,
-            shaped["W"],
-            tables["L_nl"],
-            tables["n_cells"],
-        )
-        coeffs_3wm = bloch_coefficients(
-            cme_inputs["relations_3wm"], unit_3wm, self.twpa.epsilon, *coeff_args
-        )
-        coeffs_4wm = bloch_coefficients(
-            cme_inputs["relations_4wm"], unit_4wm, self.twpa.xi, *coeff_args
-        )
-
-        return {
-            "coeffs_3wm": coeffs_3wm,
-            "coeffs_4wm": coeffs_4wm,
-            "W": shaped["W"],
-            "split": shaped["split"],
-            "Zb_plus": shaped["Zb_plus"],
-            "Zb_minus": shaped["Zb_minus"],
-            "phi_plus": phi_plus,
-            "phi_minus": phi_minus,
-            "L_nl": tables["L_nl"],
-            "positions": tables["positions"],
-            "n_cells": tables["n_cells"],
-            "eig_residual": shaped["eig_residual"],
-            "gamma_mismatch": np.abs(shaped["gamma_exact"] + gammas),
-            # Inputs of the forward-backward kernel, which builds the
-            # coefficients of every direction combination itself.
-            "base_3wm": unit_3wm * self.twpa.epsilon,
-            "base_4wm": unit_4wm * self.twpa.xi,
-            "prefac": -2j * omegas / shaped["W"],
-            "freqs_hz": freqs_hz,
-            "gamma_exact": shaped["gamma_exact"],
-        }
-
     @staticmethod
     def _log_edge_basis_skipped(labels, near_injected, entries, e_edge):
         """Warnings of the edge basis: injected modes near an edge, edges not found."""
@@ -1295,8 +1084,8 @@ class TWPAnalysis(Analyzer, Frequencies):
         bloch["edge_weights"] = weights
         if np.all(weights == 1.0):
             return out
-        out["pw3"] = _process_weights_nd(cme_inputs["relations_3wm"], weights)
-        out["pw4"] = _process_weights_nd(cme_inputs["relations_4wm"], weights)
+        out["pw3"] = process_weights(cme_inputs["relations_3wm"], weights)
+        out["pw4"] = process_weights(cme_inputs["relations_4wm"], weights)
         return out
 
     def _apply_edge_basis_segmented(
@@ -1657,7 +1446,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         pump: Optional[float] = None,
         Is0: float = 1e-7,
         Ip0: Optional[float] = None,
-        model: Union[str, GainModel] = GainModel.GENERAL_NO_REFLECTIONS,
+        model: Union[str, GainModel] = GainModel.SIMPLE,
         mode_array_config: str = "basic_3wm",
         signal_mode: str = "s",
         pump_mode: str = "p",
@@ -1665,13 +1454,10 @@ class TWPAnalysis(Analyzer, Frequencies):
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         thin: int = 100,
-        fb_config: FBSolverConfig = FBSolverConfig(),
+        fb_config: Optional[FBSolverConfig] = None,
     ) -> dict[str, Any]:
         """
         Compute the TWPA gain using coupled mode equation models.
-
-        Unified gain computation method supporting all CME models including
-        the forward-backward model with reflection convergence.
 
         Parameters
         ----------
@@ -1683,15 +1469,13 @@ class TWPAnalysis(Analyzer, Frequencies):
             Initial signal current amplitude (A).
         Ip0 : float, optional
             Initial pump current amplitude (A). If None, uses TWPA's Ip0 parameter.
-        model : GainModel or str, default 'GENERAL_NO_REFLECTIONS'
-            CME model:
-            * 'general_no_reflections': Extended modes, no reflections.
-            * 'general': Full forward-backward model with reflection convergence.
-            * 'bloch_no_reflections': Extended modes, no reflections, Bloch-mode
-              basis (non-segmented devices only).
-            * 'bloch': Forward-backward model in the Bloch-mode basis with exact
-              boundary conditions; segmented devices are solved per segment with
-              exact junction conditions.
+        model : GainModel or str, default 'simple'
+            CME model (see :class:`GainModel`):
+            * 'simple': traditional CMEs of a homogeneous line, forward waves
+              only; fast, approximate couplings, no reflections or connectors.
+            * 'bloch': forward-backward model in the Bloch-mode basis with exact
+              couplings and boundary conditions; segmented devices are solved per
+              segment with exact junction conditions.
         mode_array_config : str, default 'basic_3wm'
             Name of mode array configuration to use.
         signal_mode, pump_mode, idler_mode : str
@@ -1699,19 +1483,19 @@ class TWPAnalysis(Analyzer, Frequencies):
         initial_amplitudes_fwd, initial_amplitudes_bwd : array_like, optional
             Amplitudes of the waves injected at x=0 (traveling along +x) and at
             x=L (traveling along -x); override Is0 and Ip0. Backward inputs
-            require a forward-backward model ('general' or 'bloch'); the
-            no-reflection models raise a ValueError if any is nonzero.
+            require the 'bloch' model; 'simple' raises a ValueError if any is
+            nonzero.
         thin : int, default 100
             Position array thinning factor.
-        fb_config : FBSolverConfig, default FBSolverConfig()
-            Convergence parameters for the forward-backward solver (GENERAL model
-            only): ``passes``, ``kappa_cutoff``, ``update_rate``,
-            ``convergence_threshold``, ``save_all_passes``.
+        fb_config : FBSolverConfig, optional
+            Settings of the 'bloch' solver (default ``FBSolverConfig()``);
+            ignored by 'simple'.
+
         Returns
         -------
         dict
-            Gain analysis results with model-specific fields. The
-            forward-backward models (``general``, ``bloch``) also return the
+            Gain analysis results with model-specific fields. The 'bloch'
+            model also returns the
             port-resolved signal gains ``gain_db`` (S21) and ``gain_db_11``
             (S11), referenced to the forward input, and ``gain_db_12`` (S12)
             and ``gain_db_22`` (S22), referenced to the backward input set with
@@ -1719,27 +1503,21 @@ class TWPAnalysis(Analyzer, Frequencies):
             NaN. With inputs at both ends the outputs contain the response to
             both, so inject from one side at a time for S-parameters.
         """
-        if isinstance(model, str):
-            try:
-                model = GainModel(model)
-            except ValueError:
-                raise ValueError(
-                    f"Invalid model: {model}. Must be one of {[m.value for m in GainModel]}"
-                )
+        try:
+            model = GainModel(model)
+        except ValueError:
+            raise ValueError(
+                f"Invalid model: {model}. Must be one of {[m.value for m in GainModel]}"
+            ) from None
 
-        no_reflection_models = (
-            GainModel.GENERAL_NO_REFLECTIONS,
-            GainModel.BLOCH_NO_REFLECTIONS,
-        )
         if (
-            model in no_reflection_models
+            model == GainModel.SIMPLE
             and initial_amplitudes_bwd is not None
             and np.any(np.asarray(initial_amplitudes_bwd) != 0)
         ):
             raise ValueError(
-                f"Model '{model.value}' propagates only +x traveling waves and "
-                "cannot use backward inputs (initial_amplitudes_bwd). Use the "
-                "forward-backward models ('general' or 'bloch') for "
+                "Model 'simple' propagates only +x traveling waves and cannot use "
+                "backward inputs (initial_amplitudes_bwd). Use model='bloch' for "
                 "counter-propagating waves."
             )
 
@@ -1752,8 +1530,8 @@ class TWPAnalysis(Analyzer, Frequencies):
         N_tot = self.twpa.N_tot
         x = np.linspace(0, N_tot, int(N_tot / thin), endpoint=True, dtype=np.float64)
 
-        if model == GainModel.GENERAL:
-            return self._compute_forward_backward_gain(
+        if model == GainModel.BLOCH:
+            return self._compute_bloch_gain(
                 signal_freqs,
                 pump,
                 Is0,
@@ -1766,251 +1544,21 @@ class TWPAnalysis(Analyzer, Frequencies):
                 initial_amplitudes_bwd,
                 fb_config,
             )
-        elif model == GainModel.BLOCH:
-            return self._compute_bloch_forward_backward_gain(
-                signal_freqs,
-                pump,
-                Is0,
-                mode_array_config,
-                signal_mode,
-                pump_mode,
-                idler_mode,
-                x,
-                initial_amplitudes_fwd,
-                initial_amplitudes_bwd,
-                fb_config,
-            )
-        elif model == GainModel.BLOCH_NO_REFLECTIONS:
-            return self._compute_bloch_gain_no_reflections(
-                signal_freqs,
-                pump,
-                mode_array_config,
-                signal_mode,
-                pump_mode,
-                idler_mode,
-                x,
-                initial_amplitudes_fwd,
-                Is0,
-            )
-        else:
-            return self._compute_general_gain_no_reflections(
-                signal_freqs,
-                pump,
-                mode_array_config,
-                signal_mode,
-                pump_mode,
-                idler_mode,
-                x,
-                model,
-                initial_amplitudes_fwd,
-                Is0,
-            )
+        return self._compute_simple_gain(
+            signal_freqs,
+            pump,
+            mode_array_config,
+            signal_mode,
+            pump_mode,
+            idler_mode,
+            x,
+            initial_amplitudes_fwd,
+            Is0,
+        )
 
     # Private CME solvers
 
-    def _compute_forward_backward_gain(
-        self,
-        signal_freqs: FloatArray,
-        pump: float,
-        Is0: float,
-        mode_array_config: str,
-        signal_mode: str,
-        pump_mode: str,
-        idler_mode: str,
-        x: FloatArray,
-        initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
-        initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
-        fb_config: Optional[FBSolverConfig] = None,
-    ) -> dict[str, Any]:
-        """Compute gain using the forward-backward propagation model."""
-        fb_config = fb_config if fb_config is not None else FBSolverConfig()
-        mode_array = self.get_mode_array(mode_array_config)
-
-        # Forward wave: pump + signal, backward wave: zero (unless overridden).
-        y0_fwd = self._setup_initial_conditions(
-            mode_array,
-            signal_mode,
-            pump_mode,
-            Is0,
-            self.twpa.Ip0,
-            initial_amplitudes_fwd,
-            default_fill=0.0,
-        )
-        y0_bwd = self._setup_initial_conditions(
-            mode_array,
-            signal_mode,
-            pump_mode,
-            Is0=0.0,
-            Ip0=0.0,
-            initial_amplitudes=initial_amplitudes_bwd,
-            default_fill=0.0,
-        )
-
-        cme_inputs = self._prepare_cme_inputs(
-            mode_array, signal_freqs, pump, signal_mode, pump_mode
-        )
-        mode_labels = cme_inputs["mode_labels"]
-        n_freq = cme_inputs["n_freq"]
-        gammas = cme_inputs["gammas"]
-        Zb_table = cme_inputs["Zb_table"]
-        mode_params = cme_inputs["mode_params"]
-
-        # Build the per-boundary two-port tables (Zout_in/out + ABCD in/out).
-        # When self.port/self.port_out are None these encode identity connectors
-        # with Zout = self.twpa.Z0_ref, recovering the bare boundary.
-        Zout_in, Zout_out, abcd_in, abcd_out = self._build_port_tables(
-            mode_params, mode_labels, n_freq
-        )
-
-        y0_fwd_broadcast = self._broadcast_ic(y0_fwd, n_freq)
-        y0_bwd_broadcast = self._broadcast_ic(y0_bwd, n_freq)
-
-        I_tuples_raw = general_cmes_solve_fb_cutoff(
-            x,
-            y0_fwd_broadcast,
-            y0_bwd_broadcast,
-            gammas,
-            Zb_table,
-            cme_inputs["relations_3wm"],
-            cme_inputs["relations_4wm"],
-            cme_inputs["coeffs_3wm"],
-            cme_inputs["coeffs_4wm"],
-            fb_config.passes,
-            fb_config.kappa_cutoff,
-            update_rate=fb_config.update_rate,
-            convergence_threshold=fb_config.convergence_threshold,
-            save_all_passes=fb_config.save_all_passes,
-            Z0=self.port_Z_ext,
-            Ze=self.port_Z_ext,
-            Zout_in=Zout_in,
-            Zout_out=Zout_out,
-            abcd_in=abcd_in,
-            abcd_out=abcd_out,
-            segment_midpoints=cme_inputs["segment_midpoints"],
-        )
-
-        # Unpack forward/backward blocks for each saved pass and apply phase correction.
-        # Raw layout: [fwd_pass_0, ..., fwd_pass_N, bwd_pass_0, ..., bwd_pass_N]
-        # each block is (n_freq, n_modes, n_x).
-        num_saved_passes = fb_config.passes if fb_config.save_all_passes else 1
-        I_tuples_all_passes = {}
-        for p in range(num_saved_passes):
-            if gammas.ndim == 3:
-                gammas_bwd = gammas[:, :, ::-1]
-            else:
-                gammas_bwd = gammas
-            I_tuples_all_passes[p] = {
-                "forward": self._apply_phase_carrier(
-                    I_tuples_raw[p * n_freq : (p + 1) * n_freq],
-                    gammas,
-                    x,
-                    cme_inputs["segment_midpoints"],
-                ),
-                "backward": self._apply_phase_carrier(
-                    I_tuples_raw[
-                        num_saved_passes * n_freq
-                        + p * n_freq : num_saved_passes * n_freq
-                        + (p + 1) * n_freq
-                    ],
-                    gammas_bwd,
-                    x,
-                    cme_inputs["segment_midpoints"],
-                ),
-            }
-
-        I_tuples_fwd = I_tuples_all_passes[num_saved_passes - 1]["forward"]
-        I_tuples_bwd = I_tuples_all_passes[num_saved_passes - 1]["backward"]
-
-        signal_idx = mode_labels.index(signal_mode)
-
-        # Prompt boundary reflections Gamma_in/Gamma_out (Q2): the injected
-        # drive reflecting directly off the near boundary without accounting
-        # for propagation/generation of the counter-propagating wave along
-        # the TWPA.  ABCD-correct form:
-        #     Gamma = (Ze - Zin) / (Ze + Zin),   Zin = (A*Ztilde + B)/(C*Ztilde + D)
-        # evaluated in the linear limit Ztilde ~= Zb (the nonlinear correction
-        # is handled self-consistently by the solver's internal rho update).
-        Ze = self.port_Z_ext
-        Zb_in_sig = (
-            Zb_table[:, signal_idx, 0]
-            if Zb_table.ndim == 3
-            else Zb_table[:, signal_idx]
-        )
-        Zb_out_sig = (
-            Zb_table[:, signal_idx, -1]
-            if Zb_table.ndim == 3
-            else Zb_table[:, signal_idx]
-        )
-
-        A_in, B_in, C_in, D_in = (abcd_in[:, signal_idx, k] for k in range(4))
-        Zin_in = (A_in * Zb_in_sig + B_in) / (C_in * Zb_in_sig + D_in)
-        refl_in = (Ze - Zin_in) / (Ze + Zin_in)
-
-        A_out, B_out, C_out, D_out = (abcd_out[:, signal_idx, k] for k in range(4))
-        Zin_out = (A_out * Zb_out_sig + B_out) / (C_out * Zb_out_sig + D_out)
-        refl_out = (Ze - Zin_out) / (Ze + Zin_out)
-
-        I_out_fwd = (
-            I_tuples_fwd[:, signal_idx, -1] + y0_bwd_broadcast[:, signal_idx] * refl_out
-        )
-        I_out_bwd = (
-            I_tuples_bwd[:, signal_idx, -1] + y0_fwd_broadcast[:, signal_idx] * refl_in
-        )
-
-        Is0_rep = np.repeat(y0_fwd[signal_idx], n_freq)
-        Ib0_rep = np.repeat(y0_bwd[signal_idx], n_freq)
-        gains_fwd = _ratio_db(I_out_fwd, Is0_rep)
-        gains_bwd = _ratio_db(I_out_bwd, Ib0_rep)
-        gains_fwd_11 = _ratio_db(I_out_bwd, Is0_rep)
-        gains_bwd_22 = _ratio_db(I_out_fwd, Ib0_rep)
-
-        gains_all_passes = []
-        for p in range(num_saved_passes):
-            I_fwd_p = I_tuples_all_passes[p]["forward"]
-            I_bwd_p = I_tuples_all_passes[p]["backward"]
-            I_out_fwd_p = (
-                I_fwd_p[:, signal_idx, -1] + y0_bwd_broadcast[:, signal_idx] * refl_out
-            )
-            I_out_bwd_p = (
-                I_bwd_p[:, signal_idx, -1] + y0_fwd_broadcast[:, signal_idx] * refl_in
-            )
-            gains_all_passes.append(
-                {
-                    "gain_db_fwd": _ratio_db(I_out_fwd_p, Is0_rep),
-                    "gain_db_bwd": _ratio_db(I_out_bwd_p, Ib0_rep),
-                    "gain_db_11": _ratio_db(I_out_bwd_p, Is0_rep),
-                    "gain_db_22": _ratio_db(I_out_fwd_p, Ib0_rep),
-                }
-            )
-
-        mode_map = {label: idx for idx, label in enumerate(mode_labels)}
-
-        return {
-            "model": GainModel.GENERAL.value,
-            "pump_freq": pump,
-            "signal_freqs": signal_freqs,
-            "x": x,
-            "I_tuples": I_tuples_fwd,  # final-pass forward (backward-compat alias)
-            "I_tuples_fwd": I_tuples_fwd,
-            "I_tuples_bwd": I_tuples_bwd,
-            "I_tuples_all_passes": I_tuples_all_passes,
-            "gain_db": gains_fwd,
-            "gain_db_12": gains_bwd,
-            "gain_db_11": gains_fwd_11,
-            "gain_db_22": gains_bwd_22,
-            "gains_all_passes": gains_all_passes,
-            "passes": fb_config.passes,
-            "mode_info": {
-                "mode_array": mode_array_config,
-                "mode_map": mode_map,
-                "reverse_mode_map": {idx: label for label, idx in mode_map.items()},
-                "signal_mode": signal_mode,
-                "pump_mode": pump_mode,
-                "idler_mode": idler_mode,
-            },
-        }
-
-    def _compute_general_gain_no_reflections(
+    def _compute_simple_gain(
         self,
         signal_freqs: FloatArray,
         pump: float,
@@ -2019,11 +1567,10 @@ class TWPAnalysis(Analyzer, Frequencies):
         pump_mode: str,
         idler_mode: str,
         x: FloatArray,
-        model: GainModel,
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         Is0: float = 1e-6,
     ) -> dict[str, Any]:
-        """Compute gain using the general coupled mode equations without reflections."""
+        """Gain with the traditional forward-only CMEs (``model="simple"``)."""
         mode_array = self.get_mode_array(mode_array_config)
 
         y0 = self._setup_initial_conditions(
@@ -2066,7 +1613,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         mode_map = {label: idx for idx, label in enumerate(mode_labels)}
 
         return {
-            "model": model.value,
+            "model": GainModel.SIMPLE.value,
             "pump_freq": pump,
             "signal_freqs": signal_freqs,
             "x": x,
@@ -2082,115 +1629,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             },
         }
 
-    def _compute_bloch_gain_no_reflections(
-        self,
-        signal_freqs: FloatArray,
-        pump: float,
-        mode_array_config: str,
-        signal_mode: str,
-        pump_mode: str,
-        idler_mode: str,
-        x: FloatArray,
-        initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
-        Is0: float = 1e-6,
-    ) -> dict[str, Any]:
-        """
-        Compute gain with the no-reflections CMEs written in the Bloch-mode basis.
-
-        Amplitudes are the boundary currents of the forward Bloch modes at the
-        supercell boundaries (x = 0 and x = N_tot are supercell boundaries), so
-        initial conditions and outputs have the same meaning as in the
-        standard model. See :mod:`twpasolver.cmes.bloch` for the theory.
-        """
-        if self._is_segmented():
-            raise NotImplementedError(
-                "The bloch_no_reflections model currently supports only "
-                "non-segmented devices."
-            )
-        mode_array = self.get_mode_array(mode_array_config)
-
-        y0 = self._setup_initial_conditions(
-            mode_array,
-            signal_mode,
-            pump_mode,
-            Is0,
-            self.twpa.Ip0,
-            initial_amplitudes_fwd,
-        )
-
-        cme_inputs = self._prepare_cme_inputs(
-            mode_array, signal_freqs, pump, signal_mode, pump_mode
-        )
-        mode_labels = cme_inputs["mode_labels"]
-        n_freq = cme_inputs["n_freq"]
-        gammas = cme_inputs["gammas"]
-
-        bloch = self._prepare_bloch_coefficients(mode_array, cme_inputs)
-
-        # Keep only the terms described by cell-averaged couplings.
-        kappas = gammas.imag
-        coeffs_3wm = bloch["coeffs_3wm"] * cell_phase_mask(
-            cme_inputs["relations_3wm"],
-            kappas,
-            bloch["n_cells"],
-            solver_config.BLOCH_CELL_PHASE_CUTOFF,
-        )
-        coeffs_4wm = bloch["coeffs_4wm"] * cell_phase_mask(
-            cme_inputs["relations_4wm"],
-            kappas,
-            bloch["n_cells"],
-            solver_config.BLOCH_CELL_PHASE_CUTOFF,
-        )
-        y0_table = self._broadcast_ic(y0, n_freq)
-        pw3, pw4 = self._bloch_edge_guard(
-            bloch,
-            cme_inputs,
-            signal_freqs,
-            np.any(np.abs(y0_table) > 0, axis=0),
-            forward_only=True,
-        )
-        coeffs_3wm = coeffs_3wm * pw3
-        coeffs_4wm = coeffs_4wm * pw4
-
-        I_tuples_array = bloch_no_reflections_cmes_solve(
-            x,
-            y0_table,
-            gammas,
-            cme_inputs["relations_3wm"],
-            cme_inputs["relations_4wm"],
-            coeffs_3wm,
-            coeffs_4wm,
-        )
-
-        I_tuples_array = self._apply_phase_carrier(I_tuples_array, gammas, x)
-
-        signal_idx = mode_labels.index(signal_mode)
-        initial_signal = y0[signal_idx] if y0.ndim == 1 else y0[:, signal_idx]
-        gain_db = 10 * np.log10(
-            np.abs(I_tuples_array[:, signal_idx, -1] / initial_signal) ** 2
-        )
-
-        mode_map = {label: idx for idx, label in enumerate(mode_labels)}
-
-        return {
-            "model": GainModel.BLOCH_NO_REFLECTIONS.value,
-            "pump_freq": pump,
-            "signal_freqs": signal_freqs,
-            "x": x,
-            "I_tuples": I_tuples_array,
-            "gain_db": gain_db,
-            "bloch": bloch,
-            "mode_info": {
-                "mode_array": mode_array_config,
-                "mode_map": mode_map,
-                "reverse_mode_map": {idx: label for label, idx in mode_map.items()},
-                "signal_mode": signal_mode,
-                "pump_mode": pump_mode,
-                "idler_mode": idler_mode,
-            },
-        }
-
-    def _compute_bloch_forward_backward_gain(
+    def _compute_bloch_gain(
         self,
         signal_freqs: FloatArray,
         pump: float,
@@ -2209,9 +1648,8 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         Amplitudes are +x-referenced boundary currents of the forward and
         backward Bloch modes; boundary coefficients use the exact Bloch
-        impedances Zb+ (forward) and Zb- (backward). ``fb_config.update_rate``
-        is not used: the boundary coefficients are constant in this basis.
-        Segmented devices (a ``TWPA`` whose cells are all ``TWPA`` segments)
+        impedances Zb+ (forward) and Zb- (backward), so the boundary
+        coefficients are constant. Segmented devices (a ``TWPA`` whose cells are all ``TWPA`` segments)
         are solved on per-segment Bloch modes joined by exact junction
         conditions; uniform devices are the one-segment case. See
         :mod:`twpasolver.cmes.bloch_fb`.

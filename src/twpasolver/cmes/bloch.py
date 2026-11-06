@@ -1,5 +1,5 @@
 """
-Coupled mode equations in the Bloch-mode basis.
+Linear Bloch-mode tables for the coupled mode equations in the Bloch basis.
 
 The standard CMEs treat the periodically loaded line as a homogeneous medium:
 the supercell only provides the Bloch propagation constant, while the
@@ -23,12 +23,15 @@ For a homogeneous lumped ladder ``phi = 1`` and ``-2j omega L / W`` equals
 ``-gamma * tanh(gamma/2) / (gamma/2)``, which tends to the standard ``-gamma``
 far below the ladder cutoff.
 
-Scope of this first version:
-    * no-reflections model (forward modes only),
-    * non-segmented devices,
-    * unit cells whose nonlinearity is a lumped series inductance
-      (``LCLfBaseCell``, ``StubBaseCell``), or any cell defining a
-      ``bloch_nl_elements()`` method (see :func:`series_nl_elements`).
+This module provides the linear ingredients: Bloch impedances, ``W`` and the
+intracell current profiles of a supercell (:func:`bloch_mode_tables`), the
+fixed ("edge") basis for modes close to a stopband edge
+(:func:`edge_basis_tables` and the edge search), and the per-mode and
+per-process weights of the stopband guard. The forward-backward solver is in
+:mod:`twpasolver.cmes.bloch_fb`. Supported unit cells are those whose
+nonlinearity is a lumped series inductance (``LCLfBaseCell``,
+``StubBaseCell``), or any cell defining a ``bloch_nl_elements()`` method (see
+:func:`series_nl_elements`).
 
 Time convention is the package one: exp(+j omega t), forward waves ~ exp(-gamma x)
 with gamma = alpha + j k.
@@ -38,23 +41,9 @@ from __future__ import annotations
 
 from typing import Any
 
-import numba as nb
 import numpy as np
 
-from twpasolver.bonus_types import (
-    ComplexArray,
-    FloatArray,
-    nb_complex1d,
-    nb_float1d,
-    nb_int2d,
-)
-from twpasolver.cmes.rk45 import rk45_solve
-from twpasolver.cmes.solver_config import (
-    SOLVER_ATOL,
-    SOLVER_FIRST_STEP,
-    SOLVER_MAX_STEPS,
-    SOLVER_RTOL,
-)
+from twpasolver.bonus_types import ComplexArray, FloatArray
 from twpasolver.models.twoportarrays import TwoPortArray
 from twpasolver.models.twpa_cells import LCLfBaseCell, StubBaseCell
 
@@ -588,100 +577,6 @@ def edge_basis_tables(
     }
 
 
-def bloch_coefficients(
-    relations: np.ndarray,
-    unit_coeffs: np.ndarray,
-    nl_coeff: float,
-    omegas: np.ndarray,
-    phi_plus: np.ndarray,
-    phi_minus: np.ndarray,
-    W: np.ndarray,
-    L_nl: np.ndarray,
-    n_cells: int,
-) -> np.ndarray:
-    """
-    Per-frequency mixing coefficients in the Bloch basis (forward waves only).
-
-    Parameters
-    ----------
-    relations : (R, 1+p) int
-        Rows ``[target, input_1, ...]``; an input index ``>= n_modes`` means the
-        complex conjugate of mode ``index - n_modes`` (kernel convention).
-    unit_coeffs : (R,) complex
-        RWA multiplicities divided by 4, i.e. ``prepare_relations_coefficients``
-        output with ``epsilon = xi = 1``.
-    nl_coeff : float
-        ``epsilon`` (3WM) or ``xi`` (4WM).
-    omegas, W : (F, n_modes)
-        Angular frequencies and Bloch normalization of every mode.
-    phi_plus, phi_minus : (F, n_modes, n_nl)
-        Periodic current profiles through the nonlinear inductors.
-    L_nl : (n_nl,)
-        Nonlinear inductances.
-    n_cells : int
-        Unit cells per supercell.
-
-    Returns
-    -------
-    (F, R) complex coefficients, already including the per-mode prefactor
-    ``-2j omega_n / W_n`` (the kernel must not multiply by gamma again).
-    """
-    n_f, n_modes, _ = phi_plus.shape
-    out = np.zeros((n_f, len(relations)), dtype=np.complex128)
-    for r, rel in enumerate(relations):
-        if unit_coeffs[r] == 0:
-            continue
-        n = rel[0]
-        prod = L_nl[None, :] * phi_minus[:, n, :]
-        for idx in rel[1:]:
-            if idx >= n_modes:
-                prod = prod * np.conj(phi_plus[:, idx - n_modes, :])
-            else:
-                prod = prod * phi_plus[:, idx, :]
-        eta = prod.sum(axis=-1) / n_cells
-        out[:, r] = unit_coeffs[r] * nl_coeff * (-2j * omegas[:, n] / W[:, n]) * eta
-    return out
-
-
-def cell_phase_mask(
-    relations: np.ndarray, kappas: np.ndarray, n_cells: int, cell_phase_cutoff: float
-) -> np.ndarray:
-    """
-    Mask of the forward mixing rows whose mismatch satisfies ``|dk| d < cutoff``.
-
-    The Bloch couplings are cell averages (G = 0 Fourier component of the
-    intracell profiles); a term whose phase mismatch per supercell is not small
-    compared with pi is closer to a quasi-phase-matched harmonic G != 0 and is
-    not described by them. The condition depends only on ``|dk|``, which is the
-    same for all partner terms of a process, so they are kept or dropped
-    together.
-
-    Parameters
-    ----------
-    relations : (R, 1+p) int
-        Rows ``[target, input_1, ...]``; inputs ``>= n_modes`` are conjugated.
-    kappas : (F, n_modes) float
-        Kernel wavenumbers (``Im`` of the kernel gammas), per unit cell.
-    n_cells : int
-        Unit cells per supercell.
-    cell_phase_cutoff : float
-
-    Returns
-    -------
-    (F, R) bool
-    """
-    n_modes = kappas.shape[1]
-    dk = np.zeros((kappas.shape[0], len(relations)))
-    for r, rel in enumerate(relations):
-        dk[:, r] = -kappas[:, rel[0]]
-        for idx in rel[1:]:
-            if idx >= n_modes:
-                dk[:, r] -= kappas[:, idx - n_modes]
-            else:
-                dk[:, r] += kappas[:, idx]
-    return np.abs(dk) * n_cells < cell_phase_cutoff
-
-
 def reactive_angle_deg(W: np.ndarray) -> np.ndarray:
     """
     Reactive angle of the Bloch normalisation, ``arcsin(|Im W| / |W|)`` in degrees.
@@ -698,7 +593,7 @@ def reactive_angle_deg(W: np.ndarray) -> np.ndarray:
 
 def edge_guard_mode_weights(W: np.ndarray, lo_deg: float, hi_deg: float) -> np.ndarray:
     """
-    Stopband weights of each mode from its reactive angle (forward-only model).
+    Stopband weights of each mode from its reactive angle (used by the quantum model).
 
     1 below ``lo_deg``, 0 above ``hi_deg``, smoothstep in between (a hard switch
     at ``hi_deg`` if ``hi_deg <= lo_deg``). Zero inside a whole stopband.
@@ -708,23 +603,6 @@ def edge_guard_mode_weights(W: np.ndarray, lo_deg: float, hi_deg: float) -> np.n
         return np.where(ang < hi_deg, 1.0, 0.0)
     t = np.clip((ang - lo_deg) / (hi_deg - lo_deg), 0.0, 1.0)
     return 1.0 - t * t * (3.0 - 2.0 * t)
-
-
-def edge_proximity_mode_weights(split: np.ndarray, lo: float, hi: float) -> np.ndarray:
-    """
-    Stopband-edge weights of each mode from its Bloch splitting.
-
-    ``split = |sinh(gamma d)|`` (see :func:`bloch_mode_tables`) is 0 at every
-    band edge and grows on both sides, in the passband and inside the gap, so
-    the weight vanishes only in a window around each edge: 0 for
-    ``split <= lo``, 1 for ``split >= hi``, smoothstep in between (a hard switch
-    at ``hi`` if ``hi <= lo``).
-    """
-    split = np.asarray(split, dtype=np.float64)
-    if hi <= lo:
-        return np.where(split >= hi, 1.0, 0.0)
-    t = np.clip((split - lo) / (hi - lo), 0.0, 1.0)
-    return t * t * (3.0 - 2.0 * t)
 
 
 def process_weights(relations: np.ndarray, mode_weights: np.ndarray) -> np.ndarray:
@@ -740,133 +618,15 @@ def process_weights(relations: np.ndarray, mode_weights: np.ndarray) -> np.ndarr
     ----------
     relations : (R, 1+p) int
         Rows ``[target, input_1, ...]``; inputs ``>= n_modes`` are conjugated.
-    mode_weights : (F, n_modes) float
+    mode_weights : (..., n_modes) float
 
     Returns
     -------
-    (F, R) float
+    (..., R) float
     """
-    n_f, n_modes = mode_weights.shape
-    out = np.ones((n_f, len(relations)), dtype=np.float64)
+    n_modes = mode_weights.shape[-1]
+    out = np.ones(mode_weights.shape[:-1] + (len(relations),), dtype=np.float64)
     for r, rel in enumerate(relations):
         for idx in rel:
-            out[:, r] *= mode_weights[:, int(idx) % n_modes]
+            out[..., r] *= mode_weights[..., int(idx) % n_modes]
     return out
-
-
-# --------------------------------------------------------------------------- #
-# Nonlinear part: CME kernel and parallel solver
-# --------------------------------------------------------------------------- #
-
-
-@nb.njit(
-    nb_complex1d(
-        nb.float64,
-        nb_complex1d,
-        nb_float1d,
-        nb_float1d,
-        nb_int2d,
-        nb_int2d,
-        nb_complex1d,
-        nb_complex1d,
-    ),
-    cache=True,
-)
-def bloch_no_reflections_cmes(
-    x,
-    currents,
-    alphas,
-    kappas,
-    relations_3wm,
-    relations_4wm,
-    coeffs_3wm,
-    coeffs_4wm,
-):
-    """
-    RHS of the no-reflections Bloch CMEs for a uniform device.
-
-    Same structure as ``no_reflections_cmes``, but the per-mode prefactor is
-    already folded into ``coeffs_*`` (see :func:`bloch_coefficients`).
-    """
-    num_modes = len(currents)
-    derivs = np.zeros(num_modes, nb.complex128)
-    exp_pos = np.exp(1j * kappas * x)
-
-    fields = np.zeros(2 * num_modes, dtype=np.complex128)
-    for i in range(num_modes):
-        fields[i] = currents[i] * exp_pos[i]
-        fields[i + num_modes] = np.conj(fields[i])
-
-    for i, (idx, idx1, idx2) in enumerate(relations_3wm):
-        derivs[idx] += coeffs_3wm[i] * fields[idx1] * fields[idx2]
-    for i, (idx, idx1, idx2, idx3) in enumerate(relations_4wm):
-        derivs[idx] += coeffs_4wm[i] * fields[idx1] * fields[idx2] * fields[idx3]
-    derivs = derivs / exp_pos + alphas * currents
-    return derivs
-
-
-@nb.njit(parallel=True, cache=True)
-def _bloch_no_reflections_solve_uniform(
-    x_array,
-    y0_broadcast,
-    gammas_array,
-    relations_3wm,
-    relations_4wm,
-    coeffs_3wm_table,
-    coeffs_4wm_table,
-):
-    """Parallel solve; coefficient tables have shape (n_freq, n_relations)."""
-    n_freq = y0_broadcast.shape[0]
-    n_modes = y0_broadcast.shape[1]
-    x_span = (x_array[0], x_array[-1])
-    I_tuples = np.empty((n_freq, n_modes, len(x_array)), dtype=nb.complex128)
-
-    for i in nb.prange(n_freq):
-        I_tuples[i] = rk45_solve(
-            bloch_no_reflections_cmes,
-            x_span,
-            y0_broadcast[i],
-            args=(
-                gammas_array[i].real,
-                gammas_array[i].imag,
-                relations_3wm,
-                relations_4wm,
-                coeffs_3wm_table[i],
-                coeffs_4wm_table[i],
-            ),
-            atol=SOLVER_ATOL,
-            rtol=SOLVER_RTOL,
-            max_num_steps=SOLVER_MAX_STEPS,
-            t_eval=x_array,
-            first_step=SOLVER_FIRST_STEP,
-        )
-
-    return I_tuples
-
-
-def bloch_no_reflections_cmes_solve(
-    x_array: FloatArray,
-    y0_broadcast: ComplexArray,
-    gammas_array: ComplexArray,
-    relations_3wm: np.ndarray,
-    relations_4wm: np.ndarray,
-    coeffs_3wm_table: ComplexArray,
-    coeffs_4wm_table: ComplexArray,
-) -> ComplexArray:
-    """
-    Solve the no-reflections Bloch CMEs for every signal frequency in parallel.
-
-    Returns slow-envelope amplitudes of shape (n_freq, n_modes, n_x); apply the
-    phase carrier in the caller as for the standard model.
-    """
-    if gammas_array.ndim != 2:
-        raise NotImplementedError("Bloch CMEs support only non-segmented devices.")
-    return _bloch_no_reflections_solve_uniform(
-        np.ascontiguousarray(x_array, dtype=np.float64),
-        np.ascontiguousarray(y0_broadcast, dtype=np.complex128),
-        np.ascontiguousarray(gammas_array, dtype=np.complex128),
-        np.ascontiguousarray(relations_3wm, dtype=np.int64),
-        np.ascontiguousarray(relations_4wm, dtype=np.int64),
-        np.ascontiguousarray(coeffs_3wm_table, dtype=np.complex128),
-        np.ascontiguousarray(coeffs_4wm_table, dtype=np.complex128),
-    )

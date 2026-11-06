@@ -104,7 +104,7 @@ def _gain(analysis, sig, threshold, passes=80, depth=15):
         model="bloch",
         mode_array_config="ext2",
         fb_config=FBSolverConfig(
-            passes=passes, anderson_depth=depth, edge_basis_threshold=threshold
+            passes=passes, anderson_depth=depth, edge_threshold=threshold
         ),
     )
 
@@ -390,7 +390,6 @@ def test_auto_m_max_config():
 
     assert FBSolverConfig(m_max="auto").m_max_fixed == 1
     assert FBSolverConfig(m_max=3).m_max_fixed == 3
-    assert FBSolverConfig(edge_basis_threshold=0.12).edge_threshold == 0.12
     with pytest.raises(ValueError):
         FBSolverConfig(m_max=-1)
     with pytest.raises(ValueError):

@@ -34,52 +34,25 @@ def plot_mode_currents(
         colors: Optional list of colors for different modes
         title: Custom title for the plot
         ylim: Optional y-axis limits as (min, max)
+        backward: Plot the backward-propagating currents (``bloch`` model)
 
     Returns:
         The matplotlib figure object
     """
-    # Extract data from gain result
     x = gain_result["x"]
-    model = gain_result.get("model", "minimal_3wm")
-
-    # Determine the dimensionality and mode names based on the model
-    if model == "minimal_3wm":
-        # Standard 3WM model with pump, signal, idler
+    if backward and "I_tuples_bwd" in gain_result:
+        I_tuples = gain_result["I_tuples_bwd"]
+    else:
         I_tuples = gain_result["I_tuples"]
-        n_freqs = I_tuples.shape[0]
-        n_modes = I_tuples.shape[1]
+    n_modes = I_tuples.shape[1]
 
-        # Use default mode names for standard model
-        if mode_names is None:
-            mode_names = ["Pump", "Signal", "Idler"]
+    # Mode names from the result if not given
+    if mode_names is None:
+        reverse_mode_map = gain_result.get("mode_info", {}).get("reverse_mode_map", {})
+        mode_names = [reverse_mode_map.get(i, f"Mode {i}") for i in range(n_modes)]
 
-        # Compute mean current across all frequencies
-        mean_currents = np.mean(np.abs(I_tuples), axis=0)
-
-    else:  # general model
-        # General model with arbitrary number of modes
-        if backward and "I_tuples_bwd" in gain_result:
-            I_tuples = gain_result["I_tuples_bwd"]
-        else:
-            I_tuples = gain_result["I_tuples"]
-        n_freqs = I_tuples.shape[0]
-        n_modes = I_tuples.shape[1]
-
-        # Extract mode names from the result if available
-        if mode_names is None and "mode_info" in gain_result:
-            mode_info = gain_result["mode_info"]
-            reverse_mode_map = mode_info.get("reverse_mode_map", {})
-            if reverse_mode_map:
-                mode_names = [
-                    reverse_mode_map.get(i, f"Mode {i}") for i in range(n_modes)
-                ]
-            else:
-                mode_names = [f"Mode {i}" for i in range(n_modes)]
-        elif mode_names is None:
-            mode_names = [f"Mode {i}" for i in range(n_modes)]
-
-        # Compute mean current across all frequencies
-        mean_currents = np.mean(np.abs(I_tuples), axis=0)
+    # Mean current across all frequencies
+    mean_currents = np.mean(np.abs(I_tuples), axis=0)
 
     # Create figure
     fig, ax = plt.subplots(figsize=figsize)

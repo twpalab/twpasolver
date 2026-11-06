@@ -64,7 +64,7 @@ _F_ARANGE = (0.05, 20, 1e-3)
 _SIGNAL_FREQS = np.array([2.0, 3.0])
 
 
-def _warm_analysis(twpa: TWPA, label: str, verbose: bool) -> None:
+def _warm_analysis(twpa: TWPA, label: str, models: tuple, verbose: bool) -> None:
     if verbose:
         print(
             f"twpasolver warmup: compiling CME kernels for the {label} device path..."
@@ -72,34 +72,26 @@ def _warm_analysis(twpa: TWPA, label: str, verbose: bool) -> None:
     analysis = TWPAnalysis(twpa=twpa, f_arange=_F_ARANGE)
     analysis.update_base_data()
     with warnings.catch_warnings():
-        # The default zero backward-wave initial condition used here (no
-        # initial_amplitudes_bwd override) makes analysis.py's bwd-gain
-        # ratios divide by zero -- harmless for a warmup call that only
-        # cares about triggering compilation, not the returned gain values.
+        # No backward input is injected, so the backward-referenced gains are
+        # 0/0; harmless for a call that only triggers compilation.
         warnings.simplefilter("ignore", RuntimeWarning)
-        # Triggers _no_reflections_solve_{uniform,segmented} (ndim of the
-        # gammas array picks uniform vs segmented, driven by `twpa`'s
-        # topology).
-        analysis.gain(_SIGNAL_FREQS, model=GainModel.GENERAL_NO_REFLECTIONS)
-        # Triggers _general_cmes_solve_fb_cutoff_{uniform,segmented}.
-        analysis.gain(
-            _SIGNAL_FREQS, model=GainModel.GENERAL, fb_config=FBSolverConfig(passes=1)
-        )
+        for model in models:
+            analysis.gain(
+                _SIGNAL_FREQS, model=model, fb_config=FBSolverConfig(passes=1)
+            )
 
 
 def warmup(verbose: bool = True) -> None:
-    """Trigger and disk-cache compilation of all 4 CME solver njit kernels.
+    """Trigger and disk-cache compilation of the CME solver kernels.
 
-    Runs both gain models (no-reflections and general/forward-backward) on
-    both a uniform and a segmented TWPA -- the (model) x (device topology)
-    combinations that select between ``_no_reflections_solve_{uniform,
-    segmented}`` and ``_general_cmes_solve_fb_cutoff_{uniform,segmented}``
-    in :mod:`twpasolver.cmes`. Safe to run repeatedly: once the cache is
-    populated, subsequent runs hit it and finish in a few seconds.
+    ``simple`` has one kernel for uniform and one for segmented devices;
+    ``bloch`` has a single kernel (a uniform device is one segment). Safe to
+    run repeatedly: once the cache is populated, later runs finish in seconds.
     """
-    _warm_analysis(TWPA(**_TWPA_KWARGS), "uniform", verbose)
-    segmented = TWPA(cells=[TWPA(**_TWPA_KWARGS), TWPA(**_TWPA_KWARGS)], Ip0=250e-6)
-    _warm_analysis(segmented, "segmented", verbose)
+    uniform = TWPA.model_validate(_TWPA_KWARGS)
+    _warm_analysis(uniform, "uniform", (GainModel.SIMPLE, GainModel.BLOCH), verbose)
+    segmented = TWPA(cells=[uniform, uniform.model_copy(deep=True)], Ip0=250e-6)
+    _warm_analysis(segmented, "segmented", (GainModel.SIMPLE,), verbose)
     if verbose:
         print("twpasolver warmup: done, Numba cache populated.")
 

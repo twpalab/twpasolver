@@ -227,7 +227,9 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
     and never used by the kernel).
 - [ ] **3.3 One boundary-table helper, one forward–backward post-processing helper** (per-pass split, port gains,
   prompt reflections, `mode_info`), shared by every forward–backward driver.
-- [ ] **3.4 Guard systems** (per D2/D3/D4).
+- [ ] **3.4 Guard systems** (per D2/D3/D4). Mostly done 2026-11-06: the `bloch_no_reflections` guard stack is
+  removed and `process_weights` is the single N-d version. Still open: D4 (the `simulate_stopband_modes=False`
+  path) and the 45° constant.
   - **What exists:**
     - `_stopband_guard_weights` and `_process_weights_nd` serve `simulate_stopband_modes=False`;
     - `_bloch_mode_weights`, `_bloch_edge_guard`, `edge_proximity_mode_weights`, `cell_phase_mask` and the
@@ -237,10 +239,10 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
   - **Target:** at most one guard-weight mechanism, or none. Remove the `pw3`/`pw4` kernel plumbing if nothing
     needs it.
   - The 45° reactive-angle threshold is repeated at 4 places; make it one constant.
-- [ ] **3.5 Forward-only kernels:** `bloch_no_reflections_cmes` (bloch.py:775) is `no_reflections_cmes`
+- [x] **3.5 Forward-only kernels:** `bloch_no_reflections_cmes` (bloch.py:775) is `no_reflections_cmes`
   (base.py:63) with the (α+jκ) prefactor folded into the coefficients. Keep one kernel with per-frequency
   coefficient tables (per D2).
-- [ ] **3.6 `general` model** (per D1). If removed, delete `cmes_fb.py`, `_compute_forward_backward_gain`, the
+- [x] **3.6 `general` model** (per D1). If removed, delete `cmes_fb.py`, `_compute_forward_backward_gain`, the
   `general` branches and options (`update_rate`, `BOUNDARY_CORR_MAX`) and `_filter_wm_terms`; also
   `_convergence_step`/`_store_pass` once `bloch_fb` no longer imports them.
 - [ ] **3.7 Unify defaults:** `m_max` (config 2 vs wrapper 5), `anderson_depth` (10 vs 5), and the `general`
@@ -523,3 +525,33 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
   - **Sensitivity:** ignoring the connectors would be off by 0.5 dB on S21 and 12 dB on S11/S22; reversing the
     output connector by 0.1 dB and 3-15 dB.
   - **No test covered connectors before.** Finding: `general_no_reflections` ignores connectors (WP7.6).
+- 2026-11-06, WP3.4–3.6 and the rename, on `bloch-cmes`:
+  - **Two models left:** `simple` (renamed from `general_no_reflections`; the old string still works with a
+    deprecation warning, via `GainModel._missing_`) and `bloch`. Default model: `simple`. `gain(fb_config=None)`
+    replaces the shared mutable default.
+  - **Removed models:**
+    - `general`: `cmes/cmes_fb.py` (1,628 lines), its driver, `update_rate`, `BOUNDARY_CORR_MAX`.
+    - `bloch_no_reflections`: its kernel and `bloch_coefficients`, `cell_phase_mask`,
+      `edge_proximity_mode_weights`, `_bloch_mode_weights`, `_bloch_edge_guard`, `_prepare_bloch_coefficients`,
+      `BLOCH_EDGE_GUARD`, `BLOCH_CELL_PHASE_CUTOFF`.
+  - **Also removed:** the never-called `configure_solver`/`get_solver_config`, the `edge_basis_threshold` alias,
+    `as_solver_args`, `_process_weights_nd` (now `bloch.process_weights`, N-d), and the dead `minimal_3wm` branch
+    of `plot_mode_currents`.
+  - **Kept:** `edge_guard_mode_weights` and `BLOCH_EDGE_GUARD_DEG`, used by `quantum/`.
+  - **Other files:**
+    - `cmes/bloch.py` is now pure NumPy (linear tables, edge basis, weights).
+    - `warmup.py` compiles `simple` (uniform and segmented) and `bloch`; built with `TWPA.model_validate`, which
+      removes its 13 mypy errors.
+    - The solver's non-convergence warning no longer says "Segmented" for uniform devices.
+  - **Tests:** 95 pass. Removed: `test_energy_conservation_lossless` (no-reflections), the segmented-rejection test,
+    two no-reflections guard tests, and the `general` case of the mismatch-filter test. The energy tests now build
+    uniform tables with `_uniform_bloch_tables` (segmented preparation plus `_drop_segment_axis`).
+  - **Notebook 04:** the model section is rewritten for `simple` and `bloch`, the Floquet text now describes exact
+    junctions, and `FBSolverConfig` uses 40 passes and a 1e-2 threshold (the old 10 passes and 1e-4 left every
+    `bloch` call unconverged). Notebooks 01-04 execute without warnings.
+  - **Regression:** bit-identical for `simple` (uniform and segmented, `basic_3wm` and `ext2`), `bloch` (uniform and
+    segmented, edge basis and guard option), the default model and `quantum/`.
+  - **Size and checks:** `src/` is 11,330 lines (14,820 at the start of the clean-up); mypy is down from 37 to 24
+    errors.
+  - **Downstream:** scripts using `model="general"` (Ch. 6 `plot_cme_layers*.py`, `kitwpac_fc.ipynb`) need the
+    `edge-basis` branch.

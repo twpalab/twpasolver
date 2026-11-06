@@ -11,7 +11,7 @@ Why this exists, instead of just calling CyRK directly: CyRK's own
 coefficients are module-level ``np.array`` globals, which Numba compiles as
 "dynamic globals" (baked-in runtime addresses that don't survive a process
 restart), and that taints caching for any njit function that calls it,
-including every parallel dispatch function in base.py/cmes_fb.py, even
+including every parallel dispatch function in base.py/bloch_fb.py, even
 when they request ``cache=True`` themselves (confirmed via
 ``NumbaWarning: Cannot cache ... as it uses dynamic globals``).
 

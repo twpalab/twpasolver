@@ -1593,7 +1593,7 @@ def bloch_fb_segmented_cmes_solve(
     if not np.all(converged):
         bad = np.flatnonzero(~converged)
         log.warning(
-            "Segmented Bloch forward-backward CMEs did not converge for %d of %d "
+            "Bloch forward-backward CMEs did not converge for %d of %d "
             "frequency points within %d passes (indices %s; last relative "
             "residuals %s).",
             bad.size,

@@ -29,9 +29,11 @@ Key Features
     - Parameter sweeps with result caching
 
 **Gain Models:**
-    - MINIMAL_3WM: Basic three-wave mixing model with only pump, signal and idler
-    - GENERAL_NO_REFLECTIONS: Extended modes without reflections
-    - GENERAL: Full model with losses and reflections
+    - SIMPLE: Traditional coupled mode equations of a homogeneous line, forward
+      waves only (fast, approximate couplings)
+    - BLOCH: Forward-backward coupled mode equations in the Bloch-mode basis
+      (exact couplings, reflections, connectors, stopband edges, segmented
+      devices)
 
 **Circuit Modeling:**
     - Hierarchical composition of one-port and two-port network elements

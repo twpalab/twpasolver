@@ -1,9 +1,9 @@
-"""Tests for the Bloch-basis CMEs (bloch_no_reflections and bloch models)."""
+"""Tests for the Bloch-basis CMEs (``bloch`` model) and the ``simple`` model."""
 
 import numpy as np
 import pytest
 
-from twpasolver.analysis import GainModel, TWPAnalysis
+from twpasolver.analysis import GainModel, TWPAnalysis, _drop_segment_axis
 from twpasolver.cmes.bloch import bloch_mode_tables
 from twpasolver.cmes.bloch_fb import bloch_fb_cmes_solve
 from twpasolver.cmes.solver_config import FBSolverConfig
@@ -18,6 +18,13 @@ def _forward_gamma(twpa, freqs, n_cells):
     tr = T[:, 0, 0] + T[:, 1, 1]
     gamma = np.log((tr + np.sqrt(tr**2 - 4 + 0j)) / 2) / n_cells
     return np.where(gamma.imag < 0, -gamma, gamma)
+
+
+def _uniform_bloch_tables(analysis, mode_array, cme_inputs):
+    """Bloch tables of a uniform device, without the segment axis."""
+    ci = {**cme_inputs, "gammas": cme_inputs["gammas"][..., None]}
+    tables = analysis._prepare_bloch_segmented(mode_array, ci)
+    return _drop_segment_axis(tables, cme_inputs["n_freq"])
 
 
 @pytest.mark.parametrize("n_cells, centered", [(1, False), (5, False), (3, True)])
@@ -37,44 +44,6 @@ def test_uniform_ladder_limit(n_cells, centered):
     eta = (tab["L_nl"] / L * tab["phi_minus"] * tab["phi_plus"]).sum(-1) / n_cells
     ratio = 2j * 2 * np.pi * freqs * L / tab["W"] * eta / gamma
     assert np.allclose(ratio, np.tanh(gamma / 2) / (gamma / 2), rtol=1e-9)
-
-
-def test_energy_conservation_lossless():
-    """Lossless 3WM: sum_n W_n |A_n|^2 is conserved by the Bloch CMEs."""
-    twpa = TWPA(
-        cells=[CELL_U, CELL_L, CELL_U], N=200, Istar=6.3e-3, Idc=1e-3, Ip0=2.5e-4
-    )
-    analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-3))
-    analysis.update_base_data()
-    signal_freqs = np.array([1.75, 2.0, 12.25, 12.5])
-    res = analysis.gain(
-        signal_freqs,
-        pump=14.3,
-        Is0=1e-6,
-        model=GainModel.BLOCH_NO_REFLECTIONS,
-        thin=50,
-    )
-    W = res["bloch"]["W"]
-    assert np.allclose(W.imag, 0, atol=1e-9 * np.abs(W).max())
-
-    power = W.real[:, :, None] * np.abs(res["I_tuples"]) ** 2
-    delta = power[:, :, -1] - power[:, :, 0]
-    labels = list(res["mode_info"]["mode_map"])
-    s, i = labels.index("s"), labels.index("i")
-    transferred = delta[:, s] + delta[:, i]
-    # Floor: solver tolerance on the (much larger) pump power.
-    floor = 1e-8 * power[:, labels.index("p"), 0]
-    assert np.all(np.abs(delta.sum(axis=1)) < 1e-3 * np.abs(transferred) + floor)
-
-
-def test_segmented_not_supported_without_reflections():
-    """The no-reflections Bloch model is restricted to non-segmented devices."""
-    seg = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10)
-    twpa = TWPA(cells=[seg, seg], Ip0=2.5e-4)
-    analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-2))
-    analysis.update_base_data()
-    with pytest.raises(NotImplementedError):
-        analysis.gain([2.0], pump=14.3, model="bloch_no_reflections")
 
 
 def _mismatched_analysis(Ip0, Z_ext=70.0, N=100):
@@ -213,7 +182,7 @@ def test_fb_energy_balance_lossless(m_max):
     signal_freqs = np.array([1.75, 2.0, 12.5])
     mode_array = analysis.get_mode_array("basic_3wm")
     ci = analysis._prepare_cme_inputs(mode_array, signal_freqs, 14.3, "s", "p")
-    bl = analysis._prepare_bloch_coefficients(mode_array, ci)
+    bl = _uniform_bloch_tables(analysis, mode_array, ci)
     labels = ci["mode_labels"]
     p, s = labels.index("p"), labels.index("s")
     n = len(signal_freqs)
@@ -259,9 +228,9 @@ def test_fb_energy_balance_lossless(m_max):
         assert np.all(np.abs(PL - P0) < 1e-6 * np.abs(P0))
 
 
-@pytest.mark.parametrize("model", ["general_no_reflections", "bloch_no_reflections"])
+@pytest.mark.parametrize("model", ["simple", "general_no_reflections"])
 def test_backward_inputs_rejected_without_reflections(model):
-    """No-reflection models propagate only +x waves: backward inputs must raise."""
+    """The simple model propagates only +x waves: backward inputs must raise."""
     twpa = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10, Ip0=2.5e-4)
     analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-2))
     analysis.update_base_data()
@@ -310,12 +279,10 @@ def _process_signatures(rows, n_modes, n_in):
     return signatures
 
 
-@pytest.mark.parametrize("which", ["general", "bloch"])
-def test_mismatch_filter_keeps_partner_terms_together(which):
+def test_mismatch_filter_keeps_partner_terms_together():
     """Partner terms of a process are always kept or dropped together."""
     from twpasolver.analysis import prepare_relations_coefficients
     from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
-    from twpasolver.cmes.cmes_fb import _filter_wm_terms
     from twpasolver.modes_rwa import ModeArrayFactory
 
     twpa = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10)
@@ -331,8 +298,6 @@ def test_mismatch_filter_keeps_partner_terms_together(which):
     rng = np.random.default_rng(1)
 
     def run(kappas, cutoff):
-        if which == "general":
-            return _filter_wm_terms(kappas, rel3, rel4, cutoff)
         return _filter_wm_terms_bloch(
             kappas, rel3, rel4, cutoff, 66, np.full(len(kappas), 5)
         )
@@ -363,7 +328,7 @@ def test_bloch_rhs_conserves_energy_with_reciprocal_vectors():
     analysis = _mismatched_analysis(Ip0=2.5e-4, Z_ext=50.0, N=100)
     mode_array = analysis.get_mode_array("basic_3wm")
     ci = analysis._prepare_cme_inputs(mode_array, np.array([12.5]), 14.3, "s", "p")
-    bl = analysis._prepare_bloch_coefficients(mode_array, ci)
+    bl = _uniform_bloch_tables(analysis, mode_array, ci)
     kappas = np.ascontiguousarray(ci["gammas"][0].imag)
     W = bl["W"][0].real
     L = float(analysis.twpa.N_tot)
@@ -502,7 +467,7 @@ def test_anderson_converges_where_plain_iteration_diverges():
     sig = np.array([7.46, 7.48, 7.50, 7.52])
     mode_array = analysis.get_mode_array("basic_3wm")
     ci = analysis._prepare_cme_inputs(mode_array, sig, pump, "s", "p")
-    bl = analysis._prepare_bloch_coefficients(mode_array, ci)
+    bl = _uniform_bloch_tables(analysis, mode_array, ci)
     labels = ci["mode_labels"]
     ip, is_ = labels.index("p"), labels.index("s")
     x = np.linspace(0, twpa.N_tot, 400)
@@ -642,7 +607,7 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
     analysis = _mismatched_analysis(Ip0=2.5e-4, Z_ext=50.0, N=100)
     mode_array = analysis.get_mode_array("basic_3wm")
     ci = analysis._prepare_cme_inputs(mode_array, np.array([12.5]), 14.3, "s", "p")
-    bl = analysis._prepare_bloch_coefficients(mode_array, ci)
+    bl = _uniform_bloch_tables(analysis, mode_array, ci)
     kappas = np.ascontiguousarray(ci["gammas"][0].imag)
     W = bl["W"][0].real
     L = float(analysis.twpa.N_tot)
@@ -736,49 +701,3 @@ def _holotype_analysis():
             ),
         )
     return analysis
-
-
-def test_edge_guard_switches_off_edge_conversion():
-    """
-    imskit holotype pumped at 16 GHz: around fs = 9.19 GHz the second
-    conversion product 2 fp + fs sits at the upper edge of the third stopband.
-    The guard of the no-reflections Bloch model switches p2s off there, and the
-    result matches the run without the second conversion.
-
-    (With the earlier holotype parameters the unguarded run also showed tens of
-    dB of spurious ps <-> p2s gain here; with the current ones it does not, so
-    only the guard itself is checked.)
-    """
-    analysis = _holotype_analysis()
-    sig = np.array([9.188, 9.194, 9.198])
-    kw = dict(signal_freqs=sig, Is0=1e-9, pump=16.0, model="bloch_no_reflections")
-    ref = analysis.gain(mode_array_config="ext1", **kw)["gain_db"]
-    guarded = analysis.gain(mode_array_config="ext2", **kw)
-    p2s = guarded["mode_info"]["mode_map"]["p2s"]
-    assert np.all(guarded["bloch"]["edge_weights"][:, p2s] == 0.0)
-    assert np.allclose(guarded["gain_db"], ref, atol=0.1)
-
-
-def test_edge_guard_never_drops_injected_modes(monkeypatch, caplog):
-    """An injected mode flagged by the guard is kept and a warning is logged."""
-    from twpasolver.cmes import solver_config
-    from twpasolver.logger import log
-
-    analysis = _holotype_analysis()
-    # Absurdly strict guard: every lossy mode is "reactive".
-    monkeypatch.setattr(solver_config, "BLOCH_EDGE_GUARD_DEG", (0.0, 1e-9))
-    log.addHandler(caplog.handler)
-    try:
-        res = analysis.gain(
-            signal_freqs=np.array([6.0]),
-            Is0=1e-9,
-            pump=16.0,
-            model="bloch_no_reflections",
-        )
-    finally:
-        log.removeHandler(caplog.handler)
-    mm = res["mode_info"]["mode_map"]
-    w = res["bloch"]["edge_weights"][0]
-    assert w[mm["p"]] == 1.0 and w[mm["s"]] == 1.0
-    assert w[mm["i"]] == 0.0
-    assert any("injected mode" in r.getMessage() for r in caplog.records)
