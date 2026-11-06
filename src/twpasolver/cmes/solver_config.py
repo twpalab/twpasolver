@@ -70,8 +70,9 @@ class BlochSolverConfig(BaseModel):
         description="Phase-mismatch cutoff used to filter 3WM/4WM terms: a term is"
         " kept when its residual mismatch |dk + G_m| after a reciprocal vector is"
         " below kappa_cutoff times the largest wavenumber of its process, capped"
-        " at the zone edge pi / d of the primitive period d, so no kept term"
-        " advances more than kappa_cutoff * pi per period.",
+        " at the zone edge pi / d (the largest wavenumber the supercell-averaged"
+        " envelopes resolve), so no kept term advances more than"
+        " kappa_cutoff * pi per supercell.",
     )
     convergence_threshold: float = Field(
         default=0.01,
@@ -87,8 +88,6 @@ class BlochSolverConfig(BaseModel):
         default=2,
         description="Largest |m| of the reciprocal lattice"
         " vectors G_m = 2 pi m / d whose intracell Fourier components couple"
-        " (d the primitive period: a supercell made of q identical periods is"
-        " counted per period, so unfolding it does not change the result)"
         " quasi-phase-matched terms. Only terms whose residual mismatch"
         " |dk + G_m| passes kappa_cutoff are kept; 0 keeps cell averages only."
         " 'auto': 1 for every mode, raised to the Bragg"
