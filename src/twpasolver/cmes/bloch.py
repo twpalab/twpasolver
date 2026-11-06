@@ -26,8 +26,8 @@ far below the ladder cutoff.
 This module provides the linear ingredients: Bloch impedances, ``W`` and the
 intracell current profiles of a supercell (:func:`bloch_mode_tables`), the
 fixed ("edge") basis for modes close to a stopband edge
-(:func:`edge_basis_tables` and the edge search), and the per-mode and
-per-process weights of the stopband guard. The forward-backward solver is in
+(:func:`edge_basis_tables` and the edge search), and the per-process weights
+of the stopband guard (:func:`process_weights`). The forward-backward solver is in
 :mod:`twpasolver.cmes.bloch_fb`. Supported unit cells are those whose
 nonlinearity is a lumped series inductance (``LCLfBaseCell``,
 ``StubBaseCell``), or any cell defining a ``bloch_nl_elements()`` method (see
@@ -589,20 +589,6 @@ def reactive_angle_deg(W: np.ndarray) -> np.ndarray:
     W = np.asarray(W)
     ratio = np.abs(W.imag) / np.maximum(np.abs(W), 1e-300)
     return np.degrees(np.arcsin(np.clip(ratio, 0.0, 1.0)))
-
-
-def edge_guard_mode_weights(W: np.ndarray, lo_deg: float, hi_deg: float) -> np.ndarray:
-    """
-    Stopband weights of each mode from its reactive angle (used by the quantum model).
-
-    1 below ``lo_deg``, 0 above ``hi_deg``, smoothstep in between (a hard switch
-    at ``hi_deg`` if ``hi_deg <= lo_deg``). Zero inside a whole stopband.
-    """
-    ang = reactive_angle_deg(W)
-    if hi_deg <= lo_deg:
-        return np.where(ang < hi_deg, 1.0, 0.0)
-    t = np.clip((ang - lo_deg) / (hi_deg - lo_deg), 0.0, 1.0)
-    return 1.0 - t * t * (3.0 - 2.0 * t)
 
 
 def process_weights(relations: np.ndarray, mode_weights: np.ndarray) -> np.ndarray:

@@ -567,18 +567,14 @@ HOLOTYPE = (
 )
 
 
-def test_edge_guard_weights():
-    """Weights: 1 for real W, 0 for reactive W, continuous and monotone between."""
-    from twpasolver.cmes.bloch import edge_guard_mode_weights, reactive_angle_deg
+def test_reactive_angle():
+    """Reactive angle of W: 0 for real W, 90 deg for imaginary W, sign-independent."""
+    from twpasolver.cmes.bloch import reactive_angle_deg
 
     ang = np.linspace(0, 90, 181)
     W = 50 * np.exp(-1j * np.radians(ang))
     assert np.allclose(reactive_angle_deg(W), ang)
     assert np.allclose(reactive_angle_deg(-W), ang)  # sign of W is irrelevant
-    w = edge_guard_mode_weights(W, 5.0, 20.0)
-    assert np.all(w[ang <= 5] == 1.0) and np.all(w[ang >= 20] == 0.0)
-    assert np.all(np.diff(w) <= 0)
-    assert np.max(np.abs(np.diff(w))) < 0.1  # no jumps on a 0.5 deg grid
 
 
 def test_lossless_passband_W_is_real_for_asymmetric_cells():

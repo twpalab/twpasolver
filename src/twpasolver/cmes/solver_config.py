@@ -25,13 +25,6 @@ SOLVER_MAX_STEPS_PER_CELL = 1
 # 'auto'.
 BLOCH_M_MAX_AUTO_BASE = 1
 
-# Quantum model (twpasolver.quantum) only: reactive-angle guard. Each mode gets
-# a weight that is 1 for |arg W| below the first angle (degrees), 0 above the
-# second, with a smoothstep in between: inside a gap W turns reactive and a
-# single evanescent Bloch mode carries no power. The classical forward-backward
-# model handles stopbands with the edge basis instead. Set to None to disable.
-BLOCH_EDGE_GUARD_DEG = (10, 30.0)
-
 
 class FBSolverConfig(BaseModel):
     """

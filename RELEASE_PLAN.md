@@ -77,11 +77,12 @@ and merging code over adding options.
   `quantum.ipynb` uses it. Options: leave it out of the first release, or ship it as
   `twpasolver.experimental.quantum` with a warning and a smoke test. If it ships, it still needs
   `edge_guard_mode_weights` (see WP3.4).
-  **Decided 2026-11-06:** keep `quantum/` in the repo for a future update. It is not part of this clean-up. When
-  refactoring the Bloch code, keep `quantum/background.py` importable (adapter or minimal edits), but don't invest in
-  it; how it is packaged for the first release is still open (WP6).
-- [ ] **D4. `simulate_stopband_modes=False`** (the guard path superseded by the edge basis; it only buys about
-  2.5× speed). Keep it as a fast option, or remove it.
+  **Decided 2026-11-06 (revised the same day):** `quantum/` is removed from `bloch-cmes` together with its
+  reactive-angle guard (`edge_guard_mode_weights`, `BLOCH_EDGE_GUARD_DEG`). It stays on `edge-basis` and comes back
+  in a later update, adapted to the new API: it used the uniform `bloch_fb_cmes_solve`, `bloch_mode_tables`,
+  `process_weights` and the private `_prepare_cme_inputs`/`_build_port_tables`.
+- [x] **D4. `simulate_stopband_modes=False`** (the guard path superseded by the edge basis; it only buys about
+  2.5× speed). Keep it as a fast option, or remove it. **Decided 2026-11-06: keep it** (large speed-up).
 - [x] **D5. Holotype JSON.** Is the uncommitted edit of `docs/source/notebooks/imskit_v3_holotype.json` intended
   for the docs? Either way the tests get frozen fixtures (WP1.2).
   **Decided 2026-11-06:** yes, the edited JSON (unloaded cells L 55.2 pH, Lf 0.039 nH) is the docs model,
@@ -227,9 +228,10 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
     and never used by the kernel).
 - [ ] **3.3 One boundary-table helper, one forward–backward post-processing helper** (per-pass split, port gains,
   prompt reflections, `mode_info`), shared by every forward–backward driver.
-- [ ] **3.4 Guard systems** (per D2/D3/D4). Mostly done 2026-11-06: the `bloch_no_reflections` guard stack is
-  removed and `process_weights` is the single N-d version. Still open: D4 (the `simulate_stopband_modes=False`
-  path) and the 45° constant.
+- [x] **3.4 Guard systems** (per D2/D3/D4). Mostly done 2026-11-06: the `bloch_no_reflections` guard stack is
+  removed and `process_weights` is the single N-d version. With `quantum/` gone (D3), the only guard left is the
+  `simulate_stopband_modes=False` path (kept, D4). Leftover: the 45° reactive-angle threshold is repeated in
+  `analysis.py`; make it one constant (small, do it with WP4).
   - **What exists:**
     - `_stopband_guard_weights` and `_process_weights_nd` serve `simulate_stopband_modes=False`;
     - `_bloch_mode_weights`, `_bloch_edge_guard`, `edge_proximity_mode_weights`, `cell_phase_mask` and the
@@ -555,3 +557,19 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
     errors.
   - **Downstream:** scripts using `model="general"` (Ch. 6 `plot_cme_layers*.py`, `kitwpac_fc.ipynb`) need the
     `edge-basis` branch.
+- 2026-11-06, `quantum/` removed (D3 revised) on `bloch-cmes`: `src/twpasolver/quantum/` (1,859 lines),
+  `edge_guard_mode_weights` and `BLOCH_EDGE_GUARD_DEG`. `test_edge_guard_weights` became `test_reactive_angle`.
+  - **Checks:** 95 tests pass; `simple` and `bloch` are bit-identical on the regression set.
+  - **Kept:** the uniform wrapper `bloch_fb_cmes_solve` (used by the tests, and a convenient entry point for uniform
+    devices).
+
+## Where to pick up (end of session 2026-11-06)
+
+`bloch-cmes` holds WP1, WP3.1-3.6 and the connector test; nothing is pushed. Next, roughly in order:
+1. **WP3.7:** one source of defaults (`m_max` 2 in the config vs 5 in the solver signature, `anderson_depth` 10 vs
+   5). **WP3.8:** add the `twpasolver-warmup` script entry to `pyproject`.
+2. **WP2:** the bug fixes that still apply. 2.1 and 2.20 are moot; 2.6 and 2.14 are done; 2.5 (silent NaN) now
+   concerns `simple` only.
+3. **WP4:** split `analysis.py` (now about 1,900 lines; many WP4 items shrank with the model removal), a
+   consistent result dict, and the docstrings (Is0 default, `fb_config`).
+4. **WP5 to WP7:** models and modes, packaging and CI, docs; then reconcile with `origin/main` and push.
