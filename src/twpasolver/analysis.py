@@ -29,8 +29,8 @@ from twpasolver.cmes.bloch import (
     reactive_angle_deg,
     stopband_edges,
 )
-from twpasolver.cmes.bloch_fb import bloch_fb_cmes_solve
-from twpasolver.cmes.bloch_fb_segmented import (
+from twpasolver.cmes.bloch_fb import (
+    bloch_fb_cmes_solve,
     bloch_fb_segmented_cmes_solve,
     segmented_phase,
 )
@@ -2281,10 +2281,10 @@ class TWPAnalysis(Analyzer, Frequencies):
         backward Bloch modes; boundary coefficients use the exact Bloch
         impedances Zb+ (forward) and Zb- (backward). ``fb_config.update_rate``
         is not used: the boundary coefficients are constant in this basis.
-        See :mod:`twpasolver.cmes.bloch_fb`. Segmented devices (a ``TWPA`` whose
-        cells are all ``TWPA`` segments) are solved on per-segment Bloch modes
-        joined by exact junction conditions, see
-        :mod:`twpasolver.cmes.bloch_fb_segmented`.
+        Segmented devices (a ``TWPA`` whose cells are all ``TWPA`` segments)
+        are solved on per-segment Bloch modes joined by exact junction
+        conditions; uniform devices are the one-segment case. See
+        :mod:`twpasolver.cmes.bloch_fb`.
         """
         segmented = self._is_segmented()
         fb_config = fb_config if fb_config is not None else FBSolverConfig()

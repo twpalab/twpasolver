@@ -227,7 +227,7 @@ def _process_signatures(rows, n_modes, n_in):
 def test_mismatch_filter_keeps_partner_terms_together(which):
     """Partner terms of a process are always kept or dropped together."""
     from twpasolver.analysis import prepare_relations_coefficients
-    from twpasolver.cmes.bloch_fb import _filter_wm_terms_bloch
+    from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
     from twpasolver.cmes.cmes_fb import _filter_wm_terms
     from twpasolver.modes_rwa import ModeArrayFactory
 
@@ -270,11 +270,8 @@ def test_bloch_rhs_conserves_energy_with_reciprocal_vectors():
     of d/dx sum_n W_n (|A+_n|^2 - |A-_n|^2), summed over the kept rows of both
     solves (including G != 0 rows), must vanish.
     """
-    from twpasolver.cmes.bloch_fb import (
-        _bloch_row_coeffs,
-        _filter_wm_terms_bloch,
-        bloch_fb_rhs,
-    )
+    from twpasolver.cmes.bloch_common import _bloch_row_coeffs, _filter_wm_terms_bloch
+    from twpasolver.cmes.bloch_fb import bloch_fb_segment_rhs
 
     analysis = _mismatched_analysis(Ip0=2.5e-4, Z_ext=50.0, N=100)
     mode_array = analysis.get_mode_array("basic_3wm")
@@ -314,7 +311,7 @@ def test_bloch_rhs_conserves_energy_with_reciprocal_vectors():
         x = rng.uniform(0, L)
         total = 0.0
         for fwd, own, ctr, pos in ((True, Bf, Bb, x), (False, Bb, Bf, L - x)):
-            rhs = bloch_fb_rhs(
+            rhs = bloch_fb_segment_rhs(
                 pos,
                 own,
                 np.zeros(3),
@@ -325,8 +322,12 @@ def test_bloch_rhs_conserves_energy_with_reciprocal_vectors():
                 coeffs[("4wm", fwd)],
                 rows3[:, -1] * g_unit,
                 rows4[:, -1] * g_unit,
+                0.0,  # segment start x0 and its phase: one segment from x = 0
+                np.zeros(3),
                 grid,
                 np.ascontiguousarray(np.stack([ctr, ctr], -1)),
+                0.0,
+                np.zeros(3),
                 L,
             )
             total += np.sum(W * 2 * np.real(np.conj(own) * rhs))
@@ -548,11 +549,8 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
     rows); scaling a single row without its partners breaks it.
     """
     from twpasolver.cmes.bloch import process_weights
-    from twpasolver.cmes.bloch_fb import (
-        _bloch_row_coeffs,
-        _filter_wm_terms_bloch,
-        bloch_fb_rhs,
-    )
+    from twpasolver.cmes.bloch_common import _bloch_row_coeffs, _filter_wm_terms_bloch
+    from twpasolver.cmes.bloch_fb import bloch_fb_segment_rhs
 
     analysis = _mismatched_analysis(Ip0=2.5e-4, Z_ext=50.0, N=100)
     mode_array = analysis.get_mode_array("basic_3wm")
@@ -601,7 +599,7 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
         x = rng.uniform(0, L)
         total = 0.0
         for fwd, own, ctr, pos in ((True, Bf, Bb, x), (False, Bb, Bf, L - x)):
-            rhs = bloch_fb_rhs(
+            rhs = bloch_fb_segment_rhs(
                 pos,
                 own,
                 np.zeros(3),
@@ -612,8 +610,12 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
                 coeffs[("4wm", fwd)],
                 rows3[:, -1] * g_unit,
                 rows4[:, -1] * g_unit,
+                0.0,  # segment start x0 and its phase: one segment from x = 0
+                np.zeros(3),
                 grid,
                 np.ascontiguousarray(np.stack([ctr, ctr], -1)),
+                0.0,
+                np.zeros(3),
                 L,
             )
             total += np.sum(W * 2 * np.real(np.conj(own) * rhs))

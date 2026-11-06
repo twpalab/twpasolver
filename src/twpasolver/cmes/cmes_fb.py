@@ -13,6 +13,7 @@ from twpasolver.bonus_types import (
     nb_int2d,
 )
 from twpasolver.cmes.base import _sorted_interp_bracket
+from twpasolver.cmes.bloch_common import _convergence_step, _store_pass
 from twpasolver.cmes.rk45 import rk45_solve
 from twpasolver.cmes.solver_config import (
     BOUNDARY_CORR_MAX,
@@ -600,52 +601,6 @@ def _update_input_boundary_and_launch(
             )
         A_bwd_end_j = A_bwd_i[j, -1] * phase_end[j]
         I_fwd[j] = y0_fwd[j] * trans_0_in[j] + refl_0_out[j] * A_bwd_end_j
-
-
-@nb.njit(inline="always")
-def _convergence_step(
-    A_fwd_i, A_bwd_i, prev_fwd, prev_bwd, n_modes, convergence_threshold, stable_count
-):
-    """Relative-change convergence test; returns updated (stable_count, converged)."""
-    n_fwd = 0.0
-    n_bwd = 0.0
-    for j in range(n_modes):
-        v = np.abs(A_fwd_i[j, -1] - prev_fwd[j]) / (np.abs(A_fwd_i[j, -1]) + 1e-30)
-        w = np.abs(A_bwd_i[j, -1] - prev_bwd[j]) / (np.abs(A_bwd_i[j, -1]) + 1e-30)
-        if v > n_fwd:
-            n_fwd = v
-        if w > n_bwd:
-            n_bwd = w
-    if n_fwd < convergence_threshold and n_bwd < convergence_threshold:
-        stable_count += 1
-    else:
-        stable_count = 0
-    converged = stable_count >= 3
-    return stable_count, converged
-
-
-@nb.njit(inline="always")
-def _store_pass(
-    I_out,
-    A_fwd_i,
-    A_bwd_i,
-    refl_end_out,
-    refl_0_out,
-    tof_out,
-    tof_in,
-    idx_fwd,
-    idx_bwd,
-    n_modes,
-):
-    """Write one forward/backward pass into I_out, overwriting the last x-point
-    with the physical outcoupled current: forward-out (S21) at idx_fwd,
-    backward-out (S11) at idx_bwd.
-    """
-    I_out[idx_fwd] = A_fwd_i
-    I_out[idx_bwd] = A_bwd_i
-    for j in range(n_modes):
-        I_out[idx_fwd, j, -1] = A_fwd_i[j, -1] * (1.0 + refl_end_out[j]) * tof_out[j]
-        I_out[idx_bwd, j, -1] = A_bwd_i[j, -1] * (1.0 + refl_0_out[j]) * tof_in[j]
 
 
 @nb.njit(parallel=True, cache=True)

@@ -12,7 +12,8 @@ from twpasolver.cmes.bloch import (
     lossless_copy,
     supercell_matrix,
 )
-from twpasolver.cmes.bloch_fb import _edge_bvp_solve, _expm_2x2
+from twpasolver.cmes.bloch_common import _expm_2x2
+from twpasolver.cmes.bloch_fb import _edge_bvp_solve_segmented
 
 
 def test_logm_expm_2x2():
@@ -29,6 +30,27 @@ def test_logm_expm_2x2():
     assert np.allclose(_expm_2x2(N), np.eye(2) + N, atol=1e-16)
 
 
+def _edge_bvp_one_segment(K, x, S_plus, S_minus, cp_in, rho_in, cm_out, rho_out):
+    """Exact two-point solve of dc/dx = K c + S on a uniform grid (one segment)."""
+    one, zero = np.ones(1, complex), np.zeros(1, complex)
+    return _edge_bvp_solve_segmented(
+        np.asarray(K)[None],
+        x,
+        np.array([0, len(x)], dtype=np.int64),
+        S_plus,
+        S_minus,
+        cp_in,
+        rho_in,
+        cm_out,
+        rho_out,
+        one,
+        one,
+        zero,
+        zero,
+        np.zeros(2),
+    )
+
+
 def test_edge_bvp_solve_inside_gap():
     """Riccati sweep: end conditions exact, ODE satisfied, bounded for |K01| L = 50."""
     L, n = 1000.0, 4001
@@ -37,7 +59,7 @@ def test_edge_bvp_solve_inside_gap():
     K = np.array([[-0.001 - 0.002j, 0.05], [0.05, -0.001 + 0.002j]])
     Sp = 1e-3 * np.exp(1j * 0.01 * x)
     Sm = 2e-3 * np.exp(-1j * 0.02 * x)
-    cp, cm = _edge_bvp_solve(K, h, Sp, Sm, 1.0 + 0j, 0.3 + 0j, 0.1j, -0.2 + 0j)
+    cp, cm = _edge_bvp_one_segment(K, x, Sp, Sm, 1.0 + 0j, 0.3 + 0j, 0.1j, -0.2 + 0j)
     assert abs(cp[0] - (1 + 0.3 * cm[0])) < 1e-14
     assert abs(cm[-1] - (0.1j - 0.2 * cp[-1])) < 1e-14
     c = np.vstack([cp, cm])
@@ -187,8 +209,6 @@ def _random_segmented_problem(seed=3):
 
 def test_segmented_bvp_matches_transfer_matrix():
     """Riccati sweep across junctions: exact against the transfer matrix, junctions exact."""
-    from twpasolver.cmes.bloch_fb_segmented import _edge_bvp_solve_segmented
-
     lens, bounds, sub_off, xs, K, t, tp, rL, rR, Phi = _random_segmented_problem()
     n_seg = len(lens)
     bc = (1.0 + 0j, 0.2 - 0.1j, 0.05j, -0.3 + 0.1j)  # cp_in, rho_in, cm_out, rho_out
@@ -228,9 +248,7 @@ def test_segmented_bvp_matches_transfer_matrix():
 
 
 def test_segmented_bvp_trivial_junctions_equal_uniform():
-    """Identical segments with transparent junctions reproduce the uniform solve."""
-    from twpasolver.cmes.bloch_fb_segmented import _edge_bvp_solve_segmented
-
+    """Identical segments with transparent junctions reproduce a single segment."""
     _, _, _, _, K, *_ = _random_segmented_problem()
     n_seg, h, n_pts = 5, 5.0, 41
     L = h * (n_pts - 1) * n_seg
@@ -255,14 +273,14 @@ def test_segmented_bvp_trivial_junctions_equal_uniform():
         np.zeros(n_seg + 1),
     )
     xu = np.linspace(0, L, (n_pts - 1) * n_seg + 1)
-    cpu, _ = _edge_bvp_solve(K[0], h, *src(xu), *bc)
+    cpu, _ = _edge_bvp_one_segment(K[0], xu, *src(xu), *bc)
     ref = np.interp(xs, xu, cpu.real) + 1j * np.interp(xs, xu, cpu.imag)
     assert np.allclose(cps, ref, atol=1e-14)
 
 
 def test_relative_residual_is_infinite_for_nonfinite_iterates():
     """A blown-up iterate never passes for converged."""
-    from twpasolver.cmes.bloch_fb import _relative_residual
+    from twpasolver.cmes.bloch_common import _relative_residual
 
     f = np.zeros((2, 5), dtype=complex)
     assert _relative_residual(f, np.ones(2)) == 0.0
@@ -334,7 +352,7 @@ def test_per_mode_harmonic_limits_in_filter():
 
     from twpasolver import TWPAnalysis
     from twpasolver.analysis import prepare_relations_coefficients
-    from twpasolver.cmes.bloch_fb import _filter_wm_terms_bloch
+    from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
     from twpasolver.models import TWPA
     from twpasolver.modes_rwa import ModeArrayFactory
 
@@ -425,7 +443,7 @@ def test_mismatch_cutoff_capped_at_zone_edge():
 
     from twpasolver import TWPAnalysis
     from twpasolver.analysis import prepare_relations_coefficients
-    from twpasolver.cmes.bloch_fb import _filter_wm_terms_bloch
+    from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
     from twpasolver.models import TWPA
     from twpasolver.modes_rwa import ModeArrayFactory
 
@@ -477,7 +495,7 @@ def test_mismatch_cutoff_capped_at_zone_edge():
 
 def test_cubic_table_interpolation():
     """4-point stencil: exact for cubics, clamped like np.interp, linear on short grids."""
-    from twpasolver.cmes.bloch_fb import _interp_rows
+    from twpasolver.cmes.bloch_common import _interp_rows
 
     rng = np.random.default_rng(4)
     xp = np.sort(rng.uniform(0, 10, 12))

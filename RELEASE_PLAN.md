@@ -57,16 +57,22 @@ and merging code over adding options.
 
 ## WP0: Decisions needed from Pietro (blocking WP3 to WP5 and WP7)
 
-- [ ] **D1. `general` forward–backward model** (`cmes_fb.py` plus its `analysis.py` branch, about 1,850 lines).
+- [x] **D1. `general` forward–backward model** (`cmes_fb.py` plus its `analysis.py` branch, about 1,850 lines).
   - **Against keeping it:** it is the least accurate model, has no convergence flags, no NaN detection and no
     tests, uses clamped perturbative boundary updates, and has a Manley–Rowe-breaking cutoff (WP2).
   - **What only it provides:** segmentations whose segments are not whole supercells.
   - **Options:** remove it, or deprecate it for one release, then remove it.
-- [ ] **D2. `bloch_no_reflections`.**
+  **Decided 2026-11-06: remove it.**
+- [x] **D2. `bloch_no_reflections`.**
   - **Against keeping it:** it covers uniform devices only, depends on the heuristic guard stack, and exists only
     as a fast Bloch-coupling estimate.
   - **Options:** remove it, or merge it into one forward-only kernel shared with `general_no_reflections`
     (Bloch coefficient tables as input).
+  **Decided 2026-11-06: remove it.** The final package has two models:
+  - **`simple`** (renamed from `general_no_reflections`): the traditional homogeneous-line CMEs, forward-only and
+    fast. Keep both of its kernels: the uniform one is 1.4× faster than the segmented one, and the segmented one
+    interpolates linearly between segment midpoints.
+  - **`bloch`:** the segmented forward–backward kernel only; uniform devices are the one-segment case.
 - [x] **D3. `quantum/`.** It has about 1.8k lines, 0 % coverage and no API docs, and only the untracked
   `quantum.ipynb` uses it. Options: leave it out of the first release, or ship it as
   `twpasolver.experimental.quantum` with a warning and a smoke test. If it ships, it still needs
@@ -197,7 +203,7 @@ Each fix gets a test.
 
 Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
 
-- [ ] **3.1 Drop the uniform Bloch forward–backward kernel; route uniform devices through the segmented solver
+- [x] **3.1 Drop the uniform Bloch forward–backward kernel; route uniform devices through the segmented solver
   as n_seg = 1.**
   - **Evidence (2026-11-06):** the holotype uniform vs `_segmented_holotype(scale=(1.0,))` agree to 3e-11 dB at
     8 points from 4 to 12 GHz, and to 3e-12 dB at the p2s edge (9.204–9.25 GHz). Runtime is equal (0.52 vs
@@ -441,3 +447,59 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
   - Stale `.ipynb_checkpoints` folders deleted from the repo root, `src/` and `tests/`.
   - Notebooks 01-04 carry no outputs, and nbstripout already runs in pre-commit.
   - **WP1 complete:** green suite, clean tree.
+- 2026-11-06, benchmark for WP3.1 (warm numba, best of 3, uniform holotype vs a 1-segment segmented copy; script:
+  `/tmp/claude-1000/bench/seg_vs_uni.py`):
+  - **Speed:** segmented/uniform time ratio is 1.00-1.04 for 9 modes: 10 or 200 signals, fixed 20 passes or the
+    default config, fine x-grid (`thin=10`), and the p2s edge with the edge basis. Only tiny runs show fixed
+    setup overhead: 3 modes and 10 points take 10 ms against 7 ms (ratio 1.5). The interpolation in the
+    segmented kernel costs nothing measurable.
+  - **Results:** identical (≤5e-10 dB) wherever the iteration converges. With the 3-mode `basic` array they
+    differ by up to 0.18 dB only at non-converged points (fs 3.0-3.6 GHz, idler 12.4-13 GHz just below the first
+    gap, residuals 0.05-0.4), because the uniform kernel reindexes its Anderson history every pass. Keep the
+    segmented behaviour.
+  - **Side finding:** `basic` (p, s, i) fails to converge there with the default config. Check this after WP3.1.
+- 2026-11-06, benchmark of the models (holotype, `ext2`, 200 signals, warm numba; scripts
+  `/tmp/claude-1000/bench/models.py`, `gnr_seg.py`):
+
+  | model | time | vs `bloch` (median / max \|ΔG\|) |
+  |---|---|---|
+  | `general_no_reflections` | 0.09 s | 0.8 / 4.2 dB |
+  | `bloch_no_reflections` | 0.13 s | 4.1 / 6.6 dB |
+  | `general` | 2.9 s | 5.2 / 8.3 dB |
+  | `bloch` | 3.9 s | reference |
+
+  - **Downstream use:** `bloch_no_reflections` is used nowhere. `general` appears only in the Ch. 6 CME-layer figure
+    (`plot_cme_layers*.py`) and in `kitwpac_fc.ipynb`.
+  - **Leaning (Pietro, not final):** keep `general_no_reflections`, as the "traditional" homogeneous-line CMEs
+    (textbook baseline, fast, forward-only, any segmentation; couplings are not exact), and `bloch`. Drop `general`
+    and `bloch_no_reflections`.
+  - **`general_no_reflections` segmented vs uniform:** the segmented kernel is 35-40 % slower (0.091 → 0.125 s at
+    200 signals, 0.48 → 0.67 s at 1000), independently of the number of segments. The cause is the per-step
+    interpolation of α, κ, couplings and phase in `no_reflections_cmes_segmented`. Results are identical for 1 or 4
+    segments.
+  - **Keep both kernels for this model:** the uniform path is about 85 lines and buys a 1.4× speed-up on the fast
+    model (unlike Bloch, where the uniform solver is 850 lines with no speed gain).
+  - **Physics difference:** the segmented `general_no_reflections` interpolates k and couplings linearly between
+    segment midpoints (a smooth taper), while segmented `bloch` uses piecewise-constant segments with exact
+    junctions. Document this.
+  - **Helper caveat:** `_segmented_holotype` uses `N // n_seg`, so 36 segments make a line 1 % shorter (1188
+    supercells).
+- 2026-11-06, WP3.1 on `bloch-cmes`:
+  - **What changed:** the uniform Bloch forward–backward kernel is deleted. `cmes/bloch_fb.py` is now the former
+    segmented module (renamed with `git mv`, with a merged module docstring), plus a thin wrapper
+    `bloch_fb_cmes_solve` that adds a one-segment axis for uniform devices. Its extra parameters are keyword-only.
+    The shared numba helpers moved to the new `cmes/bloch_common.py`, together with `_convergence_step` and
+    `_store_pass` taken from `cmes_fb.py`.
+  - **Unchanged callers:** `analysis.py` (uniform path), `quantum/background.py` and the tests still call
+    `bloch_fb_cmes_solve`. The tests that used the uniform RHS or the uniform edge BVP now call the segmented
+    versions with one segment, which is mathematically identical.
+  - **Regression** (`/tmp/claude-1000/wp31/regress.py`):
+    - uniform holotype: default, fixed-pass and guard configurations agree to ≤1e-9 dB;
+    - the 4-segment device and the quantum response are bit-identical;
+    - the native-basis run differs by 2e-7 dB and contra-QPM by 7e-4 relative, both only at non-converged points
+      (the Anderson iteration path differs).
+  - **Size and compile time:** `cmes/` lost about 810 lines. A cold numba compile of the Bloch forward–backward
+    model now takes 76 s and covers uniform and segmented devices; before, the two kernels compiled separately
+    (about 55 s and 80 s).
+  - **Next:** WP3.2 (one preparation path in `analysis.py`). Then remove `general` and `bloch_no_reflections`
+    (WP3.4–3.6) and rename `general_no_reflections` to `simple`.
