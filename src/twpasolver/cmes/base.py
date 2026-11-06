@@ -14,11 +14,13 @@ from twpasolver.bonus_types import (
 )
 from twpasolver.cmes.rk45 import rk45_solve
 from twpasolver.cmes.solver_config import (
+    SIMPLE_MAX_STEPS_PER_CELL,
     SOLVER_ATOL,
     SOLVER_FIRST_STEP,
     SOLVER_MAX_STEPS,
     SOLVER_RTOL,
 )
+from twpasolver.logger import log
 
 
 @nb.njit(
@@ -226,6 +228,7 @@ def _no_reflections_solve_uniform(
             atol=SOLVER_ATOL,
             rtol=SOLVER_RTOL,
             max_num_steps=SOLVER_MAX_STEPS,
+            max_steps_per_cell=SIMPLE_MAX_STEPS_PER_CELL,
             t_eval=x_array,
             first_step=SOLVER_FIRST_STEP,
         )
@@ -311,6 +314,7 @@ def _no_reflections_solve_segmented(
             atol=SOLVER_ATOL,
             rtol=SOLVER_RTOL,
             max_num_steps=SOLVER_MAX_STEPS,
+            max_steps_per_cell=SIMPLE_MAX_STEPS_PER_CELL,
             t_eval=x_array,
             first_step=SOLVER_FIRST_STEP,
         )
@@ -350,7 +354,7 @@ def no_reflections_cmes_solve(
                 "segment_midpoints is required for segmented devices "
                 "(gammas_array.ndim == 3)."
             )
-        return _no_reflections_solve_segmented(
+        I_tuples = _no_reflections_solve_segmented(
             np.ascontiguousarray(x_array),
             y0_broadcast,
             gammas_array,
@@ -361,7 +365,7 @@ def no_reflections_cmes_solve(
             np.ascontiguousarray(segment_midpoints),
         )
     else:
-        return _no_reflections_solve_uniform(
+        I_tuples = _no_reflections_solve_uniform(
             x_array,
             y0_broadcast,
             gammas_array,
@@ -370,3 +374,13 @@ def no_reflections_cmes_solve(
             coeffs_3wm,
             coeffs_4wm,
         )
+    bad = np.flatnonzero(~np.isfinite(I_tuples).all(axis=(1, 2)))
+    if bad.size:
+        log.warning(
+            "No-reflections CMEs hit the RK45 step cap (NaN output) for %d of %d "
+            "frequency points (indices %s).",
+            bad.size,
+            len(I_tuples),
+            bad[:20].tolist(),
+        )
+    return I_tuples

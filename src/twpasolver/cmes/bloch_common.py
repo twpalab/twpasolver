@@ -9,7 +9,7 @@ Numba helpers shared by the forward-backward Bloch CME solver.
 * closed-form exponential of a 2x2 generator (``_expm_2x2``);
 * fixed-point iteration: residual scales, relative residual, Anderson mixing
   and pass bookkeeping (``_mode_scales``, ``_relative_residual``,
-  ``_anderson_mix``, ``_convergence_step``, ``_store_pass``).
+  ``_anderson_mix``, ``_store_pass``).
 """
 
 import numba as nb
@@ -399,28 +399,6 @@ def _anderson_mix(g, f, dG, dF, n_hist, head, depth, scales):
             for t in range(n_x):
                 u[j, t] -= gam[a] * dG[ia, j, t]
     return u
-
-
-@nb.njit(inline="always")
-def _convergence_step(
-    A_fwd_i, A_bwd_i, prev_fwd, prev_bwd, n_modes, convergence_threshold, stable_count
-):
-    """Relative-change convergence test; returns updated (stable_count, converged)."""
-    n_fwd = 0.0
-    n_bwd = 0.0
-    for j in range(n_modes):
-        v = np.abs(A_fwd_i[j, -1] - prev_fwd[j]) / (np.abs(A_fwd_i[j, -1]) + 1e-30)
-        w = np.abs(A_bwd_i[j, -1] - prev_bwd[j]) / (np.abs(A_bwd_i[j, -1]) + 1e-30)
-        if v > n_fwd:
-            n_fwd = v
-        if w > n_bwd:
-            n_bwd = w
-    if n_fwd < convergence_threshold and n_bwd < convergence_threshold:
-        stable_count += 1
-    else:
-        stable_count = 0
-    converged = stable_count >= 3
-    return stable_count, converged
 
 
 @nb.njit(inline="always")

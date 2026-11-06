@@ -445,7 +445,7 @@ def _circuit_reference_3wm(twpa, pump, signal_freqs, Ip0, Ze):
     return gain
 
 
-def test_anderson_converges_where_plain_iteration_diverges():
+def test_anderson_converges_near_bragg_coupling():
     """
     Near a stopband the forward signal is Bragg-coupled to the backward idler
     (G != 0 term). With strong coupling the plain forward/backward iteration
@@ -504,20 +504,18 @@ def test_anderson_converges_where_plain_iteration_diverges():
     ref = _circuit_reference_3wm(twpa, pump, sig, Ip0, Ze)
     accelerated = solve(5, 30)
     assert np.allclose(accelerated, ref, atol=0.25)
-    plain = solve(0, 30)
-    assert np.max(plain - ref) > 20  # the plain iteration runs away
 
 
-def test_anderson_matches_plain_iteration_when_it_converges():
+def test_result_does_not_depend_on_anderson_depth():
     """Acceleration changes only the path to the fixed point, not the result."""
     analysis = _mismatched_analysis(Ip0=1.5e-4)
     freqs = analysis.data["freqs"]
     idx = np.searchsorted(freqs, [2.0, 6.0, 10.0])
     kw = dict(pump=14.3, Is0=1e-8, model=GainModel.BLOCH, thin=20)
-    plain = analysis.gain(
+    shallow = analysis.gain(
         freqs[idx],
         fb_config=FBSolverConfig(
-            passes=60, convergence_threshold=1e-8, anderson_depth=0
+            passes=60, convergence_threshold=1e-8, anderson_depth=1
         ),
         **kw,
     )
@@ -528,8 +526,41 @@ def test_anderson_matches_plain_iteration_when_it_converges():
         ),
         **kw,
     )
-    assert np.allclose(acc["gain_db"], plain["gain_db"], atol=1e-3)
-    assert np.allclose(acc["gain_db_11"], plain["gain_db_11"], atol=1e-2)
+    assert np.allclose(acc["gain_db"], shallow["gain_db"], atol=1e-3)
+    assert np.allclose(acc["gain_db_11"], shallow["gain_db_11"], atol=1e-2)
+
+
+def test_nan_iterate_stops_unconverged():
+    """A NaN pass ends the iteration at once and is never flagged converged."""
+    analysis = _mismatched_analysis(Ip0=1.5e-4)
+    freqs = analysis.data["freqs"]
+    idx = np.searchsorted(freqs, [2.0, 6.0])
+    res = analysis.gain(
+        freqs[idx],
+        pump=14.3,
+        Is0=np.nan,
+        model=GainModel.BLOCH,
+        fb_config=FBSolverConfig(passes=30, save_all_passes=True),
+        thin=20,
+    )
+    assert not res["bloch"]["converged"].any()
+    assert np.isinf(res["bloch"]["residuals"]).all()
+
+
+def test_simple_nan_output_is_reported(caplog):
+    """The simple model warns when a point comes back NaN."""
+    analysis = _mismatched_analysis(Ip0=1.5e-4)
+    from twpasolver.logger import log
+
+    log.addHandler(caplog.handler)
+    try:
+        res = analysis.gain(
+            np.array([2.0]), pump=14.3, Is0=np.nan, model="simple", thin=20
+        )
+    finally:
+        log.removeHandler(caplog.handler)
+    assert np.isnan(res["gain_db"]).all()
+    assert any("step cap" in r.getMessage() for r in caplog.records)
 
 
 def test_unconverged_points_are_reported(caplog):

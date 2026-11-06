@@ -58,6 +58,7 @@ def rk45_solve(
     first_step: float = None,
     t_eval: np.ndarray = EMPTY_ARR,
     max_num_steps: int = 0,
+    max_steps_per_cell: float = SOLVER_MAX_STEPS_PER_CELL,
 ) -> np.ndarray:
     """
     Adaptive Dormand-Prince RK45, ported from CyRK's ``nbsolve_ivp``.
@@ -175,14 +176,12 @@ def rk45_solve(
             atol_array[i] = atol
 
     # Cap the number of accepted steps at the integration length in unit cells
-    # (times SOLVER_MAX_STEPS_PER_CELL): the CMEs describe envelopes that vary
+    # (times max_steps_per_cell): the CMEs describe envelopes that vary
     # slowly on the scale of one cell, so needing more steps than cells means
     # the solution is running away (e.g. an unguarded stopband-edge process).
     # The run then stops with status -7 and the unreached points are NaN.
-    if SOLVER_MAX_STEPS_PER_CELL > 0:
-        span_steps = (
-            int(np.ceil(np.abs(t_end - t_start) * SOLVER_MAX_STEPS_PER_CELL)) + 1
-        )
+    if max_steps_per_cell > 0:
+        span_steps = int(np.ceil(np.abs(t_end - t_start) * max_steps_per_cell)) + 1
         if max_num_steps <= 0 or max_num_steps > span_steps:
             max_num_steps = span_steps
     use_max_steps = max_num_steps > 0

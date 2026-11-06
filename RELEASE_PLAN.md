@@ -149,11 +149,20 @@ Each fix gets a test.
   - **Fix:** detect the primitive period of the linear cells, or at least document this and scale the auto base
     by q.
   - The auto window also falls back to a hardcoded 0.10 when `edge_threshold=None` (`~1234`).
-- [ ] **2.5 Silent NaN.** The rk45 step cap (`rk45.py:~182`) produces NaN; the no-reflections and `general`
+- [x] **2.5 Silent NaN.** The rk45 step cap (`rk45.py:~182`) produces NaN; the no-reflections and `general`
   models return NaN gain without a warning. Add a warning, or a `converged`/`finite` flag on every model.
+  - **Done 2026-11-06 (branch `audit-fixes`):** the cap is an `rk45_solve` argument (`max_steps_per_cell`).
+    `bloch` keeps 1 per cell (`SOLVER_MAX_STEPS_PER_CELL`); `simple` uses `SIMPLE_MAX_STEPS_PER_CELL = 10`,
+    because it keeps every mixing term unfiltered and strongly mismatched terms need a few steps per cell.
+    Case: uniform LCLf, N=2000, `create_extended_3wm(n_pump_harmonics=2, nfc=1)`, pump 18 GHz, signals 8.5/8.8
+    GHz gave `[nan, nan]` with cap 1. `no_reflections_cmes_solve` now logs a warning for any NaN point.
 - [ ] **2.6 Global solver constants are frozen into cached numba kernels.** Changing `SOLVER_MAX_STEPS_PER_CELL`
   and similar has no effect until `__pycache__` is wiped. Remove `configure_solver`/`get_solver_config`
   (`solver_config.py:81-115`), which are never called and misleading, and pass tolerances as arguments.
+  - **Audit 2026-11-06: wider than constants.** Numba re-checks only the caller's own file, so editing a callee
+    in another module (`rk45.py`, `bloch_common.py`, `solver_config.py`) also keeps the stale kernels in
+    `base.py`/`bloch_fb.py` (reproduced with a toy two-file kernel). Fix: pass constants as arguments, and set
+    `numba.config.CACHE_DIR` to a folder keyed by a hash of `cmes/*.py` in `cmes/__init__.py`.
 
 ### API bugs (confirmed by running them)
 
@@ -167,6 +176,9 @@ Each fix gets a test.
 - [ ] **2.11 Stopband detection from argmin/argmax of `diff(S21_db)`** (`~665-670`) can return start > end; it
   gave `[19.13, 14.07]` on the device in `tests/test_bloch.py`. That reversed pair feeds the default ranges and
   the pump estimate. Use the supercell half-trace (`passband_mask`/`in_stopband` from the edge-basis fix).
+  - **Audit 2026-11-06:** the result depends on where the grid ends. Same device: `f_arange` to 20 GHz gives
+    `[19.06, 14.16]`, to 10 GHz `[6.79, 7.50]`, to 40 GHz `[39.55, 39.54]`. `_estimate_optimal_pump` then works
+    on the single point `freqs[idx:-1]`.
 - [ ] **2.12 Base data is never computed automatically.** `gain()` on a fresh `TWPAnalysis` raises
   `KeyError 'optimal_pump_freq'`, and edits to `twpa` leave stale data without warning. Call `update_base_data()`
   from the decorator, as it did before 6097a93. Exclude `Ip0` from the state check.
@@ -188,6 +200,8 @@ Each fix gets a test.
 
 - [ ] **2.21 `TWPA` slicing drops parameters** (`modelarray.py:53`): `TWPA(Istar=1e-3, N=7)[0:2]` returns
   default `Istar` and `N=1`.
+  - **Audit 2026-11-06:** also `OnePortArray(parallel=True, twoport_parallel=True)[0:2]` comes back as a series
+    array. Fix: `return self.model_copy(update={"cells": self.cells[indices]})`.
 - [ ] **2.22 `validate_nested_cells` mutates the caller's list** (`modelarray.py:39`).
 - [ ] **2.23 Small fixes:** `matrices_arrays.py:99` (`and` should be `or`), `bonus_types.py:41` (missing `f`
   prefix), and `Frequencies.f` silently prefers `f_arange` when `f_list` is also set (raise instead).
@@ -197,6 +211,51 @@ Each fix gets a test.
   loop forever. Detect cycles and raise.
 - [ ] **2.26 `Mode.__eq__`/`__hash__`:** eq ignores the label but hash uses it (`~204/216`).
 - [ ] **2.27 `twpa_cells.py:94,103`:** complex `C` is passed where the annotation says float (mypy).
+
+### Audit 2026-11-06 (new findings, `/ponytail-audit` on `bloch-cmes` daa4246)
+
+Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` daa4246.
+
+- [x] **2.28 NaN iterates flagged converged with `anderson_depth=0`** (`bloch_common._convergence_step`):
+  `nan > n_fwd` is False, so NaN passes counted as stable and `converged=True` after 3 passes. The Anderson
+  branch caught NaN (`_relative_residual` returns inf) but kept iterating NaN for every remaining pass.
+  - **Done 2026-11-06 (branch `audit-fixes`):** the plain iteration is removed (`anderson_depth` must be >= 1,
+    `_convergence_step` deleted). A non-finite residual ends the iteration at once with `converged=False`, so
+    the existing warning reports it and no time is spent on NaN passes. Tests:
+    `test_nan_iterate_stops_unconverged`, `test_result_does_not_depend_on_anderson_depth` (depth 1 vs 5).
+- [ ] **2.29 A failed HDF5 save destroys the previous file** (`file_utils.save_to_hdf5`: mode `"w"` empties it
+  first). Besides 2.8, these also fail half-way: `phase_matching` results (`triplets["k"]` mixes the (1,)
+  `pump_k` with scalars, ragged array) and `parameter_sweep` over `gain` (lists of `mode_info` dicts; notebook 03
+  does this). Int dict keys reload as strings, so `plot_mode_currents` loses its labels after `load_data`.
+  Fix: write to `name + ".tmp"` then `os.replace`; save lists of dicts as index-keyed groups; `float(pump_k)`.
+- [ ] **2.30 `update_base_data` ignores grid, unit and port changes** (`analysis.py:650-656`, state is only
+  `twpa.model_dump()`). After changing `f_arange`, `data["freqs"]` keeps the old 1995 points while `a.f` has 995.
+  Fix: include `(f_arange, f_list, unit, port)` in the state.
+- [ ] **2.31 `phase_matching` range arguments** (`analysis.py:1358-1378`): `pump_arange=[13, 14, 15]` gives only
+  `[13]` (treated as an arange); an explicit `(5, 10, 0.1)` is thinned by `thin=20` to 3 points; `pump_Ip0=0.0`
+  is falsy, so Kerr stays on. Fix: only a tuple is an arange, do not thin explicit ranges, `is not None`.
+- [ ] **2.32 `parameter_sweep` `KeyError`** (`analysis.py:412-430`) when the swept name is also a result key
+  (`parameter_sweep("gain", "signal_freqs", ...)`): it appends to `<name>_sweeped`, which is never created.
+  Fix with 2.15: `results = {}`, then `results[target_savename] = []` after the collision check.
+- [ ] **2.33 `__array__` is not NumPy-2 compliant** (`matrices_arrays.py:39-41`):
+  `np.asarray(cell.abcd, dtype=complex)` raises `TypeError`; `np.array(cell.abcd)` warns. Fix:
+  `def __array__(self, dtype=None, copy=None): return np.array(self._matarray, dtype=dtype, copy=copy)`.
+- [ ] **2.34 `.s` vs `.to_network().s` disagree for complex Z0** (`mathutils.a2s` uses pseudo-waves, skrf
+  power waves): 0.53 apart for `Z0_ref=30+20j`, 1.6e-16 for real Z0. Fix: `s_def="pseudo"` in `to_network`.
+- [ ] **2.35 Small ones:**
+  - `N=0` and `model * 0` crash on a bare `assert` in `matpow_2x2` (`N` is `NonNegativeInt`).
+  - `Z0=0` passes the validator (`bonus_types.py:40`) and then fails the bare assert in `a2s`/`s2a`.
+  - `Resistance.Z` truncates R on integer frequency arrays (`np.full_like`, `oneport.py:119`).
+  - `TwoPortCell.interpolate` defaults to polar interpolation, which is wrong for real sign-changing entries
+    (lossless TL: error 0.16 vs 0.0099 for `polar=False`).
+  - `Frequencies(f_arange=(1, 2, 0))` divides by zero (step typed `NonNegativeFloat`).
+  - A list-valued `port` fills only `Zout`; its ABCD stays the identity (`analysis.py:643-646`), read only.
+  - CI venv cache key (`analysis.yml:26-27`) ignores `matrix.python-version`.
+  - `warmup` with `passes=1` logs a "did not converge" warning every time.
+- [ ] **2.36 Test for `TWPAnalysis`:** no test runs `phase_matching`, `bandwidth`, stopband detection or a save and
+  reload of a real result; the `twpanalysis_instance` fixture asks for a `twpa_model` fixture that does not exist.
+  One test on the 3-cell device (`gain` simple and bloch, `phase_matching`, `save_data`/`load_data`, stopband
+  start < end) would have caught 2.11, 2.29-2.32.
 
 **Acceptance:** each item has a test; the full suite is green; mypy errors go down.
 
@@ -247,6 +306,14 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
 - [x] **3.6 `general` model** (per D1). If removed, delete `cmes_fb.py`, `_compute_forward_backward_gain`, the
   `general` branches and options (`update_rate`, `BOUNDARY_CORR_MAX`) and `_filter_wm_terms`; also
   `_convergence_step`/`_store_pass` once `bloch_fb` no longer imports them.
+- [ ] **3.9 Dead options and near-copies in `cmes/` (audit 2026-11-06, about 260 lines):**
+  - Never set by any caller: `max_step`, `edge_substeps`, `SOLVER_MAX_STEPS`; rk45 `rtols`/`atols` arrays, the
+    automatic `first_step` block, `y_size == 0` and `t_eval_size == 0` branches; `FBSolverConfig.m_max_fixed`.
+  - Test-only: `bloch_fb_cmes_solve` (3 uses in `test_bloch.py`).
+  - Forward and backward sweeps in `bloch_fb.py` (~90 lines each) differ only in index direction: one sweep with
+    a direction flag.
+  - `bloch.py`: `bloch_mode_tables` re-implements `supercell_matrix`/`_intracell_currents`; the edge walk is
+    repeated in `edge_reference_frequency` and `stopband_edges`.
 - [ ] **3.7 Unify defaults:** `m_max` (config 2 vs wrapper 5), `anderson_depth` (10 vs 5), and the `general`
   defaults (`passes` 3 vs 10, `kappa_cutoff` 0.1 vs 0.2, ...). Use `FBSolverConfig` as the single source.
 - [ ] **3.8 `warmup.py`:** also compile the Bloch kernels (today it compiles only the `general` models). Add the
@@ -327,6 +394,14 @@ cold compile time measured and noted here; the line count noted here.
   - No `plt.show()` in library code (`~914`); deduplicate `plot_mode_relations`/`print_symbolic_expressions`.
 - [ ] **5.4 Logging:** `logger.py:39-40` sets INFO and adds a handler at import, so messages print twice under
   pytest. A library should add only a `NullHandler`; keep a helper (`twpasolver.logger.enable(level)`) for users.
+- [ ] **5.7 Dead code outside `cmes/` (audit 2026-11-06, grepped incl. docs and notebooks):**
+  `mathutils.compute_phase_matching` (~58 lines, also crashes when `pump_f/2 < freqs[0]`), `TwoPortCell.from_z`,
+  `bonus_types.FrequencyLinspace` and `nb_complex3d`, `ModeArray.get_dependent_modes`,
+  `RWAAnalyzer.update_relations`, `print_rwa_terms`, `edge_colors`/`edge_styles`, `print_symbolic_expressions`
+  (repeats `plot_mode_relations`), `_n_distinct_segments`, and `Mode.__eq__`/`__hash__` (fixes 2.26 by deletion).
+  `_validate_modes` can go too (fixes 2.24): `RWAAnalyzer` already raises on unknown names. The `mode_info` dict
+  is built twice in `analysis.py`. `twpa_cells.py` repeats the qp-loss half-inductance block in `StubBaseCell`
+  and `LCLfBaseCell`.
 - [ ] **5.5 `matrices_arrays.py`:** the 12 duplicated property pairs on ABCD/S/Z arrays become a small descriptor.
   `TwoPortModel.__mul__` should use `model_copy(update=...)`.
 - [ ] **5.6 `quantum/`** (per D3). Dead functions: `gaussian.expm_batch`, `magnus4_omega`,
@@ -562,6 +637,14 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
   - **Checks:** 95 tests pass; `simple` and `bloch` are bit-identical on the regression set.
   - **Kept:** the uniform wrapper `bloch_fb_cmes_solve` (used by the tests, and a convenient entry point for uniform
     devices).
+
+- 2026-11-06, `/ponytail-audit` of `bloch-cmes` (daa4246): new items 2.28-2.36, 3.9, 5.7, and notes on 2.6,
+  2.11, 2.21. Branch `audit-fixes` (from daa4246) fixes 2.5 and 2.28:
+  - **2.28:** plain iteration (`anderson_depth=0`) removed; a NaN/inf residual stops the point unconverged.
+  - **2.5:** step cap is an `rk45_solve` argument; `simple` uses 10 per cell, `bloch` keeps 1; NaN warning in
+    `no_reflections_cmes_solve`.
+  - **Regression:** finite results are unchanged by construction (converged `bloch` runs take the same path; the
+    cap only acts on runs that hit it, which were NaN before).
 
 ## Where to pick up (end of session 2026-11-06)
 

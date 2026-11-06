@@ -20,6 +20,9 @@ SOLVER_FIRST_STEP = 10
 # applies). It is compiled into the Numba kernels: after changing it here,
 # clear the __pycache__ of twpasolver/cmes so the cached kernels are rebuilt.
 SOLVER_MAX_STEPS_PER_CELL = 1
+# Same cap for the 'simple' model. It keeps every mixing term unfiltered, so
+# strongly mismatched terms legitimately need a few steps per cell.
+SIMPLE_MAX_STEPS_PER_CELL = 10
 
 # Harmonic limit of the modes away from stopbands with FBSolverConfig.m_max =
 # 'auto'.
@@ -76,12 +79,12 @@ class FBSolverConfig(BaseModel):
     )
     anderson_depth: int = Field(
         default=10,
-        ge=0,
+        ge=1,
         description="Number of previous"
         " passes used by Anderson acceleration of the forward-backward"
-        " iteration (0 = plain fixed-point iteration). With acceleration,"
-        " convergence_threshold applies to the relative fixed-point residual"
-        " of the backward envelopes.",
+        " iteration. convergence_threshold applies to the relative fixed-point"
+        " residual of the backward envelopes; a point whose residual turns"
+        " NaN/inf is stopped at once and reported as not converged.",
     )
     edge_threshold: float | None = Field(
         default=0.10,

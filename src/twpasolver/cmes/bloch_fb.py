@@ -118,7 +118,6 @@ from twpasolver.bonus_types import (
 from twpasolver.cmes.bloch_common import (
     _anderson_mix,
     _bloch_row_coeffs,
-    _convergence_step,
     _cubic_stencil,
     _expm_2x2,
     _filter_wm_terms_bloch,
@@ -1105,12 +1104,7 @@ def _bloch_fb_solve_segmented(
         own_bwd = np.zeros((n_modes, n_int), dtype=np.complex128)
 
         converged = False
-        stable_count = 0
-        prev_fwd = np.zeros(n_modes, dtype=np.complex128)
-        prev_bwd = np.zeros(n_modes, dtype=np.complex128)
-
-        use_aa = anderson_depth > 0
-        depth = anderson_depth if use_aa else 1
+        depth = anderson_depth
         dG = np.zeros((depth, n_modes, n_int), dtype=np.complex128)
         dF = np.zeros((depth, n_modes, n_int), dtype=np.complex128)
         g_last = np.zeros((n_modes, n_int), dtype=np.complex128)
@@ -1263,8 +1257,7 @@ def _bloch_fb_solve_segmented(
                                 np.interp(xm, xg, cmr) + 1j * np.interp(xm, xg, cmi)
                             ) / pe
 
-            # Map to the output grid (used by the plain convergence test and
-            # for storage).
+            # Map to the output grid for storage.
             for j in range(n_modes):
                 for kx in range(n_x):
                     A_fwd_x[j, kx] = A_fwd_i[j, take[kx]]
@@ -1274,45 +1267,33 @@ def _bloch_fb_solve_segmented(
             scales = _mode_scales(A_bwd_i, scale_floor) + _mode_scales(A_fwd_i, 0.0)
             res = _relative_residual(f_k, scales)
             residuals[i] = res
-            if use_aa:
-                if not np.isfinite(res):
-                    converged = False
-                elif k > 0 and res < convergence_threshold:
-                    converged = True
-                if not converged and np.isfinite(res):
-                    if res > 10.0 * res_last:
-                        n_hist = 0
-                        have_last = False
-                    if have_last:
-                        dG[head] = A_bwd_i - g_last
-                        dF[head] = f_k - f_last
-                        head = (head + 1) % depth
-                        if n_hist < depth:
-                            n_hist += 1
-                    g_last[:, :] = A_bwd_i
-                    f_last[:, :] = f_k
-                    have_last = True
-                    res_last = res
-                    if n_hist > 0:
-                        u_next = _anderson_mix(
-                            A_bwd_i, f_k, dG, dF, n_hist, head, depth, scales
-                        )
-                    else:
-                        u_next = A_bwd_i.copy()
+            # A blown-up (NaN/inf) iterate never recovers: stop without
+            # flagging convergence, so the caller reports the point.
+            blown_up = not np.isfinite(res)
+            if not blown_up and k > 0 and res < convergence_threshold:
+                converged = True
+            if not converged and not blown_up:
+                if res > 10.0 * res_last:
+                    n_hist = 0
+                    have_last = False
+                if have_last:
+                    dG[head] = A_bwd_i - g_last
+                    dF[head] = f_k - f_last
+                    head = (head + 1) % depth
+                    if n_hist < depth:
+                        n_hist += 1
+                g_last[:, :] = A_bwd_i
+                f_last[:, :] = f_k
+                have_last = True
+                res_last = res
+                if n_hist > 0:
+                    u_next = _anderson_mix(
+                        A_bwd_i, f_k, dG, dF, n_hist, head, depth, scales
+                    )
                 else:
                     u_next = A_bwd_i.copy()
             else:
-                u_next = A_bwd_i
-                if k > 0:
-                    stable_count, converged = _convergence_step(
-                        A_fwd_x,
-                        A_bwd_x,
-                        prev_fwd,
-                        prev_bwd,
-                        n_modes,
-                        convergence_threshold,
-                        stable_count,
-                    )
+                u_next = A_bwd_i.copy()
 
             for j in range(n_modes):
                 I_fwd[j] = (
@@ -1338,13 +1319,10 @@ def _bloch_fb_solve_segmented(
                 n_modes,
             )
 
-            for j in range(n_modes):
-                prev_fwd[j] = A_fwd_x[j, n_x - 1]
-                prev_bwd[j] = A_bwd_x[j, n_x - 1]
             u_k = np.ascontiguousarray(u_next)
 
-            if converged:
-                converged_flags[i] = True
+            if converged or blown_up:
+                converged_flags[i] = converged
                 if save_all_passes:
                     for kk in range(k + 1, passes):
                         _store_pass(
@@ -1533,6 +1511,8 @@ def bloch_fb_segmented_cmes_solve(
 
     pw3 = _weights(process_weights_3wm, len(relations_3wm))
     pw4 = _weights(process_weights_4wm, len(relations_4wm))
+    if anderson_depth < 1:
+        raise ValueError(f"anderson_depth must be >= 1, got {anderson_depth}.")
 
     if edge_mode is None:
         edge_mode_f = np.zeros((n_freq, n_modes), dtype=np.float64)
