@@ -561,3 +561,134 @@ def test_stopband_edges_match_per_frequency_search():
         assert abs(e_tab[q] - f_edge) < 10.0
         assert abs(ref_tab[q] - f_ref) < 10.0
         assert par_tab[q] == parity
+
+
+# --------------------------------------------------------------------------- #
+# Zone-folding points: small splitting without a gap
+# --------------------------------------------------------------------------- #
+
+
+def test_passband_mask_ignores_touching_bands():
+    """|h| = 1 up to rounding (bands touching) is passband; a real gap is not."""
+    from twpasolver.cmes.bloch import STOPBAND_TOL, passband_mask
+
+    h = np.array([0.5, 0.99, 1 + 1e-10, 0.99, 0.9, 1.05, 1.2, 1.05, 0.9, -1 - 1e-12])
+    expect = np.array([1, 1, 1, 1, 1, 0, 0, 0, 1, 1], dtype=bool)
+    assert np.array_equal(passband_mask(h), expect)
+    assert not passband_mask(np.array([1 + 2 * STOPBAND_TOL]))[0]
+
+
+def _unfolded_holotype(q=3, nl_scale=None, delta=None):
+    """Holotype with one period unfolded to q copies of single cells (N_tot unchanged).
+
+    ``nl_scale`` (length 34 q) scales the nonlinear inductance of each cell only;
+    ``delta`` overrides the loss tangent.
+    """
+    from twpasolver.models.twpa_cells import LCLfBaseCell
+
+    class _NLCell(LCLfBaseCell):
+        nl: float = 1.0
+
+        def bloch_nl_elements(self):
+            return [(0, self.L / 2 * self.nl), (1, self.L / 2 * self.nl)]
+
+    analysis = _holotype_analysis()
+    tw = analysis.twpa
+    cells = []
+    for _ in range(q):
+        for c in list(tw.cells):
+            for _ in range(c.N):
+                d = c.model_dump()
+                d.pop("name")
+                d["N"] = 1
+                d["nl"] = 1.0 if nl_scale is None else nl_scale[len(cells)]
+                if delta is not None:
+                    d["delta"] = delta
+                cells.append(_NLCell(**d))
+    tw.cells[:] = cells
+    tw.N = tw.N // q
+    analysis.update_base_data()
+    return analysis
+
+
+@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
+def test_folding_point_is_not_an_edge():
+    """On an unfolded supercell, k D = n pi without a gap keeps the native basis."""
+    from twpasolver.analysis import _edge_basis_entries
+
+    analysis = _unfolded_holotype()
+    tw, D = analysis.twpa, 102
+    k = lambda f: np.interp(f, analysis.data["freqs"], analysis.data["k"])
+    # 22.736 GHz: k D = 5 pi, the 34-cell line has no gap there.
+    # 26.25 GHz: passband side of the real gap starting at 26.253 GHz.
+    f = np.array([[22.736, 26.25]]) * 1e9
+    T = supercell_matrix(lossless_copy(tw), f.ravel())
+    h = 0.5 * (T[:, 0, 0] + T[:, 1, 1]).real
+    split = np.sqrt(np.abs(1 - h**2))[None, :]
+    assert np.all(split < 0.10)
+    assert abs(k(22.736) * D / np.pi - 5) < 0.01
+    _, flag, ent = _edge_basis_entries(
+        tw, split, k(f / 1e9), f, D, np.array([False, False]), 0.10
+    )
+    assert not flag[0, 0] and flag[0, 1]
+    assert list(ent["outside"]) == [0]
+
+
+@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
+def test_folding_point_modes_match_native_basis():
+    """Unfolded holotype: modes at folding points give the native-basis gain exactly."""
+    analysis = _unfolded_holotype()
+    from twpasolver.modes_rwa import ModeArrayFactory
+
+    analysis.add_mode_array(
+        "ext2",
+        ModeArrayFactory.create_extended_3wm(
+            analysis.data,
+            n_pump_harmonics=3,
+            n_frequency_conversion=2,
+            n_signal_harmonics=0,
+        ),
+    )
+    sig = [3.75, 13.75]  # p2s and pi at folding points (split < 0.1, no gap)
+    fixed = _gain(analysis, sig, 0.10)
+    native = _gain(analysis, sig, None)
+    assert not fixed["bloch"].get("edge_flag", np.zeros(1, bool)).any()
+    assert np.allclose(fixed["gain_db"], native["gain_db"], atol=1e-9)
+
+
+@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
+def test_contra_qpm_survives_edge_basis():
+    """Backward conversion phase matched by a nonlinearity-only grating.
+
+    The converted tone sits on the folding point k_c D = 5 pi by construction;
+    the default edge threshold must leave it in the native basis.
+    """
+    from twpasolver.cmes.solver_config import FBSolverConfig
+    from twpasolver.modes_rwa import ModeArrayFactory
+
+    D, fp, Ip, Is = 102, 18.3, 1e-4, 1e-9
+    eta = 1 + 0.5 * np.cos(2 * np.pi * 5 * (np.arange(D) + 0.5) / D)
+    analysis = _unfolded_holotype(nl_scale=eta, delta=0.0)
+    analysis.add_mode_array(
+        "c",
+        ModeArrayFactory.create_custom(
+            analysis.data, ["p", "s", "ps"], [["ps", "p+s"]]
+        ),
+    )
+    out = {}
+    for th in (0.10, None):
+        r = analysis.gain(
+            signal_freqs=np.array([4.5335]),
+            pump=fp,
+            model="bloch",
+            mode_array_config="c",
+            initial_amplitudes_fwd=[Ip, Is, 0],
+            initial_amplitudes_bwd=[0, 0, 0],
+            fb_config=FBSolverConfig(
+                passes=100, anderson_depth=20, m_max=6, edge_threshold=th
+            ),
+        )
+        c = r["mode_info"]["mode_map"]["ps"]
+        out[th] = np.abs(r["I_tuples_bwd"][0, c, -1] / Is) ** 2 * 4.5335 / (4.5335 + fp)
+    assert out[None] > 0.8
+    assert abs(out[0.10] - out[None]) < 1e-9

@@ -292,6 +292,39 @@ def logm_unimodular_2x2(Q: np.ndarray) -> np.ndarray:
     return ratio[..., None, None] * (Q - c[..., None, None] * eye)
 
 
+# |tr T / 2| must exceed 1 by more than this for a frequency to count as inside
+# a stopband. At the zone-folding points of a supercell made of repeated
+# periods (e.g. a 34-cell holotype unfolded to 102 cells) the bands touch
+# without a gap, |tr T / 2| = 1 up to rounding, and the splitting
+# |sinh gamma d| vanishes there although the Bloch modes stay distinct.
+STOPBAND_TOL = 1e-6
+
+
+def passband_mask(h: np.ndarray) -> np.ndarray:
+    """
+    Passband points of a scan of the half trace ``h = tr T / 2``.
+
+    ``|h| < 1``, except that runs of points with ``|h| >= 1`` whose excess never
+    reaches ``STOPBAND_TOL`` (bands touching at a folding point, rounding) are
+    counted as passband.
+    """
+    a = np.abs(np.asarray(h).real)
+    inband = a < 1.0
+    out = np.flatnonzero(~inband)
+    if out.size:
+        runs = np.split(out, np.flatnonzero(np.diff(out) > 1) + 1)
+        for r in runs:
+            if a[r].max() - 1.0 <= STOPBAND_TOL:
+                inband[r] = True
+    return inband
+
+
+def in_stopband(twpa_ll: TwoPortArray, f_hz: FloatArray) -> np.ndarray:
+    """True where ``|tr T / 2| > 1 + STOPBAND_TOL`` for the (lossless) supercell."""
+    T = supercell_matrix(twpa_ll, np.atleast_1d(np.asarray(f_hz, dtype=np.float64)))
+    return np.abs(0.5 * (T[:, 0, 0] + T[:, 1, 1]).real) > 1.0 + STOPBAND_TOL
+
+
 def edge_reference_frequency(
     twpa_ll: TwoPortArray,
     f_hz: float,
@@ -326,7 +359,7 @@ def edge_reference_frequency(
         fs = f_hz + np.linspace(-span, span, n_scan)
         fs = fs[fs > 0]
         h = half_trace(fs)
-        inband = np.abs(h) < 1.0
+        inband = passband_mask(h)
         cross = np.flatnonzero(inband[1:] != inband[:-1])
         if cross.size:
             j = cross[np.argmin(np.abs(fs[cross] - f_hz))]
@@ -407,7 +440,7 @@ def stopband_edges(
         if len(g) < 2:
             continue
         h = half_trace(g)
-        inband = np.abs(h) < 1.0
+        inband = passband_mask(h)
         for j in np.flatnonzero(inband[1:] != inband[:-1]):
             f_edge = brentq(
                 lambda f: abs(half_trace(f)[0]) - 1.0, g[j], g[j + 1], xtol=1.0

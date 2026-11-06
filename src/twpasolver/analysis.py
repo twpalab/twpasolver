@@ -23,6 +23,7 @@ from twpasolver.cmes.bloch import (
     edge_guard_mode_weights,
     edge_proximity_mode_weights,
     edge_reference_frequency,
+    in_stopband,
     lossless_copy,
     process_weights,
     reactive_angle_deg,
@@ -200,7 +201,19 @@ def _edge_basis_entries(
         ``ii, nn`` (indices of the flagged entries), ``f_mode``, ``f_ref``,
         ``tab`` (:func:`edge_basis_tables`) and ``missing`` (mode indices for
         which no stopband edge was found, kept in the native basis); None when
-        nothing is flagged (``ii`` is empty when no flagged entry has an edge).
+        nothing is flagged (``ii`` is empty when no flagged entry has an edge)
+        and ``outside`` (mode indices with entries below the threshold that lie
+        neither in a stopband nor in the switch-over window of an edge, e.g.
+        at a zone-folding point where the bands touch without a gap; kept in
+        the native basis).
+
+    An entry below the threshold is expanded on the fixed basis only if it lies
+    inside a stopband or between the nearest edge and its reference frequency,
+    the window where the splitting of that edge stays below ``e_edge``. The
+    splitting alone also vanishes where two bands touch without opening a gap
+    (zone folding of a supercell made of repeated periods); the Bloch modes are
+    distinct there and the native basis is exact, while a fixed basis anchored
+    at a distant edge would carry the wrong carrier wavenumber.
     """
     # The splitting also vanishes at the zone centre (k -> 0, low frequency),
     # where T -> I and the two Bloch modes stay distinct (W finite): no
@@ -220,6 +233,7 @@ def _edge_basis_entries(
     kd_pi = np.abs(kappa[ii, nn]) * n_cells / np.pi
     m_edge = np.zeros(len(f_mode), dtype=np.int64)
     f_ref = np.empty(len(f_mode))
+    f_edge = np.full(len(f_mode), np.nan)
     found = np.ones(len(f_mode), dtype=bool)
     # Every edge near the flagged frequencies, found in one scan; each entry
     # takes the nearest one. An edge farther than the scanned span may not be
@@ -227,6 +241,8 @@ def _edge_basis_entries(
     # per-frequency search is the last resort.
     par_q = np.zeros(len(f_mode), dtype=np.int64)
     todo = np.ones(len(f_mode), dtype=bool)
+    gap_entry = in_stopband(twpa_ll, f_mode)
+    outside = np.zeros(len(f_mode), dtype=bool)
     for span in (1.0e9, 4.0e9, 8.0e9):
         if not todo.any():
             break
@@ -237,6 +253,7 @@ def _edge_basis_entries(
         near = np.argmin(np.abs(e_tab[None, :] - f_mode[idx, None]), axis=1)
         ok = (np.abs(e_tab[near] - f_mode[idx]) <= span) & np.isfinite(ref_tab[near])
         f_ref[idx[ok]] = ref_tab[near[ok]]
+        f_edge[idx[ok]] = e_tab[near[ok]]
         par_q[idx[ok]] = par_tab[near[ok]]
         todo[idx[ok]] = False
     for q, f in enumerate(f_mode):
@@ -244,12 +261,21 @@ def _edge_basis_entries(
             parity = int(par_q[q])
         else:
             try:
-                f_ref[q], _, parity = edge_reference_frequency(twpa_ll, f, e_edge)
+                f_ref[q], f_edge[q], parity = edge_reference_frequency(
+                    twpa_ll, f, e_edge
+                )
             except ValueError:
                 # No stopband edge around f (e.g. a closed gap): no
                 # exceptional point, the native basis is kept.
                 found[q] = False
                 continue
+        # Inside a stopband, or inside the switch-over window [f_edge, f_ref]
+        # of the edge; otherwise the small splitting is a band touching
+        # without a gap and the native basis is kept.
+        lo, hi = sorted((f_edge[q], f_ref[q]))
+        if not (gap_entry[q] or lo <= f <= hi):
+            outside[q] = True
+            continue
         odd = 0 if parity > 0 else 1
         m_edge[q] = 2 * int(np.round((kd_pi[q] - odd) / 2)) + odd
         if abs(kd_pi[q] - m_edge[q]) > 0.5:
@@ -261,6 +287,8 @@ def _edge_basis_entries(
                 m_edge[q],
             )
     missing = np.unique(nn[~found])
+    outside_modes = np.unique(nn[outside])
+    found &= ~outside
     if not found.all():
         flag[ii[~found], nn[~found]] = False
         ii, nn, f_mode = ii[found], nn[found], f_mode[found]
@@ -277,6 +305,7 @@ def _edge_basis_entries(
         "f_ref": f_ref,
         "tab": tab,
         "missing": missing,
+        "outside": outside_modes,
     }
     return near_injected, flag, entries
 
@@ -1153,6 +1182,14 @@ class TWPAnalysis(Analyzer, Frequencies):
                 [labels[j] for j in entries["missing"]],
                 e_edge,
             )
+        if entries is not None and len(entries.get("outside", ())):
+            log.info(
+                "Edge basis: mode(s) %s have |sinh(gamma d)| < %g at some points "
+                "outside any stopband and edge window (bands touching without a "
+                "gap); they keep their native Bloch basis there.",
+                [labels[j] for j in entries["outside"]],
+                e_edge,
+            )
 
     def _fb_stopbands(
         self,
@@ -1373,6 +1410,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         flag = np.zeros((n_freq, n_seg, n_modes), dtype=bool)
         near_inj = np.zeros(n_modes, dtype=bool)
         missing: set[int] = set()
+        outside: set[int] = set()
         gammas_k = gammas.copy()
         edge_K = np.zeros((n_freq, n_seg, n_modes, 2, 2), dtype=np.complex128)
         f_ref_tab = np.full((n_freq, n_seg, n_modes), np.nan)
@@ -1404,6 +1442,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             if ent is None:
                 continue
             missing.update(int(j) for j in ent["missing"])
+            outside.update(int(j) for j in ent["outside"])
             if len(ent["ii"]) == 0:
                 continue
             ii, nn, tab = ent["ii"], ent["nn"], ent["tab"]
@@ -1418,7 +1457,13 @@ class TWPAnalysis(Analyzer, Frequencies):
             f_ref_tab[ii, s, nn] = ent["f_ref"]
             ham[ii, s, nn] = tab["ham_defect"]
         self._log_edge_basis_skipped(
-            labels, near_inj, {"missing": np.array(sorted(missing), int)}, e_edge
+            labels,
+            near_inj,
+            {
+                "missing": np.array(sorted(missing), int),
+                "outside": np.array(sorted(outside), int),
+            },
+            e_edge,
         )
         if not flag.any():
             return None
