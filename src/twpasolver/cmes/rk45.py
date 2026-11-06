@@ -30,7 +30,6 @@ import numba as nb
 import numpy as np
 
 EPS = np.finfo(np.float64).eps
-EMPTY_ARR = np.empty(0, dtype=np.float64)
 
 # Multiply steps computed from asymptotic behaviour of errors by this.
 SAFETY = 0.9
@@ -47,24 +46,20 @@ def rk45_solve(
     diffeq,
     t_span: Tuple[float, float],
     y0: np.ndarray,
+    t_eval: np.ndarray,
+    first_step: float,
     args: tuple = (),
     rtol: float = 1.0e-3,
     atol: float = 1.0e-6,
-    rtols: np.ndarray = EMPTY_ARR,
-    atols: np.ndarray = EMPTY_ARR,
-    max_step: float = np.inf,
-    first_step: float = None,
-    t_eval: np.ndarray = EMPTY_ARR,
     max_num_steps: int = 0,
     max_steps_per_cell: float = 0.0,
 ) -> np.ndarray:
     """
     Adaptive Dormand-Prince RK45, ported from CyRK's ``nbsolve_ivp``.
 
-    Same calling convention as CyRK's ``nbsolve_ivp`` minus ``rk_method``
-    (always RK45) and the extra-output options, and returns the solution
-    array directly (shape ``(y_size, t_eval.size)``) instead of a result
-    object, since callers here only ever used ``.y``.
+    Scalar tolerances, a given positive ``first_step`` and a non-empty
+    ``t_eval`` (the only way it is called); returns the solution interpolated
+    on ``t_eval``, shape ``(y_size, t_eval.size)``.
     """
     # Built via elementwise assignment into a pre-allocated array rather than
     # np.array([...]) literal-list construction: under parallel=True, that
@@ -123,7 +118,6 @@ def rk45_solve(
     y_size = y0.size
     y_size_sqrt = np.sqrt(y_size)
     dtype = y0.dtype
-    t_eval_size = t_eval.size
 
     y_result_store = np.empty(y_size, dtype=dtype)
 
@@ -145,33 +139,8 @@ def rk45_solve(
     A_at_10 = A[1, 0]
     error_expo = 1.0 / (RK45_ERROR_ESTIMATOR_ORDER + 1.0)
 
-    # Setup tolerances. rtols/atols, when non-empty, are assumed to already
-    # be sized to y0 by the caller (validation is intentionally not done
-    # here: raising inside this function, once inlined into the prange
-    # loop it's always called from, gives the loop body more than one exit
-    # point, which silently defeats Numba's parallelization of that loop).
-    rtol_array = np.empty(y_size, dtype=np.float64)
-    rtol_size = rtols.size
-    if rtol_size > 0:
-        for i in range(y_size):
-            rtol_ = rtols[i]
-            if rtol_ < (100 * EPS):
-                rtol_ = 100 * EPS
-            rtol_array[i] = rtol_
-    else:
-        if rtol < (100 * EPS):
-            rtol = 100 * EPS
-        for i in range(y_size):
-            rtol_array[i] = rtol
-
-    atol_array = np.empty(y_size, dtype=np.float64)
-    atol_size = atols.size
-    if atol_size > 0:
-        for i in range(y_size):
-            atol_array[i] = atols[i]
-    else:
-        for i in range(y_size):
-            atol_array[i] = atol
+    if rtol < (100 * EPS):
+        rtol = 100 * EPS
 
     # Cap the number of accepted steps at the integration length in unit cells
     # (times max_steps_per_cell): the CMEs describe envelopes that vary
@@ -200,63 +169,7 @@ def rk45_solve(
     for i in range(y_size):
         dydt_old[i] = output[i]
 
-    # Find first step size. first_step, when given, is assumed valid (positive,
-    # within [t_start, t_end]). See the note above about not raising here.
-    first_step_found = False
-    if first_step is not None:
-        step_size = max_step
-        if first_step != 0.0:
-            step_size = first_step
-            first_step_found = True
-
-    if not first_step_found:
-        # Select an initial step size based on the differential equation.
-        # .. [1] E. Hairer, S. P. Norsett G. Wanner, "Solving Ordinary Differential
-        #        Equations I: Nonstiff Problems", Sec. II.4.
-        if y_size == 0:
-            step_size = np.inf
-        else:
-            d0 = 0.0
-            d1 = 0.0
-            for i in range(y_size):
-                scale = atol_array[i] + np.abs(y_old[i]) * rtol_array[i]
-                d0_abs = np.abs(y_old[i] / scale)
-                d1_abs = np.abs(dydt_old[i] / scale)
-                d0 += d0_abs * d0_abs
-                d1 += d1_abs * d1_abs
-
-            d0 = np.sqrt(d0) / y_size_sqrt
-            d1 = np.sqrt(d1) / y_size_sqrt
-
-            if d0 < 1.0e-5 or d1 < 1.0e-5:
-                h0 = 1.0e-6
-            else:
-                h0 = 0.01 * d0 / d1
-
-            y1 = y_old + h0 * direction * dydt_old
-            t1 = t_old + h0 * direction
-
-            diffeq_output = np.asarray(diffeq(t1, y1, *args), dtype=dtype)
-            for i in range(y_size):
-                dydt_new[i] = diffeq_output[i]
-
-            d2 = 0.0
-            for i in range(y_size):
-                scale = atol_array[i] + np.abs(y_old[i]) * rtol_array[i]
-                d2_abs = np.abs((dydt_new[i] - dydt_old[i]) / scale)
-                d2 += d2_abs * d2_abs
-            d2 = np.sqrt(d2) / (h0 * y_size_sqrt)
-
-            if d1 <= 1.0e-15 and d2 <= 1.0e-15:
-                h1 = max(1.0e-6, h0 * 1.0e-3)
-            else:
-                h1 = (0.01 / max(d1, d2)) ** error_expo
-
-            next_after = 10.0 * abs(np.nextafter(t_old, direction * np.inf) - t_old)
-            step_size = max(next_after, min(100.0 * h0, h1))
-
-    if y_size == 0:
-        status = -6
+    step_size = first_step
 
     len_t = 1  # Already one time step due to initial conditions.
     while status == 0:
@@ -273,9 +186,7 @@ def rk45_solve(
         next_after = 10.0 * abs(np.nextafter(t_old, direction * np.inf) - t_old)
         min_step = next_after
 
-        if step_size > max_step:
-            step_size = max_step
-        elif step_size < min_step:
+        if step_size < min_step:
             step_size = min_step
 
         step_accepted = False
@@ -326,10 +237,7 @@ def rk45_solve(
 
             error_norm = 0.0
             for i in range(y_size):
-                scale = (
-                    atol_array[i]
-                    + max(np.abs(y_old[i]), np.abs(y_new[i])) * rtol_array[i]
-                )
+                scale = atol + max(np.abs(y_old[i]), np.abs(y_new[i])) * rtol
                 K[rk_n_stages, i] = dydt_new[i]
                 error_dot_1 = 0.0
                 for j in range(rk_n_stages_plus1):
@@ -382,9 +290,6 @@ def rk45_solve(
         y_results_list_at_t = y_result_list[t_i]
         for y_i in range(y_size):
             y_results[y_i, t_i] = y_results_list_at_t[y_i]
-
-    if t_eval_size == 0:
-        return y_results
 
     # No dense output implemented (matching CyRK's own approach): linearly
     # interpolate the accepted-step trajectory onto the requested grid.

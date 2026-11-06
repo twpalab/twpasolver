@@ -201,22 +201,6 @@ class Mode:
     alpha: Optional[float] = 0.0
     Zb: Optional[float] = 0.0
 
-    def __eq__(self, other):
-        """Compare modes based on their physical properties."""
-        if not isinstance(other, Mode):
-            return False
-        return (
-            self.frequency == other.frequency
-            and self.gamma == other.gamma
-            and self.k == other.k
-            and self.alpha == other.alpha
-            and self.Zb == other.Zb
-        )
-
-    def __hash__(self):
-        """Get hash based on immutable properties."""
-        return hash((self.label, str(self.frequency)))
-
     def __str__(self):
         """Get string representation (the mode label)."""
         return self.label
@@ -257,14 +241,6 @@ class RWAAnalyzer:
     def relations(self):
         """Getter for mode relations."""
         return self._relations
-
-    def update_relations(self, relations: List[List[str]]):
-        """Update mode relations."""
-        self._relations = relations
-        self.relations_idx = self._convert_relations_to_indices()
-        self.modes_subs = self._compute_substitutions()
-        # Clear cache when relations are updated
-        self._rwa_terms_cache = {}
 
     def _parse_expression(self, expr: str) -> tuple:
         """
@@ -384,15 +360,6 @@ class RWAAnalyzer:
 
         return result
 
-    def print_rwa_terms(self, terms: List[Tuple[Any, ...]]) -> None:
-        """Pretty print the RWA terms with their coefficients."""
-        for term in terms:
-            mode_name = term[2]
-            rhs_terms = term[3]
-            coeff = term[4]
-            print(f"{mode_name} = {rhs_terms} {coeff}")
-        print(f"\nTotal matches: {len(terms)}")
-
 
 class ModeArray:
     """Class representing a list of modes and frequency relations between them."""
@@ -424,8 +391,6 @@ class ModeArray:
         self._rwa_terms_3wm: Optional[List[Tuple[Any, ...]]] = None
         self._rwa_terms_4wm: Optional[List[Tuple[Any, ...]]] = None
 
-        # Validate initial state
-        self._validate_modes()
         self._compute_mode_graph()
 
     def _parse_expression_for_propagation(self, expr: str) -> List[Tuple[str, int]]:
@@ -546,22 +511,6 @@ class ModeArray:
             f"Built symbolic expressions for {len(self.symbolic_expressions)} modes"
         )
         log.info(f"Independent modes: {self.independent_modes}")
-
-    def _validate_modes(self):
-        """Ensure all modes referenced in relations exist."""
-        for result, expr in self.relations:
-            if result not in self.modes:
-                raise ValueError(f"Mode {result} in relations not found")
-
-            # Check all modes in expression exist
-            expr_modes = {
-                m.strip("+-")
-                for m in expr.replace(" ", "").replace("(", "").replace(")", "")
-                if m.strip("+-")
-            }
-            for mode in expr_modes:
-                if mode not in self.modes:
-                    raise ValueError(f"Mode {mode} in relations not found")
 
     def _propagate_frequencies_symbolic(
         self, updated_freqs: Dict[str, float]
@@ -820,10 +769,6 @@ class ModeArray:
             G, pos, node_color=node_colors, node_size=node_size, ax=ax1
         )
 
-        # Draw edges with different styles
-        edge_colors = [G.edges[edge]["color"] for edge in G.edges()]
-        edge_styles = [G.edges[edge]["style"] for edge in G.edges()]
-
         # Draw positive and negative edges separately for different styles
         pos_edges = [(u, v) for u, v, d in G.edges(data=True) if d["color"] == "blue"]
         neg_edges = [(u, v) for u, v, d in G.edges(data=True) if d["color"] == "red"]
@@ -991,24 +936,6 @@ class ModeArray:
             print(f"  alpha: {mode.alpha}")
             print(f"  Zb: {mode.Zb}")
             print()
-
-    def print_symbolic_expressions(self):
-        """Print the symbolic expressions for all modes."""
-        print("Symbolic Expressions:")
-        print("=" * 50)
-        for mode, expression in self.symbolic_expressions.items():
-            expr_parts = []
-            for base_mode, coeff in expression.items():
-                if coeff == 1:
-                    expr_parts.append(base_mode)
-                elif coeff == -1:
-                    expr_parts.append(f"-{base_mode}")
-                else:
-                    expr_parts.append(f"{coeff}*{base_mode}")
-
-            expr_str = " + ".join(expr_parts).replace(" + -", " - ")
-            independence = " (independent)" if mode in self.independent_modes else ""
-            print(f"{mode}{independence} = {expr_str}")
 
 
 class ModeArrayFactory:

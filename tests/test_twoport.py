@@ -102,3 +102,18 @@ def test_model_mul(random_model):
     N_before = random_model.N
     mod_multiplied = random_model * 3
     assert mod_multiplied.N == 3 * N_before
+
+
+def test_stub_cell_line_abcd():
+    """StubBaseCell(line=True) is [L/2][stubs][L/2] with qp loss on the halves."""
+    from twpasolver.models.rf_functions import get_stub_cell
+    from twpasolver.models.twpa_cells import StubBaseCell
+
+    f = np.linspace(1e9, 20e9, 7)
+    L, C, Lf, l1, qp, delta = 1e-10, 2e-15, 3e-10, 10, 1e-12, 1e-4
+    cell = StubBaseCell(L=L, C=C, Lf=Lf, l1=l1, qp_loss=qp, delta=delta, line=True)
+    half = np.asarray(series_impedance_abcd(inductance(f, L / 2) * (1 - 1j * qp * f)))
+    stubs = np.asarray(get_stub_cell(f, C * (1 - 1j * delta), Lf, l1, 0))
+    np.testing.assert_allclose(
+        np.asarray(cell.single_abcd(f)), half @ stubs @ half, rtol=1e-12
+    )

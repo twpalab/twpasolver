@@ -132,6 +132,9 @@ from twpasolver.cmes.rk45 import rk45_solve
 from twpasolver.cmes.solver_config import RKSolverConfig
 from twpasolver.logger import log
 
+# Grid points per supercell of the exact edge-mode solve.
+EDGE_SUBSTEPS = 4
+
 # --------------------------------------------------------------------------- #
 # Linear pieces (plain NumPy)
 # --------------------------------------------------------------------------- #
@@ -747,9 +750,9 @@ def _segment_rows(
 
 
 @nb.njit(inline="always")
-def _forward_sweep(
+def _sweep(
     I0,
-    u,
+    ctr_field,
     alphas_seg,
     kappas_seg,
     r3,
@@ -760,14 +763,15 @@ def _forward_sweep(
     g4,
     c3,
     c4,
-    x_int,
-    s_int,
-    offsets,
-    seg_bounds,
-    Phi_f_b,
-    Phi_b_b,
-    t_j,
-    rhoR_j,
+    own_grid,
+    ctr_grid,
+    own_off,
+    ctr_off,
+    Phi_own,
+    Phi_ctr,
+    t_jn,
+    rho_jn,
+    backward,
     end,
     rk,
     edge_code,
@@ -777,33 +781,39 @@ def _forward_sweep(
     ctr_phase,
 ):
     """
-    One forward sweep over all segments (backward estimate ``u`` frozen).
+    One sweep over all segments, the counter-propagating ``ctr_field`` frozen.
 
-    ``Phi_f_b[m, s]`` is the forward phase at the start of segment ``s``;
-    ``Phi_b_b[m, q]`` the backward phase at the start of backward segment
-    ``q`` (physical segment ``n_seg - 1 - q``), both of length ``n_seg + 1``.
+    Forward: own grid ``x_int`` with ``offsets``, junction coefficients
+    ``t, rho_R``; backward: the mirrored coordinate ``s_int`` with
+    ``n_int - offsets[::-1]``, junction coefficients ``t', rho_L``. ``p`` runs
+    over the segments in the sweep direction, ``c = n_seg - 1 - p`` is the
+    same segment in the counter direction. ``Phi_own[m, p]`` / ``Phi_ctr[m, c]``
+    are the accumulated phases at segment starts, length ``n_seg + 1``.
     """
     n_modes = I0.shape[0]
-    n_seg = seg_bounds.shape[0] - 1
-    n_int = x_int.shape[0]
+    n_seg = own_off.shape[0] - 1
+    n_int = own_grid.shape[0]
     A = np.empty((n_modes, n_int), dtype=np.complex128)
     y0 = I0.copy()
-    for s in range(n_seg):
-        q = n_seg - 1 - s
-        a = offsets[s]
-        b = offsets[s + 1]
-        ca = n_int - offsets[s + 1]
-        cb = n_int - offsets[s]
-        if s > 0:
-            # Junction j = s at x = seg_bounds[s]: A+_R = t A+_L + rho_R A-_R.
+    for p in range(n_seg):
+        c = n_seg - 1 - p
+        s = c if backward else p  # physical segment
+        a = own_off[p]
+        b = own_off[p + 1]
+        ca = ctr_off[c]
+        cb = ctr_off[c + 1]
+        if p > 0:
+            # Forward, junction s at the left of s: A+_R = t A+_L + rho_R A-_R.
+            # Backward, junction s + 1 at the right of s: A-_L = t' A-_R + rho_L A+_L.
+            jn = s + 1 if backward else s
             for j in range(n_modes):
-                A_ctr = u[j, cb - 1] * np.exp(1j * Phi_b_b[j, q + 1])
-                y0[j] = t_j[s, j] * A[j, a - 1] + rhoR_j[s, j] * A_ctr * np.exp(
-                    -1j * Phi_f_b[j, s]
+                A_ctr = ctr_field[j, cb - 1] * np.exp(1j * Phi_ctr[j, c + 1])
+                y0[j] = t_jn[jn, j] * A[j, a - 1] + rho_jn[jn, j] * A_ctr * np.exp(
+                    -1j * Phi_own[j, p]
                 )
-        phi0 = np.ascontiguousarray(Phi_f_b[:, s])
-        ctr_phi0 = np.ascontiguousarray(Phi_b_b[:, q])
-        seg_x = np.ascontiguousarray(x_int[a:b])
+        phi0 = np.ascontiguousarray(Phi_own[:, p])
+        ctr_phi0 = np.ascontiguousarray(Phi_ctr[:, c])
+        seg_x = np.ascontiguousarray(own_grid[a:b])
         sol = rk45_solve(
             bloch_fb_segment_rhs_edge,
             (seg_x[0], seg_x[-1]),
@@ -819,9 +829,9 @@ def _forward_sweep(
                 g4[off4[s] : off4[s + 1]],
                 seg_x[0],
                 phi0,
-                np.ascontiguousarray(s_int[ca:cb]),
-                np.ascontiguousarray(u[:, ca:cb]),
-                s_int[ca],
+                np.ascontiguousarray(ctr_grid[ca:cb]),
+                np.ascontiguousarray(ctr_field[:, ca:cb]),
+                ctr_grid[ca],
                 ctr_phi0,
                 end,
                 edge_code,
@@ -839,97 +849,6 @@ def _forward_sweep(
         )
         A[:, a:b] = sol
     return A
-
-
-@nb.njit(inline="always")
-def _backward_sweep(
-    I0,
-    A_fwd,
-    alphas_seg,
-    kappas_seg,
-    r3,
-    r4,
-    off3,
-    off4,
-    g3,
-    g4,
-    c3,
-    c4,
-    x_int,
-    s_int,
-    offsets,
-    seg_bounds,
-    Phi_f_b,
-    Phi_b_b,
-    tp_j,
-    rhoL_j,
-    end,
-    rk,
-    edge_code,
-    own_full,
-    lin_own_seg,
-    lin_ctr_seg,
-    ctr_phase,
-):
-    """One backward sweep (mirrored coordinate) with the forward fields ``A_fwd``."""
-    n_modes = I0.shape[0]
-    n_seg = seg_bounds.shape[0] - 1
-    n_int = x_int.shape[0]
-    B = np.empty((n_modes, n_int), dtype=np.complex128)
-    y0 = I0.copy()
-    for q in range(n_seg):
-        s = n_seg - 1 - q
-        a = n_int - offsets[s + 1]
-        b = n_int - offsets[s]
-        fa = offsets[s]
-        fb = offsets[s + 1]
-        if q > 0:
-            # Junction j = s + 1 at x = seg_bounds[s + 1], left segment s:
-            # A-_L = t' A-_R + rho_L A+_L.
-            jn = s + 1
-            for j in range(n_modes):
-                A_plus_L = A_fwd[j, fb - 1] * np.exp(1j * Phi_f_b[j, s + 1])
-                y0[j] = tp_j[jn, j] * B[j, a - 1] + rhoL_j[jn, j] * A_plus_L * np.exp(
-                    -1j * Phi_b_b[j, q]
-                )
-        phi0 = np.ascontiguousarray(Phi_b_b[:, q])
-        ctr_phi0 = np.ascontiguousarray(Phi_f_b[:, s])
-        seg_s = np.ascontiguousarray(s_int[a:b])
-        sol = rk45_solve(
-            bloch_fb_segment_rhs_edge,
-            (seg_s[0], seg_s[-1]),
-            y0,
-            args=(
-                np.ascontiguousarray(alphas_seg[s]),
-                np.ascontiguousarray(kappas_seg[s]),
-                r3[off3[s] : off3[s + 1]],
-                r4[off4[s] : off4[s + 1]],
-                c3[off3[s] : off3[s + 1]],
-                c4[off4[s] : off4[s + 1]],
-                g3[off3[s] : off3[s + 1]],
-                g4[off4[s] : off4[s + 1]],
-                seg_s[0],
-                phi0,
-                np.ascontiguousarray(x_int[fa:fb]),
-                np.ascontiguousarray(A_fwd[:, fa:fb]),
-                x_int[fa],
-                ctr_phi0,
-                end,
-                edge_code,
-                seg_s,
-                np.ascontiguousarray(own_full[:, a:b]),
-                np.ascontiguousarray(lin_own_seg[s]),
-                np.ascontiguousarray(lin_ctr_seg[s]),
-                ctr_phase,
-            ),
-            atol=rk[0],
-            rtol=rk[1],
-            t_eval=seg_s,
-            first_step=rk[2],
-            max_steps_per_cell=rk[3],
-        )
-        B[:, a:b] = sol
-    return B
 
 
 @nb.njit(parallel=True, cache=True)
@@ -979,7 +898,6 @@ def _bloch_fb_solve_segmented(
     rk,
     edge_K_table,
     edge_mode_table,
-    edge_substeps,
 ):
     """Forward/backward Bloch CME solve for all frequency points (segmented)."""
     n_freq = gammas_seg.shape[0]
@@ -988,6 +906,7 @@ def _bloch_fb_solve_segmented(
     n_int = x_int.shape[0]
     n_x = take.shape[0]
     end = seg_bounds[n_seg]
+    offsets_b = n_int - offsets[::-1]  # segment offsets on the mirrored s_int
 
     if save_all_passes:
         I_out = np.empty((2 * n_freq * passes, n_modes, n_x), dtype=np.complex128)
@@ -1087,7 +1006,7 @@ def _bloch_fb_solve_segmented(
         for s in range(n_seg):
             ln = seg_bounds[s + 1] - seg_bounds[s]
             sub_off[s + 1] = (
-                sub_off[s] + int(np.ceil(ln / n_cells[s] * edge_substeps)) + 1
+                sub_off[s] + int(np.ceil(ln / n_cells[s] * EDGE_SUBSTEPS)) + 1
             )
         xs_edge = np.empty(sub_off[n_seg], dtype=np.float64)
         for s in range(n_seg):
@@ -1115,7 +1034,7 @@ def _bloch_fb_solve_segmented(
         for k in range(passes):
             for qq in range(n_flag):
                 own_bwd[flag_idx[qq]] = u_k[flag_idx[qq]]
-            A_fwd_i = _forward_sweep(
+            A_fwd_i = _sweep(
                 I_fwd,
                 u_k,
                 alphas_run,
@@ -1131,11 +1050,12 @@ def _bloch_fb_solve_segmented(
                 x_int,
                 s_int,
                 offsets,
-                seg_bounds,
+                offsets_b,
                 Phi_f_b,
                 Phi_b_b,
                 t_j,
                 rhoR_j,
+                False,
                 end,
                 rk,
                 code_fwd,
@@ -1151,7 +1071,7 @@ def _bloch_fb_solve_segmented(
                     + rho_out[j] * A_fwd_i[j, n_int - 1] * phase_end[j]
                 )
 
-            A_bwd_i = _backward_sweep(
+            A_bwd_i = _sweep(
                 I_bwd,
                 A_fwd_i,
                 alphas_run,
@@ -1164,14 +1084,15 @@ def _bloch_fb_solve_segmented(
                 g4,
                 c3b,
                 c4b,
-                x_int,
                 s_int,
+                x_int,
+                offsets_b,
                 offsets,
-                seg_bounds,
-                Phi_f_b,
                 Phi_b_b,
+                Phi_f_b,
                 tp_j,
                 rhoL_j,
+                True,
                 end,
                 rk,
                 code_bwd,
@@ -1374,7 +1295,6 @@ def bloch_fb_segmented_cmes_solve(
     rk_config: RKSolverConfig | None = None,
     edge_K: ComplexArray | None = None,
     edge_mode: np.ndarray | None = None,
-    edge_substeps: int = 4,
     diagnostics: dict | None = None,
 ) -> ComplexArray:
     """
@@ -1417,8 +1337,6 @@ def bloch_fb_segmented_cmes_solve(
         the edge-basis ones where flagged. Default: none.
     rk_config : RKSolverConfig, optional
         Settings of the RK45 integrator (default ``RKSolverConfig()``).
-    edge_substeps : int
-        Grid points per supercell of the exact edge-mode solve.
     m_max : int or (n_freq, n_seg, n_modes) int array
         Harmonic limit, global or per frequency, segment and mode (a process
         uses the largest limit among its modes).
@@ -1563,7 +1481,6 @@ def bloch_fb_segmented_cmes_solve(
         (rk_config if rk_config is not None else RKSolverConfig()).kernel_args(),
         c(edge_K, dtype=np.complex128),
         c(edge_mode_f),
-        int(edge_substeps),
     )
     if not np.all(converged):
         bad = np.flatnonzero(~converged)

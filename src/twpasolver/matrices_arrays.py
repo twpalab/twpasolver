@@ -1,5 +1,7 @@
 """ABCD matrices array module."""
 
+from typing import Any
+
 import numpy as np
 from typing_extensions import Self
 
@@ -74,32 +76,26 @@ class TwoByTwoArray:
         """Length of the internal array."""
         return self._matarray.shape[0]
 
-    def _get_parameter(self, i: int, k: int):
-        """
-        Get the specified parameter of the 2x2 matrices.
 
-        Args:
-            i (int): Row index (0 or 1).
-            k (int): Column index (0 or 1).
+class _Element:
+    """One element of every 2x2 matrix, as a 1-D array; settable."""
 
-        Returns:
-            numpy.ndarray: The specified parameter of the 2x2 matrices.
-        """
-        return self._matarray[:, i, k]
+    def __init__(self, i: int, k: int):
+        self.i, self.k = i, k
 
-    def _set_parameter(self, i: int, k: int, values: np.ndarray):
-        """
-        Set the specified parameter of the 2x2 matrices.
+    def __set_name__(self, owner, name: str):
+        self.__doc__ = f"{name} (element ({self.i},{self.k})) of the 2x2 matrices."
 
-        Args:
-            i (int): Row index (0 or 1).
-            k (int): Column index (0 or 1).
-            values (numpy.ndarray): Values to set for the specified parameter.
-        """
+    def __get__(self, obj, objtype=None) -> Any:
+        if obj is None:
+            return self
+        return obj._matarray[:, self.i, self.k]
+
+    def __set__(self, obj, values: np.ndarray):
         values = np.asarray(values)
-        if values.ndim != 1 or len(values) != self.len:
-            raise ValueError(f"Must provide a 1-D array of length {self.len}")
-        self._matarray[:, i, k] = values
+        if values.ndim != 1 or len(values) != obj.len:
+            raise ValueError(f"Must provide a 1-D array of length {obj.len}")
+        obj._matarray[:, self.i, self.k] = values
 
 
 class ABCDArray(TwoByTwoArray):
@@ -129,193 +125,28 @@ class ABCDArray(TwoByTwoArray):
         """
         return self.__class__(matpow_2x2(self._matarray, exponent))
 
-    @property
-    def A(self) -> np.ndarray:
-        """A parameter (element (0,0)) of the 2x2 matrices."""
-        return self._get_parameter(0, 0)
-
-    @A.setter
-    def A(self, value: np.ndarray):
-        """
-        Setter for the A parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the A parameter.
-        """
-        self._set_parameter(0, 0, value)
-
-    @property
-    def B(self) -> np.ndarray:
-        """B parameter (element (0,1)) of the 2x2 matrices."""
-        return self._get_parameter(0, 1)
-
-    @B.setter
-    def B(self, value: np.ndarray):
-        """
-        Setter for the B parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the B parameter.
-        """
-        self._set_parameter(0, 1, value)
-
-    @property
-    def C(self) -> np.ndarray:
-        """C parameter (element (1,0)) of the 2x2 matrices."""
-        return self._get_parameter(1, 0)
-
-    @C.setter
-    def C(self, value: np.ndarray):
-        """
-        Setter for the C parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the C parameter.
-        """
-        self._set_parameter(1, 0, value)
-
-    @property
-    def D(self) -> np.ndarray:
-        """D parameter (element (1,1)) of the 2x2 matrices."""
-        return self._get_parameter(1, 1)
-
-    @D.setter
-    def D(self, value: np.ndarray):
-        """
-        Setter for the D parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the D parameter.
-        """
-        self._set_parameter(1, 1, value)
+    A = _Element(0, 0)
+    B = _Element(0, 1)
+    C = _Element(1, 0)
+    D = _Element(1, 1)
 
 
 class SMatrixArray(TwoByTwoArray):
     """A class representing an array of two-ports S parameters matrices."""
 
-    @property
-    def S11(self) -> np.ndarray:
-        """S11 parameter (element (0,0)) of the 2x2 matrices."""
-        return self._get_parameter(0, 0)
-
-    @S11.setter
-    def S11(self, value: np.ndarray):
-        """
-        Setter for the S11 parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the S11 parameter.
-        """
-        self._set_parameter(0, 0, value)
-
-    @property
-    def S12(self) -> np.ndarray:
-        """S12 parameter (element (0,1)) of the 2x2 matrices."""
-        return self._get_parameter(0, 1)
-
-    @S12.setter
-    def S12(self, value: np.ndarray):
-        """
-        Setter for the S12 parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the S12 parameter.
-        """
-        self._set_parameter(0, 1, value)
-
-    @property
-    def S21(self) -> np.ndarray:
-        """S21 parameter (element (1,0)) of the 2x2 matrices."""
-        return self._get_parameter(1, 0)
-
-    @S21.setter
-    def S21(self, value: np.ndarray):
-        """
-        Setter for the S21 parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the S21 parameter.
-        """
-        self._set_parameter(1, 0, value)
-
-    @property
-    def S22(self) -> np.ndarray:
-        """S22 parameter (element (1,1)) of the 2x2 matrices."""
-        return self._get_parameter(1, 1)
-
-    @S22.setter
-    def S22(self, value: np.ndarray):
-        """
-        Setter for the S22 parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the S22 parameter.
-        """
-        self._set_parameter(1, 1, value)
+    S11 = _Element(0, 0)
+    S12 = _Element(0, 1)
+    S21 = _Element(1, 0)
+    S22 = _Element(1, 1)
 
 
 class ZMatrixArray(TwoByTwoArray):
     """A class representing an array of two-ports Z parameters matrices."""
 
-    @property
-    def Z11(self) -> np.ndarray:
-        """Z11 parameter (element (0,0)) of the 2x2 matrices."""
-        return self._get_parameter(0, 0)
-
-    @Z11.setter
-    def Z11(self, value: np.ndarray):
-        """
-        Zetter for the Z11 parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the Z11 parameter.
-        """
-        self._set_parameter(0, 0, value)
-
-    @property
-    def Z12(self) -> np.ndarray:
-        """Z12 parameter (element (0,1)) of the 2x2 matrices."""
-        return self._get_parameter(0, 1)
-
-    @Z12.setter
-    def Z12(self, value: np.ndarray):
-        """
-        Zetter for the Z12 parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the Z12 parameter.
-        """
-        self._set_parameter(0, 1, value)
-
-    @property
-    def Z21(self) -> np.ndarray:
-        """Z21 parameter (element (1,0)) of the 2x2 matrices."""
-        return self._get_parameter(1, 0)
-
-    @Z21.setter
-    def Z21(self, value: np.ndarray):
-        """
-        Zetter for the Z21 parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the Z21 parameter.
-        """
-        self._set_parameter(1, 0, value)
-
-    @property
-    def Z22(self) -> np.ndarray:
-        """Z22 parameter (element (1,1)) of the 2x2 matrices."""
-        return self._get_parameter(1, 1)
-
-    @Z22.setter
-    def Z22(self, value: np.ndarray):
-        """
-        Zetter for the Z22 parameter.
-
-        Args:
-            value (numpy.ndarray): Values to set for the Z22 parameter.
-        """
-        self._set_parameter(1, 1, value)
+    Z11 = _Element(0, 0)
+    Z12 = _Element(0, 1)
+    Z21 = _Element(1, 0)
+    Z22 = _Element(1, 1)
 
 
 def abcd_identity(N_abcd: int) -> ABCDArray:

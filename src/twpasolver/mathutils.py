@@ -6,8 +6,6 @@ These functions include matrix multiplications, conversions between different pa
 representations, and solutions for coupled mode equations used in RF engineering.
 """
 
-from typing import Tuple
-
 import numba as nb
 import numpy as np
 
@@ -231,63 +229,3 @@ def I_to_dBm(curr: float, Z0: float = 50) -> float:
     """
     pw = curr**2 / 2 * Z0
     return 10 * np.log10(np.abs(pw) * 1000)
-
-
-@nb.njit(cache=True)
-def compute_phase_matching(
-    freqs: FloatArray,
-    pump_freqs: FloatArray,
-    k_signal_array: FloatArray,
-    k_pump_array: FloatArray,
-    chi: float,
-    gamma_pump_array: ComplexArray,
-) -> Tuple[FloatArray, FloatArray, FloatArray]:
-    """
-    Compute phase matching profiles and triplets for given frequencies.
-
-    Args:
-        freqs (FloatArray): Array of signal frequencies.
-        pump_freqs (FloatArray): Array of pump frequencies.
-        k_signal_array (FloatArray): Array of signal wave numbers.
-        k_pump_array (FloatArray): Array of pump wave numbers.
-        chi (float): Nonlinear coefficient.
-        gamma_pump_array (ComplexArray): Array of pump reflection coefficients.
-
-    Returns:
-        Tuple[FloatArray, FloatArray, FloatArray]: Phase matching profile, frequency triplets, and wave number triplets.
-    """
-    num_freqs = len(freqs)
-    num_pumps = len(pump_freqs)
-
-    delta_k = np.empty(shape=(num_freqs, num_pumps))
-    freq_triplets = np.empty((num_pumps, 3))
-    k_triplets = np.empty((num_pumps, 3))
-
-    for i in range(num_pumps):
-        p_f = pump_freqs[i]
-        k_pump = k_pump_array[i]
-        k_idler = np.interp(p_f - freqs, freqs, k_signal_array)
-
-        deltas = (
-            k_pump
-            - k_signal_array
-            - k_idler
-            + chi
-            * (k_pump - 2 * k_idler - 2 * k_signal_array)
-            * (1 + np.abs(gamma_pump_array[i]) ** 2)
-        )
-        delta_k[:, i] = deltas
-
-        half_pump_idx = np.searchsorted(freqs, p_f / 2)
-
-        max_delta_idx = np.argmax(deltas[:half_pump_idx])
-        min_k_idx = (
-            np.argmin(np.abs(deltas[max_delta_idx:half_pump_idx])) + max_delta_idx
-        )
-
-        freq_triplets[i] = np.array([p_f, freqs[min_k_idx], p_f - freqs[min_k_idx]])
-        k_triplets[i] = np.array(
-            [k_pump, k_signal_array[min_k_idx], k_idler[min_k_idx]]
-        )
-
-    return delta_k, freq_triplets, k_triplets

@@ -160,12 +160,7 @@ def bloch_mode_tables(
     n_cells = sum(n for _, n in runs)
     n_f = len(freqs_hz)
 
-    abcds = [
-        np.asarray(cell.single_abcd(freqs_hz)).astype(np.complex128) for cell, _ in runs
-    ]
-    T = np.broadcast_to(np.eye(2, dtype=np.complex128), (n_f, 2, 2)).copy()
-    for Tc, (_, n) in zip(abcds, runs):
-        T = T @ np.linalg.matrix_power(Tc, n)
+    T = supercell_matrix(twpa, freqs_hz)
 
     # Forward mode: psi(d) = psi(0)/lambda with lambda = exp(gamma * n_cells).
     tr = T[:, 0, 0] + T[:, 1, 1]
@@ -187,25 +182,10 @@ def bloch_mode_tables(
 
     psi_p = np.stack([Zb_plus, np.ones(n_f, dtype=np.complex128)], axis=-1)
     psi_m = np.stack([-Zb_minus, np.ones(n_f, dtype=np.complex128)], axis=-1)
-    J_p, J_m, L_nl, planes = [], [], [], []
-    plane = 0
-    for Tc, (cell, n) in zip(abcds, runs):
-        elements = series_nl_elements(cell)
-        Tinv = _inverse_2x2(Tc)
-        for _ in range(n):
-            out_p = np.einsum("fij,fj->fi", Tinv, psi_p)
-            out_m = np.einsum("fij,fj->fi", Tinv, psi_m)
-            for port, L in elements:
-                J_p.append((psi_p if port == PORT_IN else out_p)[:, 1])
-                J_m.append((psi_m if port == PORT_IN else out_m)[:, 1])
-                L_nl.append(L)
-                planes.append(plane + port)
-            psi_p, psi_m = out_p, out_m
-            plane += 1
-
-    pos = np.asarray(planes, dtype=np.float64)[None, :]
-    phi_plus = np.stack(J_p, axis=-1) * np.exp(gamma_exact[:, None] * pos)
-    phi_minus = np.stack(J_m, axis=-1) * np.exp(-gamma_exact[:, None] * pos)
+    J_p, J_m, L_nl, planes, I_end = _intracell_currents(twpa, freqs_hz, psi_p, psi_m)
+    pos = planes[None, :]
+    phi_plus = J_p * np.exp(gamma_exact[:, None] * pos)
+    phi_minus = J_m * np.exp(-gamma_exact[:, None] * pos)
 
     return {
         "Zb_plus": Zb_plus,
@@ -213,11 +193,11 @@ def bloch_mode_tables(
         "W": W,
         "phi_plus": phi_plus,
         "phi_minus": phi_minus,
-        "L_nl": np.asarray(L_nl, dtype=np.float64),
+        "L_nl": L_nl,
         "n_cells": n_cells,
-        "positions": np.asarray(planes, dtype=np.float64),
+        "positions": planes,
         "gamma_exact": gamma_exact,
-        "eig_residual": np.abs(psi_p[:, 1] * lam_f - 1),
+        "eig_residual": np.abs(I_end * lam_f - 1),
         "split": np.abs(lam_f - lam_b) / 2,
     }
 
@@ -314,6 +294,48 @@ def in_stopband(twpa_ll: TwoPortArray, f_hz: FloatArray) -> np.ndarray:
     return np.abs(0.5 * (T[:, 0, 0] + T[:, 1, 1]).real) > 1.0 + STOPBAND_TOL
 
 
+def _half_trace(twpa_ll: TwoPortArray, f) -> np.ndarray:
+    T = supercell_matrix(twpa_ll, np.atleast_1d(f))
+    return 0.5 * (T[:, 0, 0] + T[:, 1, 1]).real
+
+
+def _refine_edge(
+    twpa_ll: TwoPortArray,
+    fs: np.ndarray,
+    h: np.ndarray,
+    inband: np.ndarray,
+    j: int,
+    h_ref: float,
+) -> tuple[float, float, int]:
+    """
+    Edge between ``fs[j]`` and ``fs[j + 1]`` of a scan ``h`` of ``tr T / 2``.
+
+    Returns the refined edge, the reference frequency on its passband side
+    where ``|h| = h_ref`` (NaN if the scanned passband does not reach it) and
+    the parity ``sign(h)`` at the edge.
+    """
+    from scipy.optimize import brentq
+
+    f_edge = brentq(
+        lambda f: abs(_half_trace(twpa_ll, f)[0]) - 1.0, fs[j], fs[j + 1], xtol=1.0
+    )
+    parity = int(np.sign(h[j] if not inband[j] else h[j + 1]))
+    # Walk from the edge into the passband until |h| < h_ref.
+    step = 1 if inband[j + 1] else -1
+    k = j + 1 if step == 1 else j
+    while 0 <= k < len(fs) and inband[k] and abs(h[k]) >= h_ref:
+        k += step
+    f_ref = np.nan
+    if 0 <= k < len(fs) and inband[k]:
+        # |h| - h_ref changes sign between fs[k - step] (outside the band or
+        # above h_ref) and fs[k].
+        a, b = sorted((fs[k - step], fs[k]))
+        f_ref = brentq(
+            lambda f: abs(_half_trace(twpa_ll, f)[0]) - h_ref, a, b, xtol=1.0
+        )
+    return f_edge, f_ref, parity
+
+
 def edge_reference_frequency(
     twpa_ll: TwoPortArray,
     f_hz: float,
@@ -336,36 +358,18 @@ def edge_reference_frequency(
     parity : int
         ``(-1)^m = sign(tr T / 2)`` at the edge.
     """
-    from scipy.optimize import brentq
-
-    def half_trace(f):
-        T = supercell_matrix(twpa_ll, np.atleast_1d(f))
-        return 0.5 * (T[:, 0, 0] + T[:, 1, 1]).real
-
     h_ref = np.sqrt(1.0 - e_ref**2)
     span = span_hz
     while span <= max_span_hz:
         fs = f_hz + np.linspace(-span, span, n_scan)
         fs = fs[fs > 0]
-        h = half_trace(fs)
+        h = _half_trace(twpa_ll, fs)
         inband = passband_mask(h)
         cross = np.flatnonzero(inband[1:] != inband[:-1])
         if cross.size:
             j = cross[np.argmin(np.abs(fs[cross] - f_hz))]
-            f_edge = brentq(
-                lambda f: abs(half_trace(f)[0]) - 1.0, fs[j], fs[j + 1], xtol=1.0
-            )
-            parity = int(np.sign(h[j] if not inband[j] else h[j + 1]))
-            # Walk from the edge into the passband until |h| < h_ref.
-            step = 1 if inband[j + 1] else -1
-            k = j + 1 if step == 1 else j
-            while 0 <= k < len(fs) and inband[k] and abs(h[k]) >= h_ref:
-                k += step
-            if 0 <= k < len(fs) and inband[k]:
-                # |h| - h_ref changes sign between fs[k - step] (outside the
-                # band or above h_ref) and fs[k].
-                a, b = sorted((fs[k - step], fs[k]))
-                f_ref = brentq(lambda f: abs(half_trace(f)[0]) - h_ref, a, b, xtol=1.0)
+            f_edge, f_ref, parity = _refine_edge(twpa_ll, fs, h, inband, j, h_ref)
+            if not np.isnan(f_ref):
                 return float(f_ref), float(f_edge), parity
         span *= 2
     raise ValueError(
@@ -400,12 +404,6 @@ def stopband_edges(
     parity : (E,) int
         ``(-1)^m = sign(tr T / 2)`` at the edge.
     """
-    from scipy.optimize import brentq
-
-    def half_trace(f):
-        T = supercell_matrix(twpa_ll, np.atleast_1d(f))
-        return 0.5 * (T[:, 0, 0] + T[:, 1, 1]).real
-
     h_ref = np.sqrt(1.0 - e_ref**2)
     n_span = int(np.ceil(span_hz / step_hz))
     centres = np.unique(np.round(np.asarray(f_hz, dtype=np.float64) / step_hz)).astype(
@@ -428,22 +426,10 @@ def stopband_edges(
         g = np.arange(max(lo, 1), hi + 1) * step_hz
         if len(g) < 2:
             continue
-        h = half_trace(g)
+        h = _half_trace(twpa_ll, g)
         inband = passband_mask(h)
         for j in np.flatnonzero(inband[1:] != inband[:-1]):
-            f_edge = brentq(
-                lambda f: abs(half_trace(f)[0]) - 1.0, g[j], g[j + 1], xtol=1.0
-            )
-            parity = int(np.sign(h[j] if not inband[j] else h[j + 1]))
-            # walk from the edge into the passband until |h| < h_ref
-            step = 1 if inband[j + 1] else -1
-            k = j + 1 if step == 1 else j
-            while 0 <= k < len(g) and inband[k] and abs(h[k]) >= h_ref:
-                k += step
-            f_ref = np.nan
-            if 0 <= k < len(g) and inband[k]:
-                a, b = sorted((g[k - step], g[k]))
-                f_ref = brentq(lambda f: abs(half_trace(f)[0]) - h_ref, a, b, xtol=1.0)
+            f_edge, f_ref, parity = _refine_edge(twpa_ll, g, h, inband, j, h_ref)
             edges.append(f_edge)
             refs.append(f_ref)
             pars.append(parity)
@@ -460,9 +446,9 @@ def _intracell_currents(
 ):
     """Currents of two boundary vectors propagated through one supercell.
 
-    Same traversal as :func:`bloch_mode_tables`; returns the currents through
-    every nonlinear inductor ``(F, n_nl)`` for each vector, the inductances
-    and the positions (unit cells).
+    Returns the currents through every nonlinear inductor ``(F, n_nl)`` for
+    each vector, the inductances, the positions (unit cells) and the current
+    of the first vector at the end of the supercell ``(F,)``.
     """
     runs = expand_unit_cells(twpa)
     J_p, J_m, L_nl, planes = [], [], [], []
@@ -486,6 +472,7 @@ def _intracell_currents(
         np.stack(J_m, axis=-1),
         np.asarray(L_nl, dtype=np.float64),
         np.asarray(planes, dtype=np.float64),
+        psi_p[:, 1],
     )
 
 
@@ -560,7 +547,7 @@ def edge_basis_tables(
 
     psi_p = np.stack([Zb_plus, np.ones(n_f, dtype=np.complex128)], axis=-1)
     psi_m = np.stack([-Zb_minus, np.ones(n_f, dtype=np.complex128)], axis=-1)
-    J_p, J_m, L_nl, pos = _intracell_currents(twpa, f_hz, psi_p, psi_m)
+    J_p, J_m, L_nl, pos, _ = _intracell_currents(twpa, f_hz, psi_p, psi_m)
     kappa_e = m_edge * np.pi / n_cells
     phase = np.exp(1j * kappa_e[:, None] * pos[None, :])
     return {

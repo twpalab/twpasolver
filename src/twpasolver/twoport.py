@@ -54,7 +54,7 @@ from twpasolver.basemodel import BaseModel
 from twpasolver.bonus_types import Impedance, validate_impedance
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.logger import log
-from twpasolver.mathutils import a2s, a2z, s2a, z2a
+from twpasolver.mathutils import a2s, a2z, s2a
 from twpasolver.matrices_arrays import (
     ABCDArray,
     SMatrixArray,
@@ -104,24 +104,6 @@ class TwoPortCell:
             TwoPortCell: Instance of TwoPortCell.
         """
         abcd_mat = s2a(s_mat, Z0)
-        return cls(freqs, abcd_mat, Z0=Z0)
-
-    @classmethod
-    def from_z(
-        cls, freqs: np.ndarray, z_mat: np.ndarray, Z0: float | int = 50
-    ) -> TwoPortCell:
-        """
-        Instantiate from array of Z-parameters.
-
-        Args:
-            freqs (numpy.ndarray): Frequencies of the network.
-            z_mat (numpy.ndarray): Z-parameter matrix.
-            Z0 (float | int): Reference line impedance.
-
-        Returns:
-            TwoPortCell: Instance of TwoPortCell.
-        """
-        abcd_mat = z2a(z_mat)
         return cls(freqs, abcd_mat, Z0=Z0)
 
     @classmethod

@@ -337,6 +337,19 @@ def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
     )
 
 
+def _mode_info(mode_array, mode_labels, signal_mode, pump_mode, idler_mode) -> dict:
+    """``mode_info`` entry of a gain result."""
+    mode_map = {label: idx for idx, label in enumerate(mode_labels)}
+    return {
+        "mode_array": mode_array,
+        "mode_map": mode_map,
+        "reverse_mode_map": {idx: label for label, idx in mode_map.items()},
+        "signal_mode": signal_mode,
+        "pump_mode": pump_mode,
+        "idler_mode": idler_mode,
+    }
+
+
 def _drop_segment_axis(bloch: dict[str, Any], n_freq: int) -> dict[str, Any]:
     """
     Bloch tables of a one-segment solve with the segment axis removed.
@@ -767,7 +780,6 @@ class TWPAnalysis(Analyzer, Frequencies):
             if key not in cache:
                 cache[key] = seg.single_abcd(self.f)
             out.append(cache[key])
-        self._n_distinct_segments = len(cache)
         return out
 
     def _segment_bloch_params(self, segments: list, seg_abcd: list) -> list:
@@ -1069,9 +1081,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         if e is None:
             return out
         if bloch_config.simulate_stopband_modes:
-            edge = self._apply_edge_basis_segmented(
-                bloch, cme_inputs, injected, e, True
-            )
+            edge = self._apply_edge_basis_segmented(bloch, cme_inputs, injected, e)
             if edge is not None:
                 out["edge"] = edge
                 out["gammas"] = edge["gammas"]  # kernel and carrier: -1j kappa_e
@@ -1099,15 +1109,14 @@ class TWPAnalysis(Analyzer, Frequencies):
         bloch: dict[str, Any],
         cme_inputs: dict[str, Any],
         injected: np.ndarray,
-        threshold: Optional[float],
-        gap: bool = False,
+        threshold: float,
     ) -> Optional[dict[str, Any]]:
         """
         Fixed ("edge") Bloch basis for modes close to a stopband edge.
 
         Every segment (a uniform device is one segment) is treated with its own
         supercell: a mode without input whose splitting in segment ``s`` is
-        below ``threshold``, or that lies inside a stopband (``gap``), is
+        below ``threshold``, or that lies inside a stopband, is
         expanded there on the lossless Bloch pair of that segment's supercell,
         anchored on the passband side of the nearest edge
         (:func:`_edge_basis_entries`). Modes with an input are never flagged.
@@ -1122,8 +1131,6 @@ class TWPAnalysis(Analyzer, Frequencies):
         ``edge_mode`` (``(n_freq, n_modes)``); diagnostics are stored in
         ``bloch``.
         """
-        if threshold is None:
-            return None
         e_edge = float(threshold)
         gammas = cme_inputs["gammas"]  # (n_freq, n_modes, n_seg)
         labels = cme_inputs["mode_labels"]
@@ -1142,7 +1149,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         for s, seg in enumerate(segments):
             split_s = bloch["split"][:, s]
             kappa_s = gammas[:, :, s].imag
-            in_gap = (reactive_angle_deg(bloch["W"][:, s]) > 45.0) if gap else None
+            in_gap = reactive_angle_deg(bloch["W"][:, s]) > 45.0
             key = (
                 repr([c.model_dump() for c in seg.cells]),
                 np.ascontiguousarray(kappa_s).tobytes(),
@@ -1644,8 +1651,6 @@ class TWPAnalysis(Analyzer, Frequencies):
             np.abs(I_tuples_array[:, signal_idx, -1] / initial_signal) ** 2
         )
 
-        mode_map = {label: idx for idx, label in enumerate(mode_labels)}
-
         return {
             "model": GainModel.SIMPLE.value,
             "pump_freq": pump,
@@ -1653,14 +1658,9 @@ class TWPAnalysis(Analyzer, Frequencies):
             "x": x,
             "I_tuples": I_tuples_array,
             "gain_db": gain_db,
-            "mode_info": {
-                "mode_array": mode_array_config,
-                "mode_map": mode_map,
-                "reverse_mode_map": {idx: label for label, idx in mode_map.items()},
-                "signal_mode": signal_mode,
-                "pump_mode": pump_mode,
-                "idler_mode": idler_mode,
-            },
+            "mode_info": _mode_info(
+                mode_array_config, mode_labels, signal_mode, pump_mode, idler_mode
+            ),
         }
 
     def _compute_bloch_gain(
@@ -1845,8 +1845,6 @@ class TWPAnalysis(Analyzer, Frequencies):
             for p in range(num_saved_passes)
         ]
 
-        mode_map = {label: idx for idx, label in enumerate(mode_labels)}
-
         return {
             "model": GainModel.BLOCH.value,
             "pump_freq": pump,
@@ -1863,14 +1861,9 @@ class TWPAnalysis(Analyzer, Frequencies):
             "gains_all_passes": gains_all_passes,
             "passes": bloch_config.passes,
             "bloch": bloch,
-            "mode_info": {
-                "mode_array": mode_array_config,
-                "mode_map": mode_map,
-                "reverse_mode_map": {idx: label for label, idx in mode_map.items()},
-                "signal_mode": signal_mode,
-                "pump_mode": pump_mode,
-                "idler_mode": idler_mode,
-            },
+            "mode_info": _mode_info(
+                mode_array_config, mode_labels, signal_mode, pump_mode, idler_mode
+            ),
         }
 
     # Bandwidth

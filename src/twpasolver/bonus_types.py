@@ -7,7 +7,6 @@ import numpy as np
 from pydantic import (
     GetJsonSchemaHandler,
     NonNegativeFloat,
-    NonNegativeInt,
     PositiveFloat,
 )
 from pydantic.functional_validators import BeforeValidator
@@ -86,14 +85,12 @@ Impedance = Annotated[
 ]
 FrequencyList = list[NonNegativeFloat]
 FrequencyArange = tuple[NonNegativeFloat, NonNegativeFloat, PositiveFloat]
-FrequencyLinspace = tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeInt]
 
 ComplexArray: TypeAlias = np.ndarray[Any, np.dtype[np.complex128]]
 FloatArray: TypeAlias = np.ndarray[Any, np.dtype[np.float64]]
 
 nb_complex1d = nb.complex128[:]
 nb_complex2d = nb.complex128[:, :]
-nb_complex3d = nb.complex128[:, :, :]
 nb_float1d = nb.float64[:]
 nb_float2d = nb.float64[:, :]
 nb_int2d = nb.int64[:, :]

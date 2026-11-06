@@ -388,8 +388,8 @@ def test_per_mode_harmonic_limits_in_filter():
 def test_auto_m_max_config():
     from twpasolver.cmes.solver_config import BlochSolverConfig
 
-    assert BlochSolverConfig(m_max="auto").m_max_fixed == 1
-    assert BlochSolverConfig(m_max=3).m_max_fixed == 3
+    assert BlochSolverConfig(m_max="auto").m_max == "auto"
+    assert BlochSolverConfig(m_max=3).m_max == 3
     with pytest.raises(ValueError):
         BlochSolverConfig(m_max=-1)
     with pytest.raises(ValueError):

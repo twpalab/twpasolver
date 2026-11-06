@@ -20,6 +20,13 @@ from twpasolver.twoport import TwoPortModel
 required = partial(Field, ...)
 
 
+def _centered(freqs: np.ndarray, L: float, qp_loss: float, mid: ABCDArray) -> ABCDArray:
+    """``[L/2][mid][L/2]``, with the quasiparticle loss on the series halves."""
+    half_Z = inductance(freqs, L / 2) * (1 - 1j * qp_loss * freqs)
+    half_inductance = ABCDArray(series_impedance_abcd(half_Z))
+    return half_inductance @ mid @ half_inductance
+
+
 class StubBaseCell(TwoPortModel):
     """
     Base cell of the twpa stub-filter model: a centre line loaded by two open stubs.
@@ -65,9 +72,7 @@ class StubBaseCell(TwoPortModel):
                     freqs, self.C * (1 - 1j * self.delta), self.Lf, self.l1, 0
                 )
             )
-            half_Z = inductance(freqs, self.L / 2) * (1 - 1j * self.qp_loss * freqs)
-            half_inductance = ABCDArray(series_impedance_abcd(half_Z))
-            return half_inductance @ parallel_stubs @ half_inductance
+            return _centered(freqs, self.L, self.qp_loss, parallel_stubs)
 
         return ABCDArray(
             get_stub_cell(
@@ -93,9 +98,7 @@ class LCLfBaseCell(TwoPortModel):
             fingers = ABCDArray(
                 LCLf_abcd(freqs, self.C * (1 - 1j * self.delta), 0, self.Lf)
             )
-            half_Z = inductance(freqs, self.L / 2) * (1 - 1j * self.qp_loss * freqs)
-            half_inductance = ABCDArray(series_impedance_abcd(half_Z))
-            return half_inductance @ fingers @ half_inductance
+            return _centered(freqs, self.L, self.qp_loss, fingers)
 
         return ABCDArray(
             LCLf_abcd(

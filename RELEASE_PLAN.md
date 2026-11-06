@@ -227,12 +227,14 @@ Each fix gets a test.
 - [x] **2.23 Small fixes:** `matrices_arrays.py:99` (`and` should be `or`), `bonus_types.py:41` (missing `f`
   prefix), and `Frequencies.f` silently prefers `f_arange` when `f_list` is also set (raise instead).
   - Done 2026-11-06 (audit-fixes). Tests `test_abcd_setter_rejects_wrong_length`, `test_impedance_must_have_positive_real_part`, `test_frequencies_validation`.
-- [ ] **2.24 `modes_rwa._validate_modes` checks single characters** (`~553`), so multi-character mode names on
+- [x] **2.24 `modes_rwa._validate_modes` checks single characters** (`~553`), so multi-character mode names on
   the right-hand side fail ("Mode 2 not found" for `p2-s`).
+  - Done 2026-11-06 (audit-fixes): `_validate_modes` deleted (5.7); unknown names raise `KeyError` in `RWAAnalyzer`. Test `test_mode_array_multichar_relation`.
 - [x] **2.25 Cyclic relations** are accepted silently (empty expressions); `_compute_substitutions` (`~315`) can
   loop forever. Detect cycles and raise.
   - Done 2026-11-06 (audit-fixes): networkx cycle check in `RWAAnalyzer._compute_substitutions`. Test `test_cyclic_relations_raise`.
-- [ ] **2.26 `Mode.__eq__`/`__hash__`:** eq ignores the label but hash uses it (`~204/216`).
+- [x] **2.26 `Mode.__eq__`/`__hash__`:** eq ignores the label but hash uses it (`~204/216`).
+  - Done 2026-11-06 (audit-fixes): both deleted (5.7); `Mode` uses the dataclass `__eq__`.
 - [x] **2.27 `twpa_cells.py:94,103`:** complex `C` is passed where the annotation says float (mypy).
   - Done 2026-11-06 (audit-fixes): `LCLf_abcd(C: complex)`; mypy 22 -> 20.
 
@@ -338,7 +340,7 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
 - [x] **3.6 `general` model** (per D1). If removed, delete `cmes_fb.py`, `_compute_forward_backward_gain`, the
   `general` branches and options (`update_rate`, `BOUNDARY_CORR_MAX`) and `_filter_wm_terms`; also
   `_convergence_step`/`_store_pass` once `bloch_fb` no longer imports them.
-- [ ] **3.9 Dead options and near-copies in `cmes/` (audit 2026-11-06, about 260 lines):**
+- [x] **3.9 Dead options and near-copies in `cmes/` (audit 2026-11-06, about 260 lines):**
   - Never set by any caller: `edge_substeps` (`max_step` and `SOLVER_MAX_STEPS` removed with 2.6); rk45 `rtols`/`atols` arrays, the
     automatic `first_step` block, `y_size == 0` and `t_eval_size == 0` branches; `FBSolverConfig.m_max_fixed`.
   - Test-only: `bloch_fb_cmes_solve` (3 uses in `test_bloch.py`).
@@ -346,6 +348,8 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
     a direction flag.
   - `bloch.py`: `bloch_mode_tables` re-implements `supercell_matrix`/`_intracell_currents`; the edge walk is
     repeated in `edge_reference_frequency` and `stopband_edges`.
+  - Done 2026-11-06 (audit-fixes): all of the above except `bloch_fb_cmes_solve` (undecided) and rk45
+    `max_num_steps` (kept: `notebooks/ripples/kern.py` passes it); `edge_substeps` is the constant `EDGE_SUBSTEPS`.
 - [ ] **3.7 Unify defaults:** `m_max` (config 2 vs wrapper 5), `anderson_depth` (10 vs 5), and the `general`
   defaults (`passes` 3 vs 10, `kappa_cutoff` 0.1 vs 0.2, ...). Use `FBSolverConfig` as the single source.
 - [x] **3.8 `warmup.py`:** also compile the Bloch kernels (today it compiles only the `general` models). Add the
@@ -428,7 +432,7 @@ cold compile time measured and noted here; the line count noted here.
   - No `plt.show()` in library code (`~914`); deduplicate `plot_mode_relations`/`print_symbolic_expressions`.
 - [ ] **5.4 Logging:** `logger.py:39-40` sets INFO and adds a handler at import, so messages print twice under
   pytest. A library should add only a `NullHandler`; keep a helper (`twpasolver.logger.enable(level)`) for users.
-- [ ] **5.7 Dead code outside `cmes/` (audit 2026-11-06, grepped incl. docs and notebooks):**
+- [x] **5.7 Dead code outside `cmes/` (audit 2026-11-06, grepped incl. docs and notebooks):**
   `mathutils.compute_phase_matching` (~58 lines, also crashes when `pump_f/2 < freqs[0]`), `TwoPortCell.from_z`,
   `bonus_types.FrequencyLinspace` and `nb_complex3d`, `ModeArray.get_dependent_modes`,
   `RWAAnalyzer.update_relations`, `print_rwa_terms`, `edge_colors`/`edge_styles`, `print_symbolic_expressions`
@@ -436,8 +440,11 @@ cold compile time measured and noted here; the line count noted here.
   `_validate_modes` can go too (fixes 2.24): `RWAAnalyzer` already raises on unknown names. The `mode_info` dict
   is built twice in `analysis.py`. `twpa_cells.py` repeats the qp-loss half-inductance block in `StubBaseCell`
   and `LCLfBaseCell`.
+  - Done 2026-11-06 (audit-fixes) except `get_dependent_modes` (kept: used in
+    `notebooks/amplification/twpasolver_thesis/05_quantum_time.ipynb`). Test `test_stub_cell_line_abcd`.
 - [ ] **5.5 `matrices_arrays.py`:** the 12 duplicated property pairs on ABCD/S/Z arrays become a small descriptor.
   `TwoPortModel.__mul__` should use `model_copy(update=...)`.
+  - Done 2026-11-06 (audit-fixes): descriptor `_Element`, same validation. Left: `__mul__`.
 - [ ] **5.6 `quantum/`** (per D3). Dead functions: `gaussian.expm_batch`, `magnus4_omega`,
   `transfer_to_scattering`. The Python `star`/`cascade` duplicate the numba versions in `kernels.py`;
   `linearize.py:146` uses `col` possibly before assignment.
@@ -687,6 +694,9 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
 - 2026-11-06, WP2 API batch on `audit-fixes`: 2.7, 2.8, 2.10, 2.15-2.17, 2.19, 2.21-2.23, 2.25, 2.27,
   2.29-2.34, most of 2.35, and 2.36; tests in `tests/test_analysis_api.py`. Gains bit-identical on the
   regression set; mypy 22 -> 20.
+- 2026-11-06, dead code and near-copies on `audit-fixes` (3.9, 5.5, 5.7, 2.24, 2.26): one `_sweep` for both
+  directions, `bloch.py` traversal and edge walk shared, rk45 trimmed, descriptor arrays; 15 files, +229 -717 (net -488 lines). Gains and
+  currents bit-identical on the regression set, warm bloch timing unchanged (0.8 s / 4.7 s), mypy 20 -> 19.
 
 ## Where to pick up (end of session 2026-11-06)
 

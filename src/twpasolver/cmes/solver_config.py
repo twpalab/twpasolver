@@ -137,8 +137,3 @@ class BlochSolverConfig(BaseModel):
         if v != "auto" and v < 0:
             raise ValueError("m_max must be >= 0 or 'auto'")
         return v
-
-    @property
-    def m_max_fixed(self) -> int:
-        """``m_max``, or ``BLOCH_M_MAX_AUTO_BASE`` when ``m_max='auto'``."""
-        return BLOCH_M_MAX_AUTO_BASE if self.m_max == "auto" else int(self.m_max)
