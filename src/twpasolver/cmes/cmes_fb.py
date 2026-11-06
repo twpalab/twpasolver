@@ -70,6 +70,12 @@ def _filter_wm_terms(kappas, relations_3wm, relations_4wm, relative_deltak_cutof
     therefore carries the *original* relation index (the row into
     ``coeffs_3wm``/``coeffs_4wm``), so callers must index coefficients with
     that column rather than the target-mode column.
+
+    A variant is kept when ``|dk| < relative_deltak_cutoff * k_proc``, with
+    ``k_proc`` the largest ``|kappa|`` among the modes of the process. Partner
+    terms of a process contain the same modes and opposite ``dk``, so they are
+    kept or dropped together (normalising by the target's own ``kappa`` would
+    split them and break the Manley-Rowe relations).
     """
     num_modes = len(kappas)
     # Extra trailing column holds the coefficient row index (into
@@ -101,6 +107,9 @@ def _filter_wm_terms(kappas, relations_3wm, relations_4wm, relative_deltak_cutof
         c2 = m2 >= num_modes
         k1 = m1 - num_modes if c1 else m1
         k2 = m2 - num_modes if c2 else m2
+        thr = relative_deltak_cutoff * max(
+            np.abs(bk), np.abs(kappas[k1]), np.abs(kappas[k2])
+        )
         for si in range(4):
             s1, s2 = signs_3wm[si]
             dk = (
@@ -108,7 +117,7 @@ def _filter_wm_terms(kappas, relations_3wm, relations_4wm, relative_deltak_cutof
                 + s1 * kappas[k1] * (-1 if c1 else 1)
                 + s2 * kappas[k2] * (-1 if c2 else 1)
             )
-            if np.abs(dk / bk) < relative_deltak_cutoff:
+            if np.abs(dk) < thr:
                 valid_3wm[nv3, 0] = r[0]
                 valid_3wm[nv3, 1] = r[1] + (2 * num_modes if s1 == -1 else 0)
                 valid_3wm[nv3, 2] = r[2] + (2 * num_modes if s2 == -1 else 0)
@@ -125,6 +134,9 @@ def _filter_wm_terms(kappas, relations_3wm, relations_4wm, relative_deltak_cutof
         k1 = m1 - num_modes if c1 else m1
         k2 = m2 - num_modes if c2 else m2
         k3 = m3 - num_modes if c3 else m3
+        thr = relative_deltak_cutoff * max(
+            np.abs(bk), np.abs(kappas[k1]), np.abs(kappas[k2]), np.abs(kappas[k3])
+        )
         for si in range(8):
             s1, s2, s3 = signs_4wm[si]
             dk = (
@@ -133,7 +145,7 @@ def _filter_wm_terms(kappas, relations_3wm, relations_4wm, relative_deltak_cutof
                 + s2 * kappas[k2] * (-1 if c2 else 1)
                 + s3 * kappas[k3] * (-1 if c3 else 1)
             )
-            if np.abs(dk / bk) < relative_deltak_cutoff:
+            if np.abs(dk) < thr:
                 valid_4wm[nv4, 0] = r[0]
                 valid_4wm[nv4, 1] = r[1] + (2 * num_modes if s1 == -1 else 0)
                 valid_4wm[nv4, 2] = r[2] + (2 * num_modes if s2 == -1 else 0)

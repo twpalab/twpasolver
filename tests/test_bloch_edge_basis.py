@@ -47,7 +47,6 @@ def test_edge_bvp_solve_inside_gap():
     assert np.abs(c).max() < 2
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_edge_basis_tables_exact():
     """K reproduces the cascade of N lossy supercells; lossless K conserves flux."""
     from twpasolver.models import TWPA
@@ -56,9 +55,9 @@ def test_edge_basis_tables_exact():
     for cell in tw.cells:
         cell.delta = 2e-4
     ll = lossless_copy(tw)
-    f_ref, f_edge, parity = edge_reference_frequency(ll, 41.215e9, 0.10)
-    assert 41.20e9 < f_edge < 41.22e9 and f_ref > f_edge and parity == -1
-    f = np.array([41.26e9, f_edge, 41.19e9])  # passband, edge, gap
+    f_ref, f_edge, parity = edge_reference_frequency(ll, 41.199e9, 0.10)
+    assert 41.185e9 < f_edge < 41.205e9 and f_ref > f_edge and parity == -1
+    f = np.array([41.244e9, f_edge, 41.174e9])  # passband, edge, gap
     tab = edge_basis_tables(tw, ll, f, np.full(3, f_ref), np.full(3, 3))
     nc = tab["n_cells"]
     assert np.all(tab["W"] > 0)
@@ -88,11 +87,10 @@ def _gain(analysis, sig, threshold, passes=80, depth=15):
     )
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_edge_basis_needed_at_the_edge():
     """Without the edge basis the iteration fails at the p2s edge; with it, it converges."""
     analysis = _holotype_analysis()
-    sig = [9.204, 9.212]
+    sig = [9.188, 9.196]
     native = _gain(analysis, sig, None)
     fixed = _gain(analysis, sig, 0.10)
     bad = ~native["bloch"]["converged"] | ~np.isfinite(native["gain_db"])
@@ -101,22 +99,20 @@ def test_edge_basis_needed_at_the_edge():
     assert np.all(np.isfinite(fixed["gain_db"]))
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_edge_basis_matches_native_basis_in_passband():
     """p2s in the passband: fixed and native bases give the same gain."""
     analysis = _holotype_analysis()
-    native = _gain(analysis, [9.25], None)["gain_db"]
-    fixed = _gain(analysis, [9.25], 0.09)
+    native = _gain(analysis, [9.234], None)["gain_db"]
+    fixed = _gain(analysis, [9.234], 0.09)
     p2s = fixed["mode_info"]["mode_map"]["p2s"]
     assert fixed["bloch"]["edge_flag"][0, p2s]
     assert np.allclose(fixed["gain_db"], native, atol=0.02)
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_edge_basis_independent_of_threshold():
     """At the edge of p2s the gain barely depends on the threshold around 0.1."""
     analysis = _holotype_analysis()
-    sig = [9.212]
+    sig = [9.196]
     g10 = _gain(analysis, sig, 0.10)
     g12 = _gain(analysis, sig, 0.12)
     p2s = g10["mode_info"]["mode_map"]["p2s"]
@@ -125,11 +121,10 @@ def test_edge_basis_independent_of_threshold():
     assert np.allclose(g10["gain_db"], g12["gain_db"], atol=0.02)
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_edge_basis_seamless_at_passband_switch():
     """Just inside the window on the passband side, the basis is the native one."""
     analysis = _holotype_analysis()
-    sig = [9.2711]  # p2s splitting 0.099
+    sig = [9.2481]  # p2s splitting 0.099
     fixed = _gain(analysis, sig, 0.10)
     p2s = fixed["mode_info"]["mode_map"]["p2s"]
     assert fixed["bloch"]["edge_flag"][0, p2s]
@@ -137,7 +132,6 @@ def test_edge_basis_seamless_at_passband_switch():
     assert np.allclose(fixed["gain_db"], native["gain_db"], atol=0.01)
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_zone_centre_is_not_an_edge():
     """A low-frequency idler has a small splitting (k -> 0) but no stopband edge."""
     analysis = _holotype_analysis()
@@ -308,10 +302,9 @@ def _segmented_holotype(scale=(1.0, 1.0, 1.0, 1.0)):
     return analysis
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_segmented_copy_matches_uniform():
     """Four identical segments reproduce the uniform edge-basis gain at the p2s edge."""
-    sig = [9.204, 9.212, 9.25]
+    sig = [9.188, 9.196, 9.234]
     uniform = _gain(_holotype_analysis(), sig, 0.10)
     seg = _gain(_segmented_holotype(), sig, 0.10)
     p2s = seg["mode_info"]["mode_map"]["p2s"]
@@ -320,11 +313,10 @@ def test_segmented_copy_matches_uniform():
     assert np.allclose(seg["gain_db"], uniform["gain_db"], atol=2e-3)
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_segmented_mixed_flags():
     """p2s at its edge in some segments only: converges, weak threshold dependence."""
     analysis = _segmented_holotype(scale=(1.0, 1.002, 1.004, 1.006))
-    sig = [9.168, 9.208]  # p2s flagged in segments 0-2 / 0-1
+    sig = [9.152, 9.192]  # p2s flagged in segments 0-2 / 0-1
     g10 = _gain(analysis, sig, 0.10)
     g12 = _gain(analysis, sig, 0.12)
     native = _gain(analysis, sig, None)
@@ -405,12 +397,11 @@ def _gain_m(analysis, sig, m_max):
     )
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 @pytest.mark.parametrize("segmented", [False, True])
 def test_auto_m_max_raises_edge_modes_only(segmented):
     """At the p2s edge only p2s gets its Bragg order; elsewhere auto = 1."""
     analysis = _segmented_holotype() if segmented else _holotype_analysis()
-    sig = [6.0, 9.204]
+    sig = [6.0, 9.188]
     auto = _gain_m(analysis, sig, "auto")
     lim = auto["bloch"]["m_lim"]
     p2s = auto["mode_info"]["mode_map"]["p2s"]
@@ -516,7 +507,6 @@ def test_stopband_guard_weights():
     assert np.allclose(w, [[1.0, 1.0, 0.5, 0.0, 0.0, 1.0]])
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 @pytest.mark.parametrize("segmented", [False, True])
 def test_stopband_modes_switched_off(segmented):
     """simulate_stopband_modes=False: no edge basis, p2s processes off at its edge."""
@@ -524,7 +514,7 @@ def test_stopband_modes_switched_off(segmented):
 
     analysis = _segmented_holotype() if segmented else _holotype_analysis()
     res = analysis.gain(
-        signal_freqs=np.array([9.204, 9.25]),
+        signal_freqs=np.array([9.188, 9.234]),
         Is0=1e-9,
         pump=16.0,
         model="bloch",
@@ -542,7 +532,6 @@ def test_stopband_modes_switched_off(segmented):
     assert np.all(np.isfinite(res["gain_db"]))
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_stopband_edges_match_per_frequency_search():
     """One-pass edge table: nearest edge gives the reference of edge_reference_frequency."""
     from twpasolver.cmes.bloch import stopband_edges
@@ -611,7 +600,6 @@ def _unfolded_holotype(q=3, nl_scale=None, delta=None):
     return analysis
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_folding_point_is_not_an_edge():
     """On an unfolded supercell, k D = n pi without a gap keeps the native basis."""
     from twpasolver.analysis import _edge_basis_entries
@@ -634,7 +622,6 @@ def test_folding_point_is_not_an_edge():
     assert list(ent["outside"]) == [0]
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_folding_point_modes_match_native_basis():
     """Unfolded holotype: modes at folding points give the native-basis gain exactly."""
     analysis = _unfolded_holotype()
@@ -656,7 +643,6 @@ def test_folding_point_modes_match_native_basis():
     assert np.allclose(fixed["gain_db"], native["gain_db"], atol=1e-9)
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_contra_qpm_survives_edge_basis():
     """Backward conversion phase matched by a nonlinearity-only grating.
 

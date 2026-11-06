@@ -67,16 +67,14 @@ def test_energy_conservation_lossless():
     assert np.all(np.abs(delta.sum(axis=1)) < 1e-3 * np.abs(transferred) + floor)
 
 
-def test_segmented_not_supported():
-    """The Bloch model is restricted to non-segmented devices for now."""
+def test_segmented_not_supported_without_reflections():
+    """The no-reflections Bloch model is restricted to non-segmented devices."""
     seg = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10)
     twpa = TWPA(cells=[seg, seg], Ip0=2.5e-4)
     analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-2))
     analysis.update_base_data()
     with pytest.raises(NotImplementedError):
         analysis.gain([2.0], pump=14.3, model="bloch_no_reflections")
-    with pytest.raises(NotImplementedError):
-        analysis.gain([2.0], pump=14.3, model="bloch")
 
 
 def _mismatched_analysis(Ip0, Z_ext=70.0, N=100):
@@ -507,11 +505,11 @@ def test_unconverged_points_are_reported(caplog):
 # Stopband-edge guard
 # --------------------------------------------------------------------------- #
 
+# Frozen copy of the docs holotype (V3 KI-TWPA), so that editing the docs model
+# does not move the frequencies hard-coded in the tests.
 HOLOTYPE = (
-    __import__("pathlib").Path(__file__).resolve().parents[1]
-    / "docs"
-    / "source"
-    / "notebooks"
+    __import__("pathlib").Path(__file__).resolve().parent
+    / "data"
     / "imskit_v3_holotype.json"
 )
 
@@ -651,19 +649,19 @@ def _holotype_analysis():
     return analysis
 
 
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
-def test_edge_guard_removes_spurious_conversion_gain(monkeypatch):
+def test_edge_guard_switches_off_edge_conversion():
     """
-    imskit holotype pumped at 16 GHz: around fs = 9.21 GHz the second
+    imskit holotype pumped at 16 GHz: around fs = 9.19 GHz the second
     conversion product 2 fp + fs sits at the upper edge of the third stopband.
-    Without the guard the forward-only ps <-> p2s conversion grows
-    exponentially (tens of dB of spurious gain); with it the result matches the
-    run without the second conversion.
-    """
-    from twpasolver.cmes import solver_config
+    The guard of the no-reflections Bloch model switches p2s off there, and the
+    result matches the run without the second conversion.
 
+    (With the earlier holotype parameters the unguarded run also showed tens of
+    dB of spurious ps <-> p2s gain here; with the current ones it does not, so
+    only the guard itself is checked.)
+    """
     analysis = _holotype_analysis()
-    sig = np.array([9.204, 9.21, 9.214])
+    sig = np.array([9.188, 9.194, 9.198])
     kw = dict(signal_freqs=sig, Is0=1e-9, pump=16.0, model="bloch_no_reflections")
     ref = analysis.gain(mode_array_config="ext1", **kw)["gain_db"]
     guarded = analysis.gain(mode_array_config="ext2", **kw)
@@ -671,12 +669,7 @@ def test_edge_guard_removes_spurious_conversion_gain(monkeypatch):
     assert np.all(guarded["bloch"]["edge_weights"][:, p2s] == 0.0)
     assert np.allclose(guarded["gain_db"], ref, atol=0.1)
 
-    monkeypatch.setattr(solver_config, "BLOCH_EDGE_GUARD_DEG", None)
-    unguarded = analysis.gain(mode_array_config="ext2", **kw)["gain_db"]
-    assert np.max(unguarded - ref) > 10
 
-
-@pytest.mark.skipif(not HOLOTYPE.exists(), reason="holotype model not available")
 def test_edge_guard_never_drops_injected_modes(monkeypatch, caplog):
     """An injected mode flagged by the guard is kept and a warning is logged."""
     from twpasolver.cmes import solver_config
