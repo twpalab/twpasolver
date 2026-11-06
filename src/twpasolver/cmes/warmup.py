@@ -15,12 +15,14 @@ setup).
 
 from __future__ import annotations
 
+import logging
 import warnings
 
 import numpy as np
 
 from twpasolver.analysis import GainModel, TWPAnalysis
 from twpasolver.cmes.solver_config import BlochSolverConfig
+from twpasolver.logger import log
 from twpasolver.models.twoportarrays import TWPA
 
 # Same cell physics as tests/conftest.py's `twpa` fixture, an arbitrary but
@@ -71,14 +73,22 @@ def _warm_analysis(twpa: TWPA, label: str, models: tuple, verbose: bool) -> None
         )
     analysis = TWPAnalysis(twpa=twpa, f_arange=_F_ARANGE)
     analysis.update_base_data()
-    with warnings.catch_warnings():
-        # No backward input is injected, so the backward-referenced gains are
-        # 0/0; harmless for a call that only triggers compilation.
-        warnings.simplefilter("ignore", RuntimeWarning)
-        for model in models:
-            analysis.gain(
-                _SIGNAL_FREQS, model=model, bloch_config=BlochSolverConfig(passes=1)
-            )
+    level = log.level
+    # One pass only compiles the kernels; its "did not converge" warning is noise.
+    log.setLevel(logging.ERROR)
+    try:
+        with warnings.catch_warnings():
+            # No backward input is injected, so the backward-referenced gains are
+            # 0/0; harmless for a call that only triggers compilation.
+            warnings.simplefilter("ignore", RuntimeWarning)
+            for model in models:
+                analysis.gain(
+                    _SIGNAL_FREQS,
+                    model=model,
+                    bloch_config=BlochSolverConfig(passes=1),
+                )
+    finally:
+        log.setLevel(level)
 
 
 def warmup(verbose: bool = True) -> None:

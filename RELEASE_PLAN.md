@@ -280,8 +280,8 @@ Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` da
     (lossless TL: error 0.16 vs 0.0099 for `polar=False`).
   - `Frequencies(f_arange=(1, 2, 0))` divides by zero (step typed `NonNegativeFloat`).
   - A list-valued `port` fills only `Zout`; its ABCD stays the identity (`analysis.py:643-646`), read only.
-  - CI venv cache key (`analysis.yml:26-27`) ignores `matrix.python-version`.
-  - `warmup` with `passes=1` logs a "did not converge" warning every time.
+  - CI venv cache key (`analysis.yml:26-27`) ignores `matrix.python-version`. **Done:** key has OS and Python.
+  - `warmup` with `passes=1` logs a "did not converge" warning every time. **Done** with 3.8.
   - Done 2026-11-06 (audit-fixes) for `N=0` (identity), `Z0=0`, `Resistance.Z`, arange step > 0 (tests `test_zero_repetitions_is_identity`, `test_impedance_must_have_positive_real_part`, `test_resistance_on_integer_freqs`, `test_frequencies_validation`). Still open: polar `interpolate`, list-valued `port`, CI cache key, warmup warning.
 - [x] **2.36 Test for `TWPAnalysis`:** no test runs `phase_matching`, `bandwidth`, stopband detection or a save and
   reload of a real result; the `twpanalysis_instance` fixture asks for a `twpa_model` fixture that does not exist.
@@ -348,9 +348,11 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
     repeated in `edge_reference_frequency` and `stopband_edges`.
 - [ ] **3.7 Unify defaults:** `m_max` (config 2 vs wrapper 5), `anderson_depth` (10 vs 5), and the `general`
   defaults (`passes` 3 vs 10, `kappa_cutoff` 0.1 vs 0.2, ...). Use `FBSolverConfig` as the single source.
-- [ ] **3.8 `warmup.py`:** also compile the Bloch kernels (today it compiles only the `general` models). Add the
+- [x] **3.8 `warmup.py`:** also compile the Bloch kernels (today it compiles only the `general` models). Add the
   `twpasolver-warmup` script entry to `pyproject` (the README advertises it, but it exists only in old install
   metadata). Fix its 13 mypy errors (`**dict[str, object]` passed into `TWPA`, lines 100-101).
+  - **Done 2026-11-06 (audit-fixes):** `[tool.poetry.scripts] twpasolver-warmup` (checked in a built wheel); the
+    warmup silences the logger during its one-pass calls, so it no longer prints "did not converge".
 
 **Acceptance:** results identical to the pre-refactor reference (≤1e-9 dB for `bloch`); the full suite is green;
 cold compile time measured and noted here; the line count noted here.

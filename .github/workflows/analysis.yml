@@ -24,7 +24,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: .venv
-        key: pydeps-${{ hashFiles('**/poetry.lock') }}
+        key: pydeps-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
 
     - name: install_dependencies_only
       run: poetry install --no-interaction --no-root --with analysis

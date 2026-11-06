@@ -23,6 +23,9 @@ matplotlib = ">=3.7"
 networkx = "<=3.*"
 sympy = "^1.14.0"
 
+[tool.poetry.scripts]
+twpasolver-warmup = "twpasolver.cmes.warmup:main"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
