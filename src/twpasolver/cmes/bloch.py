@@ -39,12 +39,15 @@ with gamma = alpha + j k.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
+import numba as nb
 import numpy as np
 
 from twpasolver.bonus_types import ComplexArray, FloatArray
 from twpasolver.logger import log
+from twpasolver.mathutils import matmul_2x2, matpow_2x2
 from twpasolver.models.twoportarrays import TwoPortArray
 from twpasolver.models.twpa_cells import LCLfBaseCell, StubBaseCell
 
@@ -140,6 +143,41 @@ def _t_split(Tc: np.ndarray) -> list[tuple[np.ndarray, ...]]:
     return [(one, Z1, zero, one), mid, (one, Z2, zero, one)]
 
 
+@nb.njit(parallel=True, cache=True)
+def _wind_backward(steps, counts, V, I, Z0):
+    """
+    Phase of ``a = V + Z0 I`` accumulated from x = d back to x = 0.
+
+    ``steps[r, s]`` are the ``(A, B, C, D)`` of step ``s`` of unit-cell run
+    ``r``, repeated ``counts[r]`` times. A backward sweep with the plain ABCDs
+    is stable: the forward mode grows towards x = 0, so rounding never seeds
+    the backward mode. Returns ``(k d, largest single-step phase)``.
+    """
+    n_runs, n_steps, _, n_f = steps.shape
+    kd = np.zeros(n_f)
+    max_step = np.zeros(n_f)
+    for f in nb.prange(n_f):
+        a = V[f] + Z0 * I[f]
+        v, i = V[f] / a, I[f] / a  # normalised so that a = 1 before each step
+        acc = 0.0
+        big = 0.0
+        for r in range(n_runs - 1, -1, -1):
+            for _ in range(counts[r]):
+                for s in range(n_steps - 1, -1, -1):
+                    v, i = (
+                        steps[r, s, 0, f] * v + steps[r, s, 1, f] * i,
+                        steps[r, s, 2, f] * v + steps[r, s, 3, f] * i,
+                    )
+                    a = v + Z0 * i
+                    step = math.atan2(a.imag, a.real)
+                    acc += step
+                    big = max(big, abs(step))
+                    v, i = v / a, i / a
+        kd[f] = acc
+        max_step[f] = big
+    return kd, max_step
+
+
 def bloch_wavenumber(
     twpa: TwoPortArray, freqs_hz: FloatArray, T: np.ndarray, Z0: complex
 ) -> np.ndarray:
@@ -167,25 +205,16 @@ def bloch_wavenumber(
     V = np.where(pick1, Zb1, Zb2)
     I = np.ones_like(V)
 
-    steps: list[tuple[np.ndarray, ...]] = []
-    for cell, n in expand_unit_cells(twpa):
-        Tc = np.asarray(cell.single_abcd(freqs_hz)).astype(np.complex128)
-        steps += _t_split(Tc) * n
-
-    # Backward sweep with the plain ABCDs: the forward mode grows towards x = 0,
-    # so rounding never seeds the backward mode.
-    a = V + Z0 * I
-    kd = np.zeros(len(freqs_hz))
-    max_step = np.zeros(len(freqs_hz))
-    for A, B, C, D in reversed(steps):
-        V, I = A * V + B * I, C * V + D * I
-        norm = np.hypot(np.abs(V), np.abs(I))
-        V, I = V / norm, I / norm
-        a_new = V + Z0 * I
-        step = np.angle(a_new / a)
-        kd += step
-        max_step = np.maximum(max_step, np.abs(step))
-        a = a_new
+    runs = expand_unit_cells(twpa)
+    steps = np.array(
+        [
+            _t_split(np.asarray(cell.single_abcd(freqs_hz)).astype(np.complex128))
+            for cell, _ in runs
+        ],
+        dtype=np.complex128,
+    )  # (n_runs, 3 steps, 4 entries, F)
+    counts = np.array([n for _, n in runs], dtype=np.int64)
+    kd, max_step = _wind_backward(steps, counts, V, I, complex(Z0))
 
     arg = np.angle(lam)
     m = np.round((kd - arg) / (2 * np.pi))
@@ -319,10 +348,14 @@ def lossless_copy(model: Any) -> Any:
 def supercell_matrix(twpa: TwoPortArray, freqs_hz: FloatArray) -> np.ndarray:
     """ABCD matrix of one supercell, shape (F, 2, 2)."""
     freqs_hz = np.atleast_1d(np.asarray(freqs_hz, dtype=np.float64))
-    T = np.broadcast_to(np.eye(2, dtype=np.complex128), (len(freqs_hz), 2, 2)).copy()
+    T = None
     for cell, n in expand_unit_cells(twpa):
-        Tc = np.asarray(cell.single_abcd(freqs_hz)).astype(np.complex128)
-        T = T @ np.linalg.matrix_power(Tc, n)
+        Tc = matpow_2x2(np.asarray(cell.single_abcd(freqs_hz), dtype=np.complex128), n)
+        T = Tc if T is None else matmul_2x2(T, Tc)
+    if T is None:
+        return np.broadcast_to(
+            np.eye(2, dtype=np.complex128), (len(freqs_hz), 2, 2)
+        ).copy()
     return T
 
 

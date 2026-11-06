@@ -305,6 +305,14 @@ Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` da
   One test on the 3-cell device (`gain` simple and bloch, `phase_matching`, `save_data`/`load_data`, stopband
   start < end) would have caught 2.11, 2.29-2.32.
   - Done 2026-11-06 (audit-fixes): `test_twpanalysis_end_to_end` (simple and bloch gain, `phase_matching`, `bandwidth`, save/load). Stopband start < end is left to 2.11.
+- [ ] **2.37 The segmented edge-basis `bloch` solve amplifies rounding by about 1e12** (found 2026-11-06 while
+  checking the winding k, 77a7e00). On `_segmented_holotype((1, 1.02, 0.98, 1))` with the edge basis on (ext2,
+  pump 16 GHz, passes 80, anderson_depth 15), multiplying `data["k"]` by (1 + 1e-15) moves `gain_db` by up to
+  1.9e-3 dB (S11 more) at every signal, and it stays at 400 passes; the old (unwrap) code shows the same. Uniform
+  devices agree to 3.6e-11 dB under the same perturbation. Suspect: the junction coefficients between segments when
+  a mode is on the fixed edge basis (nearly singular basis change), or the per-segment edge-basis K. To do: find
+  which input the gain is sensitive to (k vs Zb vs edge_K, per segment), check the conditioning of the junction
+  matrices, and fix or at least document the accuracy limit.
 
 **Acceptance:** each item has a test; the full suite is green; mypy errors go down.
 
@@ -736,6 +744,12 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
 - 2026-11-06, winding k (2.3) and base-data simplification on `audit-fixes`: gains of the uniform regression
   cases within 1.3e-11 dB, k within 1.1e-16 rad/cell on three devices; segmented edge case moves by up to 1e-3 dB,
   which a 1e-15 relative perturbation of k already causes on the old code (ill-conditioned there). mypy 13 -> 10.
+
+- 2026-11-06, faster base data on `audit-fixes`: the winding loop is one parallel numba kernel
+  (`bloch._wind_backward`, one atan2 per element step) and `supercell_matrix` uses `matmul_2x2`/`matpow_2x2`.
+  `update_base_data` (warm, 39,900 points): holotype 172 -> 42 ms, 3-cell 110 -> 22 ms, segmented 361 -> 130 ms.
+  Base data bit-identical; `supercell_matrix` moves by ~2e-13 (product order), so uniform `bloch` gains move
+  <= 3.5e-11 dB, `simple` is identical, and the segmented edge-basis case moves 3.3e-3 dB (item 2.37).
 
 ## Where to pick up (end of session 2026-11-06)
 
