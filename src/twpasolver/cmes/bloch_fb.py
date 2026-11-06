@@ -666,6 +666,7 @@ def _segment_rows(
     L_nl,
     positions,
     n_cells,
+    n_periods,
     pw3_seg,
     pw4_seg,
     kappa_cutoff,
@@ -675,7 +676,11 @@ def _segment_rows(
     Kept rows and their coefficients for every segment, concatenated.
 
     ``m_lim_seg`` (n_seg, n_modes): harmonic limit of every mode per segment
-    (see :func:`twpasolver.cmes.bloch_common._filter_wm_terms_bloch`).
+    (see :func:`twpasolver.cmes.bloch_common._filter_wm_terms_bloch`), in
+    units of the primitive period: the filter runs on the lattice of the
+    ``n_periods`` identical periods of the supercell (only multiples of
+    ``n_periods`` carry intracell Fourier components) and returns ``m`` in
+    supercell units.
 
     Returns ``r3, r4`` (rows), ``off3, off4`` (per-segment offsets),
     ``g3, g4`` (reciprocal vectors) and the coefficients of both solve
@@ -697,15 +702,18 @@ def _segment_rows(
     off4 = np.zeros(n_seg + 1, dtype=np.int64)
     for s in range(n_seg):
         nc = n_cells[s]
+        q = n_periods[s]
         k_s = np.ascontiguousarray(kappas_seg[s])
         a3, a4 = _filter_wm_terms_bloch(
             k_s,
             relations_3wm,
             relations_4wm,
             kappa_cutoff,
-            nc,
+            nc // q,
             np.ascontiguousarray(m_lim_seg[s]),
         )
+        a3[:, 4] *= q
+        a4[:, 5] *= q
         pp = np.ascontiguousarray(phi_plus_seg[s])
         pm = np.ascontiguousarray(phi_minus_seg[s])
         pf = np.ascontiguousarray(prefac_seg[s])
@@ -873,6 +881,7 @@ def _bloch_fb_solve_segmented(
     L_nl,
     positions,
     n_cells,
+    n_periods,
     t_table,
     tp_table,
     rhoL_table,
@@ -968,6 +977,7 @@ def _bloch_fb_solve_segmented(
             L_nl,
             positions,
             n_cells,
+            n_periods,
             pw3_table[i],
             pw4_table[i],
             kappa_cutoff,
@@ -1280,6 +1290,7 @@ def bloch_fb_segmented_cmes_solve(
     n_cells: np.ndarray,
     Zb_plus: ComplexArray,
     Zb_minus: ComplexArray,
+    n_periods: np.ndarray | None = None,
     passes: int = _DEFAULTS.passes,
     kappa_cutoff: float = _DEFAULTS.kappa_cutoff,
     m_max: int | np.ndarray = int(_DEFAULTS.m_max),
@@ -1322,6 +1333,9 @@ def bloch_fb_segmented_cmes_solve(
         segment's supercell (unit cells).
     n_cells : (n_seg,) int
         Unit cells per supercell of every segment.
+    n_periods : (n_seg,) int, optional
+        Identical primitive periods per supercell (default 1); ``m_max`` and the
+        ``kappa_cutoff`` zone-edge cap count per primitive period.
     Zb_plus, Zb_minus : (n_freq, n_seg, n_modes)
         Bloch impedances of every segment; consecutive segments define the
         junction coefficients (:func:`junction_coefficients`), the first and
@@ -1457,6 +1471,11 @@ def bloch_fb_segmented_cmes_solve(
         c(L_nl, dtype=np.float64),
         c(positions, dtype=np.float64),
         c(n_cells),
+        c(
+            np.ones_like(n_cells)
+            if n_periods is None
+            else np.asarray(n_periods, dtype=np.int64)
+        ),
         c(t),
         c(tp),
         c(rho_L),

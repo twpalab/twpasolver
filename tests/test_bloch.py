@@ -780,6 +780,31 @@ def _holotype_analysis():
     return analysis
 
 
+def test_unfolded_supercell_counts_harmonics_per_period():
+    """q copies of the holotype period per supercell give the same gain (2.4)."""
+    from twpasolver.cmes.bloch import expand_unit_cells, primitive_periods
+
+    sig = np.array([4.0, 10.5])  # 0.55 dB and 1.0 dB apart when counted per supercell
+    cfg = BlochSolverConfig(passes=80, anderson_depth=15, m_max="auto")
+    gains = []
+    for q in (1, 3):
+        analysis = _holotype_analysis()
+        analysis.twpa.cells[:] = list(analysis.twpa.cells) * q
+        analysis.twpa.N //= q
+        analysis.update_base_data()
+        assert primitive_periods(expand_unit_cells(analysis.twpa)) == q
+        res = analysis.gain(
+            sig,
+            16.0,
+            Is0=1e-9,
+            model="bloch",
+            mode_array_config="ext2",
+            bloch_config=cfg,
+        )
+        gains.append(res["gain_db"])
+    assert np.allclose(gains[0], gains[1], atol=0.05)
+
+
 # --------------------------------------------------------------------------- #
 # Bloch wavenumber by winding
 # --------------------------------------------------------------------------- #

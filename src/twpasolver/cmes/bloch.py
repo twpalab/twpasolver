@@ -106,6 +106,26 @@ def expand_unit_cells(array: TwoPortArray) -> list[tuple[Any, int]]:
     return [(cell, n) for cell, n in runs if n > 0]
 
 
+def primitive_periods(runs: list[tuple[Any, int]]) -> int:
+    """
+    Number of identical primitive periods in a supercell given as ``runs``.
+
+    The smallest repeating pattern of the flattened cell sequence: an unfolded
+    supercell (q copies of a primitive period) returns q, otherwise 1. Cells are
+    compared by type and parameters (their own ``N`` excluded).
+    """
+    flat = [
+        (type(cell).__name__, repr(cell.model_dump(exclude={"N"})))
+        for cell, n in runs
+        for _ in range(n)
+    ]
+    n_cells = len(flat)
+    for p in range(1, n_cells):
+        if n_cells % p == 0 and flat[p:] == flat[:-p]:
+            return n_cells // p
+    return 1
+
+
 def _eigvec_ratio(T: np.ndarray, lam: np.ndarray) -> np.ndarray:
     """V/I of the ABCD eigenvector with eigenvalue ``lam``, best-conditioned form."""
     A, B, C, D = T[:, 0, 0], T[:, 0, 1], T[:, 1, 0], T[:, 1, 1]
@@ -257,6 +277,8 @@ def bloch_mode_tables(
             forward/backward mode current through each nonlinear inductor
         ``L_nl`` : (n_nl,) nonlinear inductances
         ``n_cells`` : unit cells per supercell
+        ``n_periods`` : identical primitive periods per supercell
+            (:func:`primitive_periods`)
         ``positions`` : (n_nl,) position of each nonlinear inductor inside the
             supercell, in unit cells (the reference used for ``phi``)
         ``gamma_exact`` : (F,) complex, per-unit-cell gamma from the eigenvalue
@@ -307,6 +329,7 @@ def bloch_mode_tables(
         "phi_minus": phi_minus,
         "L_nl": L_nl,
         "n_cells": n_cells,
+        "n_periods": primitive_periods(runs),
         "positions": planes,
         "gamma_exact": gamma_exact,
         "eig_residual": np.abs(I_end * lam_f - 1),

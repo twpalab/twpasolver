@@ -971,10 +971,11 @@ class TWPAnalysis(Analyzer, Frequencies):
             / np.pi
         )
         if bloch_config.m_max == "auto":
+            # Bragg orders of the primitive period, the unit of m in the kernel filter.
             m_max = _harmonic_limits(
                 bloch["split"],
                 bloch["W"],
-                kd_pi,
+                kd_pi / np.asarray(bloch["n_periods"])[None, :, None],
                 solver_config.BLOCH_M_MAX_AUTO_BASE,
                 2.0 * (e if e is not None else 0.10),
             )
@@ -1218,6 +1219,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         L_nl = np.zeros((n_seg, n_nl))
         positions = np.zeros((n_seg, n_nl))
         n_cells = np.empty(n_seg, dtype=np.int64)
+        n_periods = np.empty(n_seg, dtype=np.int64)
         for s, tab in enumerate(per_seg):
             nn = tab["L_nl"].size
             W[:, s] = tab["W"].reshape(n_freq, n_modes)
@@ -1233,6 +1235,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             L_nl[s, :nn] = tab["L_nl"]
             positions[s, :nn] = tab["positions"]
             n_cells[s] = tab["n_cells"]
+            n_periods[s] = tab["n_periods"]
 
         return {
             "W": W,
@@ -1244,6 +1247,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             "L_nl": L_nl,
             "positions": positions,
             "n_cells": n_cells,
+            "n_periods": n_periods,
             "seg_bounds": seg_bounds,
             "eig_residual": eig_res,
             "gamma_mismatch": g_mis,
@@ -1671,6 +1675,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             bloch["n_cells"],
             bloch["Zb_plus"],
             bloch["Zb_minus"],
+            n_periods=bloch["n_periods"],
             passes=bloch_config.passes,
             kappa_cutoff=bloch_config.kappa_cutoff,
             m_max=sb["m_max"],

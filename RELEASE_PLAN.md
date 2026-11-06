@@ -148,7 +148,7 @@ Each fix gets a test.
   - Reference fix: `notebooks/amplification/dispersion_strategies.py::fix_k` picks 2πm ± arccos((A+D)/2) closest
     to the low-frequency linear dispersion.
   - Test it on a cell with a series/shunt LC resonator (the Malnou 2026 4WM rpm line).
-- [ ] **2.4 `m_max` and the mismatch cutoff are counted per supercell** (2π/D, π/D) and `kd_pi` uses the
+- [x] **2.4 `m_max` and the mismatch cutoff are counted per supercell** (2π/D, π/D) and `kd_pi` uses the
   supercell `n_cells` (`analysis.py:~1221-1235`). An unfolded supercell (q repeated periods) silently loses the
   base period's harmonics with `m_max='auto'`: the 102-cell holotype differs by dB from the 34-cell one.
   - **Fix:** detect the primitive period of the linear cells, or at least document this and scale the auto base
@@ -159,6 +159,11 @@ Each fix gets a test.
     scaling only m makes it worse (0.55 dB at 4 GHz). Auto vs converged reference (34 cells, m=17, kc=1,
     13× slower): 0.028 dB. q can be read from the cell list; the c_m spectrum also shows it (non-zero only at
     multiples of q, threshold ~1e-6).
+  - **Done 2026-11-06 (branch `audit-fixes`):** `bloch.primitive_periods` finds q as the smallest repeating
+    pattern of the flattened cell sequence (cells compared by type and parameters, own `N` excluded);
+    `_segment_rows` runs the filter on `n_cells // q` and scales the kept `m` by q; `'auto'` uses primitive
+    Bragg orders. Holotype ×3: 34 vs 102 cells within 0.023 dB at 9 signals (was 1.0 dB at 10.5 GHz). Test
+    `test_unfolded_supercell_counts_harmonics_per_period`. The 0.10 fallback (`edge_threshold=None`) stays.
   - **Rejected:** DFT weight rule w = |c_m|·min(L, 1/|Δk+G_m|) with one tolerance per process: 1.3–2 dB off at
     every tol (1e-1…3e-4), mostly unconverged at the edge. Exactly matched Kerr rows set W_ref (weight |c|·L) and
     drop pump-driven 4WM rows; 3WM chains are cut partially; a shared 3WM/4WM reference drops all 3WM (units).
@@ -549,7 +554,8 @@ cold compile time measured and noted here; the line count noted here.
     `bloch_fb_segmented_cmes_solve` defaults are now those of `BlochSolverConfig` (m_max 2, anderson_depth 10);
     the `twpasolver` logger no longer propagates to the root logger; `interpolate` defaults to `polar=False`;
     `data["stopband_freqs"]` replaced by `data["stopbands"]` (all bands, `(n, 2)`); `data["optimal_pump_freq"]`
-    removed, `phase_matching(...)["optimal_pump_freq"]` instead; `gain` `pump` required; `phase_matching`
+    removed, `phase_matching(...)["optimal_pump_freq"]` instead; integer `m_max` and the `kappa_cutoff` cap
+    count per primitive period (supercells of q identical periods, 2.4); `gain` `pump` required; `phase_matching`
     `signal_arange`/`pump_arange` required (keyword-only).
   - `data["k"]` by winding (2.3): changes above resonator notches (was off by π per supercell), in
     left-handed bands (now k < 0) and on grids starting above a stopband (was off by 2π per supercell);
