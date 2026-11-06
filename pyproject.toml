@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "twpasolver"
-version = "0.0.1"
+version = "0.1.0"
 description = "Project twpasolver created by twpalab"
 authors = ["twpalab"]
 license = "Apache License 2.0"
@@ -12,7 +12,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10, <3.13"
+python = ">=3.10,<4.0"
 numpy = ">=1.26"
 numba = ">=0.59.0"
 pydantic =">=2.6.3"

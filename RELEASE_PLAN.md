@@ -94,14 +94,17 @@ and merging code over adding options.
   Where should they move: a folder in the thesis repo, or `notebooks/twpasolver_thesis/` in the workspace?
   **Done 2026-11-06:** everything except notebooks 01-04, `Capacitor.json` and `imskit_v3_holotype.json` moved to
   `/home/pietro/work/phd/twpas/notebooks/amplification/twpasolver_thesis/` (see Log).
-- [ ] **D7. Release target:** GitHub plus docs only, or also PyPI? Version number (suggested `0.1.0`)? Python
+- [x] **D7. Release target:** GitHub plus docs only, or also PyPI? Version number (suggested `0.1.0`)? Python
   versions to support (suggested ≥3.10, with no upper bound)?
-- [ ] **D8. Public API naming.** Is it acceptable to break `gain()` return keys and `FBSolverConfig` options
+  - **Pietro, 2026-11-06:** PyPI, `0.1.0`, Python ≥3.10. Set in `pyproject.toml` (`>=3.10,<4.0`: poetry will not
+    resolve an open bound because the docs dependencies declare `<4.0`); lock refreshed.
+- [x] **D8. Public API naming.** Is it acceptable to break `gain()` return keys and `FBSolverConfig` options
   (see WP4.2)? Downstream notebooks would need updating.
+  - **Pietro, 2026-11-06:** any API break is allowed before 0.1.0.
 
 ## WP1: Baseline: green tests and a clean tree (do first)
 
-- [ ] **1.1 Commit the edge-basis fold-point fix** as its own commit, after Pietro confirms. Its tests:
+- [x] **1.1 Commit the edge-basis fold-point fix** as its own commit, after Pietro confirms. Its tests:
   `test_passband_mask_ignores_touching_bands`, `test_folding_point_*`, `test_contra_qpm_survives_edge_basis`.
 - [x] **1.2 Frozen fixtures.** Copy the holotype JSON into `tests/data/` and point `HOLOTYPE` there
   (`tests/test_bloch.py:510`; about 15 tests use it, and today they `skipif` silently if the docs file moves).
@@ -230,9 +233,11 @@ Each fix gets a test.
 - [ ] **2.12 Base data is never computed automatically.** `gain()` on a fresh `TWPAnalysis` raises
   `KeyError 'optimal_pump_freq'`, and edits to `twpa` leave stale data without warning. Call `update_base_data()`
   from the decorator, as it did before 6097a93. Exclude `Ip0` from the state check.
+  - Rechecked 2026-11-06 (`888f01e`): still open; a fresh `gain()` now raises
+    `ValueError: Mode array configuration 'basic_3wm' not found`.
 - [x] **2.13 `gain(Ip0=...)` permanently sets `self.twpa.Ip0`** (`~1816`). Use a local value instead.
   - Done 2026-11-06 (audit-fixes): `Ip0` is passed down to the initial conditions. Test `test_gain_ip0_does_not_change_twpa`.
-- [ ] **2.14 Shared mutable default** `fb_config=FBSolverConfig()` (`~1738`): use `None`.
+- [x] **2.14 Shared mutable default** `fb_config=FBSolverConfig()` (`~1738`): use `None`.
 - [x] **2.15 `parameter_sweep` `log.warning` format** has an argument but no `%s` (`~414`).
   - Done 2026-11-06 (audit-fixes) with 2.32. Test `test_parameter_sweep_target_in_result_keys`.
 - [x] **2.16 The decorator's overwrite message** checks `function_name` instead of `save_name` (`~368`); line
@@ -246,7 +251,7 @@ Each fix gets a test.
 - [x] **2.19 `TWPAnalysis(freqs_arange=...)`** (a typo) is silently ignored and gives an empty grid. Set
   `extra="forbid"` on the pydantic models. The unused fixture at `tests/test_analysis.py:30` has exactly this typo.
   - Done 2026-11-06 (audit-fixes): `extra="forbid"` on `TWPAnalysis` and `Frequencies` only (circuit models unchanged); dead fixture removed. Test `test_twpanalysis_rejects_unknown_fields`.
-- [ ] **2.20 Likely, not run:** in segmented `general` forward–backward runs, the backward carrier reverses
+- [x] **2.20 Likely, not run:** in segmented `general` forward–backward runs, the backward carrier reverses
   `gammas` but not the segment midpoints (`~1968-1988`). This affects only the phase of `I_tuples_bwd`. Moot if
   D1 removes the model.
 
@@ -438,7 +443,7 @@ cold compile time measured and noted here; the line count noted here.
   - one naming scheme (per-pass `gain_db_fwd/bwd` against top-level `gain_db/gain_db_12`; `mode_info` keys
     `signal`/`pump` in `phase_matching` against `signal_mode`/`pump_mode` in `gain`);
   - NaN-safe dB everywhere.
-- [ ] **4.3 Docstrings:**
+- [x] **4.3 Docstrings:**
   - `Is0` is documented as 1e-6 but defaults to 1e-7 (private drivers 1e-6);
   - `fb_config` is described as "GENERAL model only" (also in the `FBSolverConfig` docstring);
   - the comment at `~1929` says `Zout = twpa.Z0_ref`, but the code uses `port_Z_ext`;
@@ -450,7 +455,7 @@ cold compile time measured and noted here; the line count noted here.
   - `update_rate` is ignored by `bloch`, and `m_max`/`edge_threshold`/`anderson_depth` by `general`;
   - `Z0` and `Ze` are both `port_Z_ext`;
   - `max_step` and `edge_substeps` are never exposed.
-- [ ] **4.5 Dead code:**
+- [x] **4.5 Dead code:**
   - `self._n_distinct_segments` (`~743`);
   - the unreachable `threshold is None` branches (`~1300`, `~1402`);
   - `gap` is always True (`~1250`);
@@ -502,7 +507,7 @@ cold compile time measured and noted here; the line count noted here.
 - [ ] **5.5 `matrices_arrays.py`:** the 12 duplicated property pairs on ABCD/S/Z arrays become a small descriptor.
   `TwoPortModel.__mul__` should use `model_copy(update=...)`.
   - Done 2026-11-06 (audit-fixes): descriptor `_Element`, same validation. Left: `__mul__`.
-- [ ] **5.6 `quantum/`** (per D3). Dead functions: `gaussian.expm_batch`, `magnus4_omega`,
+- [x] **5.6 `quantum/`** (per D3). Dead functions: `gaussian.expm_batch`, `magnus4_omega`,
   `transfer_to_scattering`. The Python `star`/`cascade` duplicate the numba versions in `kernels.py`;
   `linearize.py:146` uses `col` possibly before assignment.
 
@@ -510,7 +515,7 @@ cold compile time measured and noted here; the line count noted here.
 
 - [ ] **6.1 `pyproject.toml`:**
   - real description; version per D7; license as SPDX `Apache-2.0`; author email; URLs; classifiers;
-  - drop the `<3.13` upper bound;
+  - drop the `<3.13` upper bound; **done 2026-11-06** with version `0.1.0` (D7), lock refreshed;
   - `networkx = "<=3.*"` resolves to 3.0: use `>=3`;
   - sympy is listed in both main and analysis (or dropped, per 5.3);
   - declare `typing_extensions` (imported);
@@ -808,13 +813,15 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
   Base data bit-identical; `supercell_matrix` moves by ~2e-13 (product order), so uniform `bloch` gains move
   <= 3.5e-11 dB, `simple` is identical, and the segmented edge-basis case moves 3.3e-3 dB (item 2.37).
 
-## Where to pick up (end of session 2026-11-06)
+## Where to pick up (updated 2026-11-06, `audit-fixes`)
 
-`bloch-cmes` holds WP1, WP3.1-3.6 and the connector test; nothing is pushed. Next, roughly in order:
-1. **WP3.7:** one source of defaults (`m_max` 2 in the config vs 5 in the solver signature, `anderson_depth` 10 vs
-   5). **WP3.8:** add the `twpasolver-warmup` script entry to `pyproject`.
-2. **WP2:** the bug fixes that still apply. 2.1 and 2.20 are moot; 2.6 and 2.14 are done; 2.5 (silent NaN) now
-   concerns `simple` only.
-3. **WP4:** split `analysis.py` (now about 1,900 lines; many WP4 items shrank with the model removal), a
-   consistent result dict, and the docstrings (Is0 default, `fb_config`).
-4. **WP5 to WP7:** models and modes, packaging and CI, docs; then reconcile with `origin/main` and push.
+WP0 is closed (PyPI, `0.1.0`, Python ≥3.10, any API break allowed). WP1, WP3 except 3.3, and most of WP2 are done;
+comments and docstrings are trimmed. Nothing is pushed. Next, roughly in order:
+1. **WP2 leftovers:** 2.12 (fresh `gain()` fails), 2.9 (segmented `phase_matching`, not rechecked), 2.35 list
+   `port`. 2.4 and 2.37 stay deferred.
+2. **WP4 (API, before the docs are written against it):** 4.2 one result dict, 4.4 ignored parameters, 4.1 split
+   `analysis.py` (about 1,860 lines), 4.6 units, 4.7 residual metric; 3.3 shared helpers fits here.
+3. **WP5:** 5.1 user models, 5.3 `modes_rwa`, 5.5 descriptor (5.2 can wait for WP8).
+4. **WP6:** rest of 6.1 (version and Python are set), CI (add 3.13), pre-commit pins, mypy.
+5. **WP7:** fix the Sphinx RST errors left in `gain`, `bloch_mode_tables`, `edge_basis_tables`, the `bloch_fb`
+   module docstring and the `|…|` field descriptions; toctree, notebooks, README, changelog; tag and publish.
