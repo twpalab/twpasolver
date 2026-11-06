@@ -128,14 +128,14 @@ def lossless_line_abcd(freqs: FloatArray, C: float, L: float, l: float) -> Compl
 
 @njit(cache=True)
 def LCLf_abcd(
-    freqs: FloatArray, C: float, L: float, Lf: float, qp_loss: float = 0.0
+    freqs: FloatArray, C: complex, L: float, Lf: float, qp_loss: float = 0.0
 ) -> ComplexArray:
     """
     Calculate the ABCD matrix of an LCLf cell model.
 
     Args:
         freqs (FloatArray): Array of frequencies.
-        C (float): Capacitance value.
+        C (complex): Capacitance value (complex for dielectric loss).
         L (float): Inductance value.
         Lf (float): Additional inductance value.
         qp_loss (float): Quasiparticle-loss coefficient (units 1/Hz).

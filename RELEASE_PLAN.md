@@ -178,13 +178,16 @@ Each fix gets a test.
 
 ### API bugs (confirmed by running them)
 
-- [ ] **2.7 2-D `initial_amplitudes_*` crash `general` and `bloch`.** `y0_fwd[signal_idx]` at
+- [x] **2.7 2-D `initial_amplitudes_*` crash `general` and `bloch`.** `y0_fwd[signal_idx]` at
   `analysis.py:~2030` and `~2458` picks a row instead of a column; use `y0_*_broadcast[:, signal_idx]`.
-- [ ] **2.8 HDF5 save fails for every forward–backward result:** `gains_all_passes` is a list of dicts. Store it
+  - Done 2026-11-06 (audit-fixes): `bloch` takes the signal column of the broadcast ICs. Test `test_bloch_2d_initial_amplitudes`.
+- [x] **2.8 HDF5 save fails for every forward–backward result:** `gains_all_passes` is a list of dicts. Store it
   as arrays.
+  - Done 2026-11-06 (audit-fixes) with 2.29. Test `test_twpanalysis_end_to_end`.
 - [ ] **2.9 `phase_matching` on segmented devices raises `IndexError`** (k is 2-D there). It also fills
   `np.empty` with garbage when `gamma` is None (`~1663`).
-- [ ] **2.10 `k_star` fit guard:** `len(freqs_mask) > 2` (`~715`) should be `freqs_mask.sum() > 2`.
+- [x] **2.10 `k_star` fit guard:** `len(freqs_mask) > 2` (`~715`) should be `freqs_mask.sum() > 2`.
+  - Done 2026-11-06 (audit-fixes). Test `test_k_star_guard_with_coarse_grid`.
 - [ ] **2.11 Stopband detection from argmin/argmax of `diff(S21_db)`** (`~665-670`) can return start > end; it
   gave `[19.13, 14.07]` on the device in `tests/test_bloch.py`. That reversed pair feeds the default ranges and
   the pump estimate. Use the supercell half-trace (`passband_mask`/`in_stopband` from the edge-basis fix).
@@ -196,33 +199,42 @@ Each fix gets a test.
   from the decorator, as it did before 6097a93. Exclude `Ip0` from the state check.
 - [ ] **2.13 `gain(Ip0=...)` permanently sets `self.twpa.Ip0`** (`~1816`). Use a local value instead.
 - [ ] **2.14 Shared mutable default** `fb_config=FBSolverConfig()` (`~1738`): use `None`.
-- [ ] **2.15 `parameter_sweep` `log.warning` format** has an argument but no `%s` (`~414`).
-- [ ] **2.16 The decorator's overwrite message** checks `function_name` instead of `save_name` (`~368`); line
+- [x] **2.15 `parameter_sweep` `log.warning` format** has an argument but no `%s` (`~414`).
+  - Done 2026-11-06 (audit-fixes) with 2.32. Test `test_parameter_sweep_target_in_result_keys`.
+- [x] **2.16 The decorator's overwrite message** checks `function_name` instead of `save_name` (`~368`); line
   `~375` is dead.
-- [ ] **2.17 `bandwidth()` with no stored gain** raises a `TypeError`; with kwargs it overwrites `data["gain"]`.
+  - Done 2026-11-06 (audit-fixes). Test `test_overwrite_message_checks_save_name`.
+- [x] **2.17 `bandwidth()` with no stored gain** raises a `TypeError`; with kwargs it overwrites `data["gain"]`.
+  - Done 2026-11-06 (audit-fixes): no stored gain and no kwargs raises `ValueError`; all-NaN gain raises; `nanargmax` for partial NaN. The kwargs path still re-runs `gain()` (unchanged). Test `test_bandwidth_errors`.
 - [ ] **2.18 `thin`** is a point count in `gain` (zero points if `N_tot < thin`) but a stride in
   `phase_matching`. Make both a stride, or rename one of them.
-- [ ] **2.19 `TWPAnalysis(freqs_arange=...)`** (a typo) is silently ignored and gives an empty grid. Set
+- [x] **2.19 `TWPAnalysis(freqs_arange=...)`** (a typo) is silently ignored and gives an empty grid. Set
   `extra="forbid"` on the pydantic models. The unused fixture at `tests/test_analysis.py:30` has exactly this typo.
+  - Done 2026-11-06 (audit-fixes): `extra="forbid"` on `TWPAnalysis` and `Frequencies` only (circuit models unchanged); dead fixture removed. Test `test_twpanalysis_rejects_unknown_fields`.
 - [ ] **2.20 Likely, not run:** in segmented `general` forward–backward runs, the backward carrier reverses
   `gammas` but not the segment midpoints (`~1968-1988`). This affects only the phase of `I_tuples_bwd`. Moot if
   D1 removes the model.
 
 ### Models and modes
 
-- [ ] **2.21 `TWPA` slicing drops parameters** (`modelarray.py:53`): `TWPA(Istar=1e-3, N=7)[0:2]` returns
+- [x] **2.21 `TWPA` slicing drops parameters** (`modelarray.py:53`): `TWPA(Istar=1e-3, N=7)[0:2]` returns
   default `Istar` and `N=1`.
   - **Audit 2026-11-06:** also `OnePortArray(parallel=True, twoport_parallel=True)[0:2]` comes back as a series
     array. Fix: `return self.model_copy(update={"cells": self.cells[indices]})`.
-- [ ] **2.22 `validate_nested_cells` mutates the caller's list** (`modelarray.py:39`).
-- [ ] **2.23 Small fixes:** `matrices_arrays.py:99` (`and` should be `or`), `bonus_types.py:41` (missing `f`
+  - Done 2026-11-06 (audit-fixes): `model_copy` keeps every field (incl. `N`) except `cells`. Test `test_twpa_slice_keeps_parameters`.
+- [x] **2.22 `validate_nested_cells` mutates the caller's list** (`modelarray.py:39`).
+  - Done 2026-11-06 (audit-fixes). Test `test_nested_cells_do_not_mutate_input`.
+- [x] **2.23 Small fixes:** `matrices_arrays.py:99` (`and` should be `or`), `bonus_types.py:41` (missing `f`
   prefix), and `Frequencies.f` silently prefers `f_arange` when `f_list` is also set (raise instead).
+  - Done 2026-11-06 (audit-fixes). Tests `test_abcd_setter_rejects_wrong_length`, `test_impedance_must_have_positive_real_part`, `test_frequencies_validation`.
 - [ ] **2.24 `modes_rwa._validate_modes` checks single characters** (`~553`), so multi-character mode names on
   the right-hand side fail ("Mode 2 not found" for `p2-s`).
-- [ ] **2.25 Cyclic relations** are accepted silently (empty expressions); `_compute_substitutions` (`~315`) can
+- [x] **2.25 Cyclic relations** are accepted silently (empty expressions); `_compute_substitutions` (`~315`) can
   loop forever. Detect cycles and raise.
+  - Done 2026-11-06 (audit-fixes): networkx cycle check in `RWAAnalyzer._compute_substitutions`. Test `test_cyclic_relations_raise`.
 - [ ] **2.26 `Mode.__eq__`/`__hash__`:** eq ignores the label but hash uses it (`~204/216`).
-- [ ] **2.27 `twpa_cells.py:94,103`:** complex `C` is passed where the annotation says float (mypy).
+- [x] **2.27 `twpa_cells.py:94,103`:** complex `C` is passed where the annotation says float (mypy).
+  - Done 2026-11-06 (audit-fixes): `LCLf_abcd(C: complex)`; mypy 22 -> 20.
 
 ### Audit 2026-11-06 (new findings, `/ponytail-audit` on `bloch-cmes` daa4246)
 
@@ -235,25 +247,31 @@ Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` da
     `_convergence_step` deleted). A non-finite residual ends the iteration at once with `converged=False`, so
     the existing warning reports it and no time is spent on NaN passes. Tests:
     `test_nan_iterate_stops_unconverged`, `test_result_does_not_depend_on_anderson_depth` (depth 1 vs 5).
-- [ ] **2.29 A failed HDF5 save destroys the previous file** (`file_utils.save_to_hdf5`: mode `"w"` empties it
+- [x] **2.29 A failed HDF5 save destroys the previous file** (`file_utils.save_to_hdf5`: mode `"w"` empties it
   first). Besides 2.8, these also fail half-way: `phase_matching` results (`triplets["k"]` mixes the (1,)
   `pump_k` with scalars, ragged array) and `parameter_sweep` over `gain` (lists of `mode_info` dicts; notebook 03
   does this). Int dict keys reload as strings, so `plot_mode_currents` loses its labels after `load_data`.
   Fix: write to `name + ".tmp"` then `os.replace`; save lists of dicts as index-keyed groups; `float(pump_k)`.
-- [ ] **2.30 `update_base_data` ignores grid, unit and port changes** (`analysis.py:650-656`, state is only
+  - Done 2026-11-06 (audit-fixes): tmp file + `os.replace`; lists of dicts, strings or ragged items saved as index groups (attr `list`), all-int keys marked (attr `int_keys`); `pump_k` stored as a scalar. Tests `test_twpanalysis_end_to_end`, `test_parameter_sweep_over_gain_saves`, `test_digit_keyed_dict_stays_dict`, `test_failed_save_keeps_previous_file`.
+- [x] **2.30 `update_base_data` ignores grid, unit and port changes** (`analysis.py:650-656`, state is only
   `twpa.model_dump()`). After changing `f_arange`, `data["freqs"]` keeps the old 1995 points while `a.f` has 995.
   Fix: include `(f_arange, f_list, unit, port)` in the state.
-- [ ] **2.31 `phase_matching` range arguments** (`analysis.py:1358-1378`): `pump_arange=[13, 14, 15]` gives only
+  - Done 2026-11-06 (audit-fixes): state is `(twpa, f_list, f_arange, unit)`; ports are read at `gain()` time and are not part of base data. Test `test_update_base_data_follows_grid`.
+- [x] **2.31 `phase_matching` range arguments** (`analysis.py:1358-1378`): `pump_arange=[13, 14, 15]` gives only
   `[13]` (treated as an arange); an explicit `(5, 10, 0.1)` is thinned by `thin=20` to 3 points; `pump_Ip0=0.0`
   is falsy, so Kerr stays on. Fix: only a tuple is an arange, do not thin explicit ranges, `is not None`.
-- [ ] **2.32 `parameter_sweep` `KeyError`** (`analysis.py:412-430`) when the swept name is also a result key
+  - Done 2026-11-06 (audit-fixes). Tests `test_phase_matching_explicit_ranges`, `test_phase_matching_zero_pump_is_linear`.
+- [x] **2.32 `parameter_sweep` `KeyError`** (`analysis.py:412-430`) when the swept name is also a result key
   (`parameter_sweep("gain", "signal_freqs", ...)`): it appends to `<name>_sweeped`, which is never created.
   Fix with 2.15: `results = {}`, then `results[target_savename] = []` after the collision check.
-- [ ] **2.33 `__array__` is not NumPy-2 compliant** (`matrices_arrays.py:39-41`):
+  - Done 2026-11-06 (audit-fixes). Test `test_parameter_sweep_target_in_result_keys`.
+- [x] **2.33 `__array__` is not NumPy-2 compliant** (`matrices_arrays.py:39-41`):
   `np.asarray(cell.abcd, dtype=complex)` raises `TypeError`; `np.array(cell.abcd)` warns. Fix:
   `def __array__(self, dtype=None, copy=None): return np.array(self._matarray, dtype=dtype, copy=copy)`.
-- [ ] **2.34 `.s` vs `.to_network().s` disagree for complex Z0** (`mathutils.a2s` uses pseudo-waves, skrf
+  - Done 2026-11-06 (audit-fixes). Test `test_abcd_array_protocol`.
+- [x] **2.34 `.s` vs `.to_network().s` disagree for complex Z0** (`mathutils.a2s` uses pseudo-waves, skrf
   power waves): 0.53 apart for `Z0_ref=30+20j`, 1.6e-16 for real Z0. Fix: `s_def="pseudo"` in `to_network`.
+  - Done 2026-11-06 (audit-fixes): `to_network` passes our pseudo-wave S with `s_def="pseudo"` (skrf converts `a=` before `z0` is set); `.z` agrees too, skrf's own `.a` still assumes power waves. Test `test_network_s_matches_for_complex_z0`.
 - [ ] **2.35 Small ones:**
   - `N=0` and `model * 0` crash on a bare `assert` in `matpow_2x2` (`N` is `NonNegativeInt`).
   - `Z0=0` passes the validator (`bonus_types.py:40`) and then fails the bare assert in `a2s`/`s2a`.
@@ -264,10 +282,12 @@ Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` da
   - A list-valued `port` fills only `Zout`; its ABCD stays the identity (`analysis.py:643-646`), read only.
   - CI venv cache key (`analysis.yml:26-27`) ignores `matrix.python-version`.
   - `warmup` with `passes=1` logs a "did not converge" warning every time.
-- [ ] **2.36 Test for `TWPAnalysis`:** no test runs `phase_matching`, `bandwidth`, stopband detection or a save and
+  - Done 2026-11-06 (audit-fixes) for `N=0` (identity), `Z0=0`, `Resistance.Z`, arange step > 0 (tests `test_zero_repetitions_is_identity`, `test_impedance_must_have_positive_real_part`, `test_resistance_on_integer_freqs`, `test_frequencies_validation`). Still open: polar `interpolate`, list-valued `port`, CI cache key, warmup warning.
+- [x] **2.36 Test for `TWPAnalysis`:** no test runs `phase_matching`, `bandwidth`, stopband detection or a save and
   reload of a real result; the `twpanalysis_instance` fixture asks for a `twpa_model` fixture that does not exist.
   One test on the 3-cell device (`gain` simple and bloch, `phase_matching`, `save_data`/`load_data`, stopband
   start < end) would have caught 2.11, 2.29-2.32.
+  - Done 2026-11-06 (audit-fixes): `test_twpanalysis_end_to_end` (simple and bloch gain, `phase_matching`, `bandwidth`, save/load). Stopband start < end is left to 2.11.
 
 **Acceptance:** each item has a test; the full suite is green; mypy errors go down.
 
@@ -661,6 +681,10 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
 - 2026-11-06, 2.6 on `audit-fixes`: `RKSolverConfig` passed to every kernel, shared step cap 10 per cell,
   `FBSolverConfig`/`fb_config` renamed `BlochSolverConfig`/`bloch_config` (no alias), and the cached kernels are
   dropped when any `@njit` module changes. Cap 1 vs 10 is bit-identical on the regression set; mypy 22 errors.
+
+- 2026-11-06, WP2 API batch on `audit-fixes`: 2.7, 2.8, 2.10, 2.15-2.17, 2.19, 2.21-2.23, 2.25, 2.27,
+  2.29-2.34, most of 2.35, and 2.36; tests in `tests/test_analysis_api.py`. Gains bit-identical on the
+  regression set; mypy 22 -> 20.
 
 ## Where to pick up (end of session 2026-11-06)
 

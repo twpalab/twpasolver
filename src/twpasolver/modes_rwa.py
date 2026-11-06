@@ -314,6 +314,12 @@ class RWAAnalyzer:
 
     def _compute_substitutions(self) -> List:
         """Compute all mode substitutions based on the relations."""
+        graph = nx.DiGraph(
+            (i, output) for output, inputs, _ in self.relations_idx for i in inputs
+        )
+        if not nx.is_directed_acyclic_graph(graph):
+            cycle = [self.modes[i] for i, _ in nx.find_cycle(graph)]
+            raise ValueError(f"Mode relations are cyclic: {' -> '.join(cycle)}")
         modes_subs = deepcopy(self.modes_symbolic)
         # Without relations every mode is independent; the loop below would
         # never reach its exit condition.

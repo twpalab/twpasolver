@@ -36,9 +36,9 @@ class TwoByTwoArray:
         """
         return f"{self.__class__.__name__}({self._matarray})"
 
-    def __array__(self):
+    def __array__(self, dtype=None, copy=None):
         """Convert the TwoByTwoArray to a numpy array."""
-        return self._matarray
+        return np.array(self._matarray, dtype=dtype, copy=copy)
 
     def __getitem__(self, indices) -> Self | np.ndarray:
         """
@@ -96,9 +96,10 @@ class TwoByTwoArray:
             k (int): Column index (0 or 1).
             values (numpy.ndarray): Values to set for the specified parameter.
         """
-        if values.ndim != 1 and len(values) != self.len:
+        values = np.asarray(values)
+        if values.ndim != 1 or len(values) != self.len:
             raise ValueError(f"Must provide a 1-D array of length {self.len}")
-        self._matarray[:, i, k] = np.asarray(values)
+        self._matarray[:, i, k] = values
 
 
 class ABCDArray(TwoByTwoArray):

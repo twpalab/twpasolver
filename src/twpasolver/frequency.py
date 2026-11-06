@@ -8,7 +8,7 @@ This module defines the `Frequencies` class for representing a span of frequenci
 from typing import Literal, Optional
 
 import numpy as np
-from pydantic import Field, PrivateAttr
+from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
 from twpasolver.basemodel import BaseModel
 from twpasolver.bonus_types import FloatArray, FrequencyArange, FrequencyList
@@ -16,6 +16,8 @@ from twpasolver.bonus_types import FloatArray, FrequencyArange, FrequencyList
 
 class Frequencies(BaseModel):
     """Frequency span with variable unit."""
+
+    model_config = ConfigDict(extra="forbid")
 
     f_list: Optional[FrequencyList] = Field(
         default=None, description="List of frequencies"
@@ -28,6 +30,13 @@ class Frequencies(BaseModel):
     _unit_multipliers: dict[str, float] = PrivateAttr(
         {"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9, "THz": 1e12}
     )
+
+    @model_validator(mode="after")
+    def _single_span(self):
+        """Reject ambiguous spans given both as a list and as an arange."""
+        if self.f_list is not None and self.f_arange is not None:
+            raise ValueError("Set only one of f_list and f_arange.")
+        return self
 
     @property
     def f(self) -> np.ndarray:

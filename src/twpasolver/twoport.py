@@ -55,7 +55,12 @@ from twpasolver.bonus_types import Impedance, validate_impedance
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.logger import log
 from twpasolver.mathutils import a2s, a2z, s2a, z2a
-from twpasolver.matrices_arrays import ABCDArray, SMatrixArray, ZMatrixArray
+from twpasolver.matrices_arrays import (
+    ABCDArray,
+    SMatrixArray,
+    ZMatrixArray,
+    abcd_identity,
+)
 
 
 class TwoPortCell:
@@ -189,7 +194,9 @@ class TwoPortCell:
             rf.Network: scikit-rf Network.
         """
         f = rf.Frequency.from_f(self.freqs * 1e-9, "ghz")
-        return rf.Network(frequency=f, a=np.asarray(self.abcd), z0=self.Z0)
+        # Pass S (pseudo-waves, as in ``self.s``), not ABCD: skrf converts ``a``
+        # before ``z0`` is set.
+        return rf.Network(frequency=f, s=np.asarray(self.s), z0=self.Z0, s_def="pseudo")
 
     @property
     def s(self) -> SMatrixArray:
@@ -345,6 +352,8 @@ class TwoPortModel(BaseModel, ABC):
         Returns:
             ABCDArray: Computed ABCD matrix of the model.
         """
+        if self.N == 0:
+            return abcd_identity(len(freqs))
         if self.N == 1:
             return self.single_abcd(freqs)
         return self.single_abcd(freqs) ** self.N

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from twpasolver.analysis import Analyzer, TWPAnalysis, analysis_function
+from twpasolver.analysis import Analyzer, analysis_function
 from twpasolver.file_utils import read_file
 
 
@@ -24,11 +24,6 @@ class SimpleAnalyzer(Analyzer):
 @pytest.fixture
 def analyzer_instance(analyzer_data):
     return SimpleAnalyzer(**analyzer_data)
-
-
-@pytest.fixture
-def twpanalysis_instance(twpa_model):
-    return TWPAnalysis(twpa=twpa_model, freqs_arange=(0, 9, 1e-3))
 
 
 def test_analysis_function(analyzer_instance):

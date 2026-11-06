@@ -34,10 +34,7 @@ class ModelArray(TwoPortModel):
         Returns:
             list[TwoPortModel]: Validated and potentially nested ModelArrays.
         """
-        for i, c in enumerate(cells):
-            if isinstance(c, list):
-                cells[i] = cls(cells=c)
-        return cells
+        return [cls(cells=c) if isinstance(c, list) else c for c in cells]
 
     def __getitem__(self, indices: slice | int) -> ModelArray | TwoPortModel:
         """
@@ -50,7 +47,7 @@ class ModelArray(TwoPortModel):
             ModelArray | TwoPortModel: Value at the specified indices or slice.
         """
         if isinstance(indices, slice):
-            return self.__class__(cells=self.cells[indices])
+            return self.model_copy(update={"cells": self.cells[indices]})
         return self.cells[indices]
 
     def append(self, other: TwoPortModel) -> None:

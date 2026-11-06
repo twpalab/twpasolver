@@ -372,14 +372,13 @@ def analysis_function(func):
         log.info("Running %s", function_name)
         result = func(self, *args, **kwargs)
         if save:
-            if function_name in self.data.keys():
-                log.info(
-                    "Data for '%s' output already present in analysis data, will be overwritten.",
-                    function_name,
-                )
             if save_name is None:
                 save_name = function_name
-                kwargs.update({"save_name": save_name})
+            if save_name in self.data.keys():
+                log.info(
+                    "Data for '%s' output already present in analysis data, will be overwritten.",
+                    save_name,
+                )
             self.data[save_name] = result
         return result
 
@@ -409,7 +408,7 @@ class Analyzer(BaseModel, ABC):
         self, function: str, target: str, values: list, *args, **kwargs
     ) -> dict[str, list[Any]]:
         """Run an analysis function multiple times for different values of a parameter."""
-        results: dict[str, list[Any]] = {target: []}
+        results: dict[str, list[Any]] = {}
         kwargs.update({"save": False})
         fn = getattr(self, function)
         target_savename = target
@@ -420,10 +419,12 @@ class Analyzer(BaseModel, ABC):
                 if target in fn_res.keys():
                     target_savename = target + "_sweeped"
                     log.warning(
-                        "Results dictionary contains key with target variable name, will be overwritten.",
+                        "Results dictionary contains key with target variable name, "
+                        "sweep values saved as '%s'.",
                         target_savename,
                     )
                 results.update({key: [item] for key, item in fn_res.items()})
+                results[target_savename] = []
             else:
                 for key, item in fn_res.items():
                     results[key].append(item)
@@ -440,7 +441,7 @@ class TWPAnalysis(Analyzer, Frequencies):
     mode relationship management.
     """
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(validate_assignment=True, extra="forbid")
     twpa: TWPA
     port: Any = Field(
         default=None,
@@ -649,7 +650,12 @@ class TWPAnalysis(Analyzer, Frequencies):
 
     def update_base_data(self) -> None:
         """Update data extracted from the twpa model."""
-        current_state = self.twpa.model_dump()
+        current_state = {
+            "twpa": self.twpa.model_dump(),
+            "f_list": self.f_list,
+            "f_arange": self.f_arange,
+            "unit": self.unit,
+        }
         if (
             not hasattr(self, "_previous_state")
             or current_state != self._previous_state
@@ -733,7 +739,7 @@ class TWPAnalysis(Analyzer, Frequencies):
                 k_full = whole["k"]
 
             freqs_mask = freqs < freqs[stopband_start_idx] / 10
-            if len(freqs_mask) > 2:
+            if freqs_mask.sum() > 2:
                 k_pars = np.polyfit(freqs[freqs_mask], k_full[freqs_mask], 2)
                 self.data["k_star"] = k_full - np.polyval(k_pars[1:], freqs)
             else:
@@ -1346,20 +1352,38 @@ class TWPAnalysis(Analyzer, Frequencies):
         idler_mode: str = "i",
         mode_array_config: str = "basic_3wm",
         pump_Ip0: Optional[float] = None,
-        signal_arange: Optional[Tuple[float, float, float]] = None,
-        pump_arange: Optional[Tuple[float, float, float]] = None,
+        signal_arange: Optional[
+            Union[Tuple[float, float, float], List[float], np.ndarray]
+        ] = None,
+        pump_arange: Optional[
+            Union[Tuple[float, float, float], List[float], np.ndarray]
+        ] = None,
         thin: int = 20,
         relative=True,
     ) -> dict[str, Any]:
-        """Analyze phase matching conditions for nonlinear processes using mode arrays."""
+        """
+        Analyze phase matching conditions for nonlinear processes using mode arrays.
+
+        Parameters
+        ----------
+        pump_Ip0 : float, optional
+            Pump current used for the Kerr term. None uses the model's ``chi``;
+            0 gives the linear mismatch.
+        signal_arange, pump_arange : tuple or array_like, optional
+            A tuple ``(start, stop, step)`` is passed to ``numpy.arange``; a list
+            or array is used as the explicit frequencies. None takes the
+            frequency grid below (signal) or above (pump) the stopband.
+        thin : int, default 20
+            Stride applied only to the default ranges taken from the grid.
+        """
         mode_array = self.get_mode_array(mode_array_config)
         freqs = self.data["freqs"]
 
         if pump_arange is not None:
             pump_f = (
-                np.arange(*pump_arange)[::thin]
-                if len(pump_arange) == 3
-                else np.array(pump_arange)
+                np.arange(*pump_arange)
+                if isinstance(pump_arange, tuple)
+                else np.asarray(pump_arange, dtype=float)
             )
         else:
             min_p_idx = np.where(freqs == self.data["stopband_freqs"][1])[0][0]
@@ -1367,15 +1391,15 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         if signal_arange is not None:
             signal_f = (
-                np.arange(*signal_arange)[::thin]
-                if len(signal_arange) == 3
-                else np.array(signal_arange)
+                np.arange(*signal_arange)
+                if isinstance(signal_arange, tuple)
+                else np.asarray(signal_arange, dtype=float)
             )
         else:
             max_s_idx = np.where(freqs == self.data["stopband_freqs"][0])[0][0]
             signal_f = freqs[:max_s_idx:thin]
 
-        chi = pump_Ip0**2 * self.twpa.xi / 8 if pump_Ip0 else self.twpa.chi
+        chi = pump_Ip0**2 * self.twpa.xi / 8 if pump_Ip0 is not None else self.twpa.chi
 
         f_triplets = []
         k_triplets = []
@@ -1403,7 +1427,9 @@ class TWPAnalysis(Analyzer, Frequencies):
 
             for j, (s_freq, i_freq) in enumerate(zip(signal_freqs_pm, idler_freqs_pm)):
                 f_triplets.append([p_freq, s_freq, i_freq])
-                k_triplets.append([pump_k, signal_k_array[j], idler_k_array[j]])
+                k_triplets.append(
+                    [np.asarray(pump_k).item(), signal_k_array[j], idler_k_array[j]]
+                )
 
             if (
                 gamma is not None
@@ -1793,8 +1819,8 @@ class TWPAnalysis(Analyzer, Frequencies):
         Zin_out = (A_out * Zb_launch_out + B_out) / (C_out * Zb_launch_out + D_out)
         refl_out = (Ze - Zin_out) / (Ze + Zin_out)
 
-        Is0_rep = np.repeat(y0_fwd[signal_idx], n_freq)
-        Ib0_rep = np.repeat(y0_bwd[signal_idx], n_freq)
+        Is0_rep = y0_fwd_broadcast[:, signal_idx]
+        Ib0_rep = y0_bwd_broadcast[:, signal_idx]
 
         def _gains(I_fwd_arr, I_bwd_arr):
             out_fwd = (
@@ -1865,14 +1891,20 @@ class TWPAnalysis(Analyzer, Frequencies):
         **gain_kwargs : dict
             Additional arguments forwarded to ``gain()``.
         """
-        if gain_kwargs or "gain" not in self.data.keys():
+        if gain_kwargs:
             self.gain(**gain_kwargs)
+        elif "gain" not in self.data.keys():
+            raise ValueError(
+                "No stored gain: run gain() first or pass its arguments to bandwidth()."
+            )
 
         gain_data = self.data["gain"]
         gain_db = gain_data["gain_db"]
         signal_freqs = gain_data["signal_freqs"]
+        if np.all(np.isnan(gain_db)):
+            raise ValueError("Stored gain is NaN at every frequency.")
 
-        max_g = gain_db[np.argmax(gain_db)]
+        max_g = gain_db[np.nanargmax(gain_db)]
         ok_idx = np.where(gain_db >= max_g - gain_reduction)[0]
         ok_freqs = signal_freqs[ok_idx]
         df = signal_freqs[1] - signal_freqs[0]

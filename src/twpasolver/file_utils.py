@@ -115,8 +115,16 @@ def save_to_hdf5(savename: str, d: Dict[str, Any]) -> None:
     if not isinstance(d, dict):
         return
 
-    with h5py.File(savename, "w") as f:
-        _recursively_save_dict_contents_to_group(f, d)
+    # Write to a temporary file so that a failed save keeps the previous one.
+    tmp = savename + ".tmp"
+    try:
+        with h5py.File(tmp, "w") as f:
+            _recursively_save_dict_contents_to_group(f, d)
+        os.replace(tmp, savename)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise
 
 
 def save_to_json(savename: str, d: Dict[str, Any]) -> None:
@@ -131,7 +139,7 @@ def save_to_json(savename: str, d: Dict[str, Any]) -> None:
         json.dump(d, fp, cls=NpEncoder, indent=4)
 
 
-def _recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> None:
+def _recursively_save_dict_contents_to_group(f: Group, d: Dict[Any, Any]) -> None:
     """
     Recursively save dictionary contents to an HDF5 group.
 
@@ -139,15 +147,32 @@ def _recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> Non
         f (Group): The HDF5 group.
         d (Dict[str, Any]): The dictionary to save.
     """
+    if d and all(isinstance(key, (int, np.integer)) for key in d):
+        f.attrs["int_keys"] = True
     for key, item in d.items():
         key = str(key)
+
+        if isinstance(item, (list, tuple)):
+            array = None
+            if not any(isinstance(i, dict) for i in item):
+                try:
+                    array = np.array(item)
+                except ValueError:  # ragged
+                    pass
+            if array is None or array.dtype.kind in "OU":
+                # Lists of dicts, strings or ragged items: one entry per index.
+                subgroup = f.create_group(key)
+                subgroup.attrs["list"] = True
+                _recursively_save_dict_contents_to_group(
+                    subgroup, dict(enumerate(item))
+                )
+                continue
+            item = array
 
         if isinstance(item, dict):
             subgroup = f.create_group(key)
             _recursively_save_dict_contents_to_group(subgroup, item)
         else:
-            if isinstance(item, (list, tuple)):
-                item = np.array(item)
             if isinstance(item, str):
                 dtype = h5py.special_dtype(vlen=str)
             elif isinstance(item, np.ndarray):
@@ -157,7 +182,7 @@ def _recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> Non
             f.create_dataset(key, data=item, dtype=dtype)
 
 
-def _recursively_load_dict_contents_from_group(f: Group) -> Dict[str, Any]:
+def _recursively_load_dict_contents_from_group(f: Group) -> Dict[Any, Any]:
     """
     Recursively load dictionary contents from an HDF5 group.
 
@@ -167,14 +192,18 @@ def _recursively_load_dict_contents_from_group(f: Group) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: The loaded dictionary.
     """
-    ans = {}
+    ans: Dict[Any, Any] = {}
+    int_keys = bool(f.attrs.get("int_keys", False))
     for key, item in f.items():
         if isinstance(item, h5py.Dataset):
-            ans[key] = (
+            value = (
                 item[()].decode("utf-8") if isinstance(item[()], bytes) else item[()]
             )
         elif isinstance(item, Group):
-            ans[key] = _recursively_load_dict_contents_from_group(f[key])
+            value = _recursively_load_dict_contents_from_group(item)
+            if item.attrs.get("list", False):
+                value = [value[i] for i in range(len(value))]
+        ans[int(key) if int_keys else key] = value
     return ans
 
 

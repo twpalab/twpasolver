@@ -116,7 +116,7 @@ class Resistance(OnePortModel):
         Returns:
             np.ndarray: Impedance of the resistor.
         """
-        return np.full_like(freqs, self.R)
+        return np.full(np.shape(freqs), self.R, dtype=float)
 
 
 class Capacitance(OnePortModel):
