@@ -1,8 +1,4 @@
-"""
-Module containing models for transmission lines.
-
-This module provides classes and functions to model various types of transmission lines.
-"""
+"""Transmission line models."""
 
 from typing import Literal
 
@@ -31,48 +27,22 @@ class LosslessTL(TwoPortModel):
         cls, Z0: NonNegativeFloat, vp: NonNegativeFloat, l: NonNegativeFloat
     ) -> "LosslessTL":
         """
-        Initialize the model from impedance and line propagation constant.
-
-        Args:
-            Z0 (NonNegativeFloat): Characteristic impedance of the line.
-            vp (NonNegativeFloat): Phase velocity of the line.
-            l (NonNegativeFloat): Length of the transmission line.
-
-        Returns:
-            LosslessTL: An instance of the LosslessTL class.
+        Build the line from characteristic impedance ``Z0``, phase velocity ``vp`` and length ``l``.
         """
         return cls(l=l, L=Z0 / vp, C=1 / (vp * Z0))
 
     @computed_field  # type: ignore
     @property
     def Z0(self) -> NonNegativeFloat:
-        """
-        Compute the characteristic impedance of the line.
-
-        Returns:
-            NonNegativeFloat: The characteristic impedance.
-        """
+        """Characteristic impedance ``sqrt(L / C)``."""
         return np.sqrt(self.L / self.C)
 
     @computed_field  # type: ignore
     @property
     def vp(self) -> NonNegativeFloat:
-        """
-        Compute the characteristic phase velocity of the line.
-
-        Returns:
-            NonNegativeFloat: The phase velocity.
-        """
+        """Phase velocity ``1 / sqrt(L C)``."""
         return 1 / np.sqrt(self.L * self.C)
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
-        """
-        Get the ABCD matrix of the transmission line portion for given frequencies.
-
-        Args:
-            freqs (np.ndarray): Array of frequencies at which to evaluate the ABCD matrix.
-
-        Returns:
-            ABCDArray: The ABCD matrix of the transmission line.
-        """
+        """ABCD matrices of the line."""
         return ABCDArray(lossless_line_abcd(freqs, self.C, self.L, self.l))

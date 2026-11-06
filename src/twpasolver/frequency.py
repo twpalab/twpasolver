@@ -1,8 +1,7 @@
 """
-Definition of class for frequency span.
+Frequency span with variable unit.
 
-This module defines the `Frequencies` class for representing a span of frequencies with a variable unit of measure. The span can be provided either as a list or as a tuple that will be passed to `numpy.arange`.
-
+The span is given either as a list or as a tuple passed to `numpy.arange`.
 """
 
 from typing import Literal, Optional
@@ -40,12 +39,7 @@ class Frequencies(BaseModel):
 
     @property
     def f(self) -> np.ndarray:
-        """
-        Computed frequencies array.
-
-        Returns:
-            numpy.ndarray: Array of computed frequencies.
-        """
+        """Frequencies in Hz."""
         freqs: FloatArray
         if self.f_arange:
             freqs = np.arange(*list(self.f_arange), dtype=np.float64)
@@ -57,20 +51,10 @@ class Frequencies(BaseModel):
 
     @property
     def omega(self) -> np.ndarray:
-        """
-        Computed angular frequencies array.
-
-        Returns:
-            numpy.ndarray: Array of computed angular frequencies.
-        """
+        """Angular frequencies in rad/s."""
         return 2 * np.pi * self.f
 
     @property
     def unit_multiplier(self) -> float:
-        """
-        Get multiplier of chosen unit of measure.
-
-        Returns:
-            float: Multiplier corresponding to the unit of measure.
-        """
+        """Multiplier converting the chosen unit to Hz."""
         return self._unit_multipliers[self.unit]

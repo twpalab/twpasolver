@@ -16,7 +16,7 @@ class TwoByTwoArray:
         Initialize the TwoByTwoArray instance.
 
         Args:
-            mat (numpy.ndarray): Input array of 2x2 matrices or [x11,x12,x21,x22], where each element is a 1D list.
+            mat (numpy.ndarray): Array of shape (N, 2, 2), or [x11, x12, x21, x22] with each element a 1D list of length N.
         """
         mat = np.asarray(mat)
         if len(mat.shape) == 2 and len(mat) == 4:
@@ -28,12 +28,7 @@ class TwoByTwoArray:
         self._matarray = mat
 
     def __repr__(self):
-        """
-        Return a string representation of the TwoByTwoArray.
-
-        Returns:
-            str: String representation of the TwoByTwoArray.
-        """
+        """Return a string representation of the TwoByTwoArray."""
         return f"{self.__class__.__name__}({self._matarray})"
 
     def __array__(self, dtype=None, copy=None):
@@ -41,27 +36,13 @@ class TwoByTwoArray:
         return np.array(self._matarray, dtype=dtype, copy=copy)
 
     def __getitem__(self, indices) -> Self | np.ndarray:
-        """
-        Get value at indices.
-
-        Args:
-            indices: Indices to access the array.
-
-        Returns:
-            TwoByTwoArray | numpy.ndarray: Value at the specified indices.
-        """
+        """Get value at indices; a slice returns a new instance of the same class."""
         if isinstance(indices, slice):
             return self.__class__(self._matarray[indices])
         return self._matarray[indices]
 
     def __setitem__(self, indices, val: float | int):
-        """
-        Set value at indices.
-
-        Args:
-            indices: Indices to set the value.
-            val (float | int): Value to set at the specified indices.
-        """
+        """Set value at indices."""
         self._matarray[indices] = val
 
     @property
@@ -100,27 +81,11 @@ class ABCDArray(TwoByTwoArray):
     """A class representing an array of ABCD matrices."""
 
     def __matmul__(self, other: Self) -> Self:
-        """
-        Efficient matrix multiplication with another ABCDArray.
-
-        Args:
-            other (ABCDArray): Another ABCDArray for matrix multiplication.
-
-        Returns:
-            ABCDArray: Result of the matrix multiplication.
-        """
+        """Element-wise 2x2 matrix product with another ABCDArray."""
         return self.__class__(matmul_2x2(self._matarray, other._matarray))
 
     def __pow__(self, exponent: int) -> Self:
-        """
-        Efficient matrix exponentiation of the ABCDArray.
-
-        Args:
-            exponent (int): The exponent to raise the ABCDArray to.
-
-        Returns:
-            ABCDArray: Result of raising the ABCDArray to the specified power.
-        """
+        """Raise each 2x2 matrix to an integer power."""
         return self.__class__(matpow_2x2(self._matarray, exponent))
 
     A = _Element(0, 0)
@@ -148,15 +113,7 @@ class ZMatrixArray(TwoByTwoArray):
 
 
 def abcd_identity(N_abcd: int) -> ABCDArray:
-    """
-    Get abcd array of identity matrices.
-
-    Args:
-        N_abcd (int): Number of matrices in array.
-
-    Returns:
-        ABCDArray: Array of identity matrices.
-    """
+    """Get an ABCDArray of ``N_abcd`` identity matrices."""
     mat = np.zeros((N_abcd, 2, 2), dtype=np.complex128)
     mat[:, 0, 0] = 1.0
     mat[:, 1, 1] = 1.0

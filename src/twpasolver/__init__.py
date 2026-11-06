@@ -1,6 +1,4 @@
 """
-``twpasolver`` package.
-
 Twpasolver: TWPA Analysis and Simulation Library
 ================================================
 
@@ -12,7 +10,7 @@ Key Features
 
 **Extended CME Systems:**
     - Solve CMEs with arbitrary numbers of modes beyond pump-signal-idler
-    - Automatic inclusion of pump harmonics, frequency conversion terms, and harmonics
+    - Automatic inclusion of pump harmonics and frequency conversion terms
     - Support for 3-wave mixing (3WM) and 4-wave mixing (4WM) processes
     - Rotating Wave Approximation (RWA) term selection
 
@@ -24,9 +22,7 @@ Key Features
 
 **Performance:**
     - Numba-accelerated parallel CME solvers
-    - Efficient matrix operations for 2x2 ABCD matrices
-    - Frequency array processing with caching
-    - Parameter sweeps with result caching
+    - Vectorised 2x2 ABCD matrix arrays
 
 **Gain Models:**
     - SIMPLE: Traditional coupled mode equations of a homogeneous line, forward

@@ -52,9 +52,9 @@ class GainModel(str, enum.Enum):
         couplings are those of a uniform medium (scaled by k), without the
         intracell current profiles, so they are not exact for loaded lines,
         especially near stopbands. Ignores reflections and the port/connector
-        models. Fast; useful for quick sweeps and comparisons with the
-        literature. Segmented devices are interpolated linearly between segment
-        midpoints (a smooth taper).
+        models. Fast; for quick sweeps and comparisons with the literature.
+        Segmented devices are interpolated linearly between segment midpoints
+        (a smooth taper).
 
     BLOCH : "bloch"
         Forward-backward model in the Bloch-mode basis: exact Bloch couplings
@@ -64,8 +64,7 @@ class GainModel(str, enum.Enum):
         (whole supercells per segment) are solved on per-segment Bloch modes
         joined by exact junction conditions. Configured by ``BlochSolverConfig``.
 
-    The name ``"general_no_reflections"`` of earlier versions is accepted for
-    ``"simple"`` with a deprecation warning.
+    ``"general_no_reflections"`` is a deprecated alias of ``"simple"``.
     """
 
     SIMPLE = "simple"
@@ -86,10 +85,7 @@ def _ratio_db(out: np.ndarray, ref: np.ndarray) -> np.ndarray:
     """
     ``20 log10 |out / ref|`` per frequency point, NaN where the reference input is zero.
 
-    Used for the port-resolved gains of the forward-backward models: S12 and
-    S22 are defined only when a signal is injected from the output side (and
-    S21, S11 only when it is injected from the input side), so an absent
-    reference input gives NaN instead of a division by zero.
+    A port-resolved gain is defined only when its reference port is driven.
     """
     out = np.asarray(out)
     ref = np.broadcast_to(np.asarray(ref), out.shape)
@@ -111,7 +107,7 @@ def _harmonic_limits(
 
     ``base`` for every mode, raised to the Bragg order ``m = round(k d / pi)``
     of a mode inside a stopband (``|arg W| > 45 deg``) or close to its edge
-    (``split < e_edge``, twice ``BlochSolverConfig.edge_threshold``): its counter-propagating component, at
+    (``split < e_edge``, twice ``edge_threshold``): its counter-propagating component, at
     ``-m pi / d``, is reached only through ``G_m``. The zone centre
     (``k d / pi < 0.5``) is excluded. All arrays share the shape
     ``(..., n_modes)``.
@@ -180,22 +176,19 @@ def _edge_basis_entries(
     flag : (n_freq, n_modes) bool
         Entries expanded on the fixed basis.
     entries : dict or None
-        ``ii, nn`` (indices of the flagged entries), ``f_mode``, ``f_ref``,
-        ``tab`` (:func:`edge_basis_tables`) and ``missing`` (mode indices for
-        which no stopband edge was found, kept in the native basis); None when
-        nothing is flagged (``ii`` is empty when no flagged entry has an edge)
-        and ``outside`` (mode indices with entries below the threshold that lie
-        neither in a stopband nor in the switch-over window of an edge, e.g.
-        at a zone-folding point where the bands touch without a gap; kept in
-        the native basis).
+        None when nothing is flagged. Otherwise ``ii, nn`` (indices of the
+        flagged entries, empty when none has an edge), ``f_mode``, ``f_ref``,
+        ``tab`` (:func:`edge_basis_tables`), ``missing`` (modes with no
+        stopband edge found) and ``outside`` (modes below the threshold outside
+        any stopband and edge window); both kept in the native basis.
 
     An entry below the threshold is expanded on the fixed basis only if it lies
     inside a stopband or between the nearest edge and its reference frequency,
     the window where the splitting of that edge stays below ``e_edge``. The
-    splitting alone also vanishes where two bands touch without opening a gap
-    (zone folding of a supercell made of repeated periods); the Bloch modes are
-    distinct there and the native basis is exact, while a fixed basis anchored
-    at a distant edge would carry the wrong carrier wavenumber.
+    splitting also vanishes where two bands touch without a gap (zone folding
+    of a supercell of repeated periods); the native basis is exact there, while
+    a fixed basis anchored at a distant edge would carry the wrong carrier
+    wavenumber.
     """
     # The splitting also vanishes at the zone centre (k -> 0, low frequency),
     # where T -> I and the two Bloch modes stay distinct (W finite): no
@@ -294,18 +287,16 @@ def _edge_basis_entries(
 
 def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
     """
-    Prepare relation terms and coefficients for 3-wave and 4-wave mixing.
+    Mode-index relations and coefficients of the 3WM and 4WM terms.
 
     Parameters
     ----------
-    terms_3wm : list
-        List of 3-wave mixing terms, each containing mode indices and coefficient.
-    terms_4wm : list
-        List of 4-wave mixing terms, each containing mode indices and coefficient.
-    epsilon : float
-        Scaling factor for 3-wave mixing coefficients.
-    xi : float
-        Scaling factor for 4-wave mixing coefficients.
+    terms_3wm, terms_4wm : list
+        RWA terms ``(mode, (indices...), coefficient)`` from
+        ``ModeArray.get_rwa_terms``.
+    epsilon, xi : float
+        Nonlinearities; the coefficients are scaled by ``epsilon / 4`` and
+        ``xi / 4``. An empty term list gives a single dummy zero relation.
 
     Returns
     -------
@@ -560,7 +551,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         n_freq: int,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        Build per-boundary port tables for the forward-backward solver.
+        Per-boundary port tables for the forward-backward solver.
 
         Port convention: port 1 → external line (port_Z_ext), port 2 → TWPA.
         The input connector (x=0) is ``self.port``; the output connector (x=L)
@@ -577,12 +568,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         abcd_out_table : (n_freq, n_modes, 4) complex
             [A,B,C,D] of output connector at x=L.
 
-        When both port fields are None all tables encode identity connectors
-        (A=1,B=0,C=0,D=1, Zout=Ze=self.port_Z_ext), recovering bare behaviour.
-        Note the identity default is ``port_Z_ext``, not ``self.twpa.Z0_ref`` --
-        for an identity connector Zout=(D*Ze+B)/(C*Ze+A)=Ze exactly, so using
-        anything else here would silently introduce a spurious boundary
-        mismatch whenever twpa.Z0_ref != port_Z_ext.
+        Without ports all tables encode identity connectors, so Zout = Ze =
+        ``port_Z_ext`` (not ``twpa.Z0_ref``, which would add a spurious boundary
+        mismatch when the two differ).
         """
         n_modes = len(mode_labels)
         Ze = self.port_Z_ext
@@ -771,11 +759,10 @@ class TWPAnalysis(Analyzer, Frequencies):
         default_fill: float = 0,
     ) -> np.ndarray:
         """
-        Build a 1-D complex128 IC vector for CME solving.
+        Complex initial amplitudes, shape (n_modes,).
 
-        If *initial_amplitudes* is provided it is returned as-is (cast to
-        complex128).  Otherwise a vector of *default_fill* is constructed with
-        the pump amplitude set to ``Ip0`` and the signal to *Is0*.
+        *initial_amplitudes* if given, otherwise *default_fill* with the pump
+        set to ``Ip0`` and the signal to ``Is0``.
         """
         if initial_amplitudes is not None:
             return np.array(initial_amplitudes, dtype=np.complex128)
@@ -807,9 +794,9 @@ class TWPAnalysis(Analyzer, Frequencies):
             Φ_m(x) = κ_m · x  (exact for constant κ_m).
 
         Segmented device (gammas.ndim == 3, shape (n_freq, n_modes, n_seg)):
-            κ_m(x) is piecewise-linear on *segment_midpoints*, so the cumulative
-            trapezoid rule on the interpolated grid is exact for that interpolant,
-            consistent with the phi_table computed inside the segmented Numba kernel.
+            κ_m(x) is piecewise-linear on *segment_midpoints*; the cumulative
+            trapezoid rule is exact for that interpolant, consistent with the
+            segmented Numba kernel.
 
         Parameters
         ----------
@@ -849,13 +836,12 @@ class TWPAnalysis(Analyzer, Frequencies):
         pump_mode: str,
     ) -> dict[str, Any]:
         """
-        Prepare all inputs shared by the CME solvers.
+        Inputs shared by the CME solvers.
 
-        For uniform devices, mode_params values have shape (n_freq,) and
-        gammas/reflections are (n_freq, n_modes).  For segmented devices the
-        2-D interpolator returns (n_segments, n_freq) per mode, so gammas and
-        reflections become (n_freq, n_modes, n_segments) and coefficient tables
-        are (n_relations, n_segments).
+        Uniform devices: mode_params values (n_freq,), gammas/reflections
+        (n_freq, n_modes). Segmented devices: mode_params values
+        (n_segments, n_freq), gammas/reflections (n_freq, n_modes, n_segments),
+        coefficient tables (n_relations, n_segments).
         """
         mode_array.update_frequencies({pump_mode: pump})
         mode_params = mode_array.process_frequency_array(signal_mode, signal_freqs)
@@ -1020,12 +1006,10 @@ class TWPAnalysis(Analyzer, Frequencies):
         """
         Fixed ("edge") Bloch basis for modes close to a stopband edge.
 
-        Every segment (a uniform device is one segment) is treated with its own
-        supercell: a mode without input whose splitting in segment ``s`` is
-        below ``threshold``, or that lies inside a stopband, is
-        expanded there on the lossless Bloch pair of that segment's supercell,
-        anchored on the passband side of the nearest edge
-        (:func:`_edge_basis_entries`). Modes with an input are never flagged.
+        A mode without input whose splitting in segment ``s`` is below
+        ``threshold``, or that lies inside a stopband, is expanded there on the
+        lossless Bloch pair of that segment's supercell, anchored on the
+        passband side of the nearest edge (:func:`_edge_basis_entries`).
         The junction coefficients follow from the overwritten ``Zb_plus`` and
         ``Zb_minus`` and stay exact. A mode flagged in at least one segment
         (``edge_mode``) is solved exactly along the whole line; in its native
@@ -1146,14 +1130,12 @@ class TWPAnalysis(Analyzer, Frequencies):
         """
         Per-segment Bloch tables for the forward-backward solver.
 
-        A uniform device is a single segment (``cme_inputs["gammas"]`` must then
-        carry a segment axis of length 1). Every segment is a uniform ``TWPA``
-        made of whole supercells; its Bloch
-        modes are computed with :func:`bloch_mode_tables` on the segment's own
-        supercell, at the mode frequencies, with the branch of ``k`` set by the
-        segment's kernel wavenumber. Segments with identical cells share the
-        computation. Intracell arrays are zero-padded to the largest number of
-        nonlinear inductors per supercell.
+        ``cme_inputs["gammas"]`` must carry a segment axis (length 1 for a
+        uniform device). Every segment is a uniform ``TWPA`` of whole
+        supercells; its Bloch modes come from :func:`bloch_mode_tables` on its
+        own supercell, with the branch of ``k`` set by its kernel wavenumber.
+        Intracell arrays are zero-padded to the largest number of nonlinear
+        inductors per supercell.
 
         Returns
         -------
@@ -1271,7 +1253,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         relative=True,
     ) -> dict[str, Any]:
         """
-        Analyze phase matching conditions for nonlinear processes using mode arrays.
+        Phase mismatch of a 3WM or 4WM process over pump and signal frequencies.
 
         Parameters
         ----------
@@ -1406,14 +1388,14 @@ class TWPAnalysis(Analyzer, Frequencies):
         Parameters
         ----------
         signal_freqs : array_like
-            Signal frequencies for gain calculation.
+            Signal frequencies, in the analysis unit.
         pump : float
             Pump frequency. There is no automatic choice; for an estimate use
             ``phase_matching(...)["optimal_pump_freq"]``.
-        Is0 : float, default 1e-6
+        Is0 : float, default 1e-7
             Initial signal current amplitude (A).
         Ip0 : float, optional
-            Initial pump current amplitude (A). If None, uses TWPA's Ip0 parameter.
+            Initial pump current amplitude (A); defaults to ``twpa.Ip0``.
         model : GainModel or str, default 'simple'
             CME model (see :class:`GainModel`):
             * 'simple': traditional CMEs of a homogeneous line, forward waves
@@ -1422,9 +1404,8 @@ class TWPAnalysis(Analyzer, Frequencies):
               couplings and boundary conditions; segmented devices are solved per
               segment with exact junction conditions.
         mode_array_config : str, default 'basic_3wm'
-            Name of mode array configuration to use.
-        signal_mode, pump_mode, idler_mode : str
-            Mode labels within the mode array.
+            Mode array name ('basic_3wm', 'basic_4wm' or one added with
+            :meth:`add_mode_array`).
         initial_amplitudes_fwd, initial_amplitudes_bwd : array_like, optional
             Amplitudes of the waves injected at x=0 (traveling along +x) and at
             x=L (traveling along -x); override Is0 and Ip0. Backward inputs
@@ -1442,8 +1423,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         Returns
         -------
         dict
-            Gain analysis results with model-specific fields. The 'bloch'
-            model also returns the
+            Gain analysis results. The 'bloch' model also returns the
             port-resolved signal gains ``gain_db`` (S21) and ``gain_db_11``
             (S11), referenced to the forward input, and ``gain_db_12`` (S12)
             and ``gain_db_22`` (S22), referenced to the backward input set with
@@ -1594,14 +1574,11 @@ class TWPAnalysis(Analyzer, Frequencies):
         rk_config: Optional[RKSolverConfig] = None,
     ) -> dict[str, Any]:
         """
-        Compute gain with the forward-backward CMEs in the Bloch-mode basis.
+        Gain with the forward-backward CMEs in the Bloch basis (``model="bloch"``).
 
         Amplitudes are +x-referenced boundary currents of the forward and
-        backward Bloch modes; boundary coefficients use the exact Bloch
-        impedances Zb+ (forward) and Zb- (backward), so the boundary
-        coefficients are constant. Segmented devices (a ``TWPA`` whose cells are all ``TWPA`` segments)
-        are solved on per-segment Bloch modes joined by exact junction
-        conditions; uniform devices are the one-segment case. See
+        backward Bloch modes; the constant boundary coefficients use the exact
+        Bloch impedances Zb+ (forward) and Zb- (backward). See
         :mod:`twpasolver.cmes.bloch_fb`.
         """
         segmented = self._is_segmented()
@@ -1790,14 +1767,14 @@ class TWPAnalysis(Analyzer, Frequencies):
         **gain_kwargs,
     ) -> dict[str, Any]:
         """
-        Compute information about the compound gain bandwidth.
+        Compound gain bandwidth of the stored (or newly computed) gain.
 
         Parameters
         ----------
         gain_reduction : float
-            Difference from maximum gain used as threshold.
+            Threshold in dB below the maximum gain.
         **gain_kwargs : dict
-            Additional arguments forwarded to ``gain()``.
+            If given, ``gain()`` is run with them first.
         """
         if gain_kwargs:
             self.gain(**gain_kwargs)

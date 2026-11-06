@@ -26,18 +26,10 @@ def plot_mode_currents(
     Plot the mean current of each mode in dBm as a function of cell number.
 
     Args:
-        gain_result: Dictionary output from the gain analysis function
-        mode_names: Optional list of mode names for labeling (auto-detected if not provided)
-        figsize: Figure size tuple (width, height)
-        log_scale: Whether to plot in dB scale (True) or linear scale (False)
-        line_styles: Optional list of line styles for different modes
-        colors: Optional list of colors for different modes
-        title: Custom title for the plot
-        ylim: Optional y-axis limits as (min, max)
-        backward: Plot the backward-propagating currents (``bloch`` model)
-
-    Returns:
-        The matplotlib figure object
+        gain_result: Output of :meth:`TWPAnalysis.gain`.
+        mode_names: Legend labels; taken from the mode map if not given.
+        log_scale: Plot in dBm (True) or in A (False).
+        backward: Plot the backward-propagating currents (``bloch`` model).
     """
     x = gain_result["x"]
     if backward and "I_tuples_bwd" in gain_result:
@@ -114,16 +106,12 @@ def plot_response(
     figsize: tuple[float, float] = (5.0, 6.0),
     **plot_kwargs,
 ) -> Axes:
-    """Plot response of twpa.
+    """Plot ``|S21|`` in dB and the wavenumber k* (rad) versus frequency.
 
     Args:
-        freqs (np.ndarray): Array of frequency values.
-        s21_db (np.ndarray): S21 parameter in dB.
-        k_star (np.ndarray): k* parameter.
-        pump_freq (Optional[float]): Frequency of the pump signal.
-        freqs_unit (str): Unit of the frequency values.
-        figsize (tuple[float, float]): Size of the figure.
-        **plot_kwargs: Additional keyword arguments for the plot.
+        pump_freq (Optional[float]): If given, marked with a vertical line.
+        freqs_unit (str): Unit label for the frequency axis.
+        **plot_kwargs: Passed to ``ax.plot``.
     """
     _, ax = plt.subplots(2, sharex=True, figsize=figsize)
     ax[0].plot(freqs, s21_db, **plot_kwargs)
@@ -143,13 +131,11 @@ def plot_gain(
     freqs_unit: str = "GHz",
     **plot_kwargs,
 ) -> Axes:
-    """Plot gain in dB.
+    """Plot gain in dB versus frequency.
 
     Args:
-        freqs (np.ndarray): Array of frequency values.
-        gain_db (np.ndarray): Gain values in dB.
-        freqs_unit (str): Unit of the frequency values.
-        **plot_kwargs: Additional keyword arguments for the plot.
+        freqs_unit (str): Unit label for the frequency axis.
+        **plot_kwargs: Passed to ``ax.plot``.
     """
     plt.figure()
     ax = plt.axes()
@@ -168,16 +154,14 @@ def plot_phase_matching(
     log_abs=True,
     **plot_kwargs,
 ) -> Axes:
-    """Plot phase matching.
+    """Plot the phase mismatch map over pump and signal frequency.
 
     Args:
-        pump_freqs (np.ndarray): Array of pump frequency values.
-        signal_freqs (np.ndarray): Array of signal frequency values.
-        delta_pm (np.ndarray): Phase mismatch values.
-        freqs_unit (str): Unit of the frequency values.
-        thin (int): Thinning factor for plotting.
-        log_abs (bool): Whether to plot the logarithm of the absolute values.
-        **plot_kwargs: Additional keyword arguments for the plot.
+        delta_pm (np.ndarray): Phase mismatch, shape ``(len(signal_freqs), len(pump_freqs))``.
+        freqs_unit (str): Unit label for the frequency axes.
+        thin (int): Plot every ``thin``-th point along both axes.
+        log_abs (bool): Plot ``log|delta_pm|``.
+        **plot_kwargs: Passed to ``ax.pcolor``.
     """
     plt.figure()
     ax = plt.axes()

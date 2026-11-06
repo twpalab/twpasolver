@@ -16,27 +16,14 @@ from typing_extensions import Annotated
 
 
 def all_subclasses(cls) -> list:
-    """
-    Recursively get all subclasses of a given class.
-
-    Args:
-        cls: The class for which to find all subclasses.
-
-    Returns:
-        list: A list of all subclasses of the given class.
-    """
+    """Recursively get all subclasses of a given class."""
     return cls.__subclasses__() + [
         s for c in cls.__subclasses__() for s in all_subclasses(c)
     ]
 
 
 def validate_impedance(Z: complex | float | str) -> complex | float:
-    """
-    Validate impedance value.
-
-    Args:
-        Z (complex | float | str): Input impedance value.
-    """
+    """Convert impedance to complex with positive real part; purely real values become float."""
     try:
         Z = complex(Z)
     except Exception as exc:

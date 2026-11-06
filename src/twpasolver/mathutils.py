@@ -1,9 +1,7 @@
 """
-Utility functions for mathematical expressions and RF equations.
+Numba-compiled utilities for arrays of 2x2 matrices.
 
-This module provides a set of utility functions optimized with Numba for high performance.
-These functions include matrix multiplications, conversions between different parameter
-representations, and solutions for coupled mode equations used in RF engineering.
+Products, powers, ABCD/S/Z conversions and dB/dBm unit conversions.
 """
 
 import numba as nb
@@ -17,16 +15,7 @@ def matmul_2x2(
     matrices_a: ComplexArray,
     matrices_b: ComplexArray,
 ) -> ComplexArray:
-    """
-    Fast multiplication between arrays of 2x2 matrices.
-
-    Args:
-        matrices_a (ComplexArray): Array of 2x2 complex matrices.
-        matrices_b (ComplexArray): Array of 2x2 complex matrices.
-
-    Returns:
-        ComplexArray: Resultant array of 2x2 complex matrices after multiplication.
-    """
+    """Product of two arrays of 2x2 matrices, shape (n, 2, 2)."""
     assert matrices_a.shape == matrices_b.shape
     assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
 
@@ -45,18 +34,7 @@ def matmul_2x2(
 
 @nb.njit(cache=True)
 def matpow_2x2(matrices_a: ComplexArray, exponent: int) -> ComplexArray:
-    """
-    Fast exponentiation of arrays of 2x2 matrices by repeated squaring.
-
-    Uses about ``2 log2(exponent)`` matrix products per matrix.
-
-    Args:
-        matrices_a (ComplexArray): Array of 2x2 complex matrices.
-        exponent (int): Exponent to which matrices are to be raised.
-
-    Returns:
-        ComplexArray: Resultant array of 2x2 complex matrices after exponentiation.
-    """
+    """Positive integer power of an array of 2x2 matrices, by repeated squaring."""
     assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
     assert exponent > 0
     base = matrices_a.astype(np.complex128)
@@ -79,14 +57,11 @@ def matpow_2x2(matrices_a: ComplexArray, exponent: int) -> ComplexArray:
 @nb.njit(cache=True)
 def a2s(abcd: ComplexArray, Z0: complex | float) -> ComplexArray:
     """
-    Convert arrays of ABCD matrices to arrays of S-parameters.
+    Convert arrays of ABCD matrices to S-parameters.
 
     Args:
-        abcd (ComplexArray): Array of 2x2 ABCD matrices.
-        Z0 (complex | float): Reference impedance.
-
-    Returns:
-        ComplexArray: Array of 2x2 S-parameter matrices.
+        abcd (ComplexArray): ABCD matrices, shape (n, 2, 2).
+        Z0 (complex | float): Reference impedance in Ohm (positive real part).
     """
     assert abcd.shape[1] == 2 and abcd.shape[2] == 2
     assert np.real(Z0) > 0
@@ -108,14 +83,11 @@ def a2s(abcd: ComplexArray, Z0: complex | float) -> ComplexArray:
 @nb.njit(cache=True)
 def s2a(spar: ComplexArray, Z0: complex | float) -> ComplexArray:
     """
-    Convert arrays of S-parameters to arrays of ABCD matrices.
+    Convert arrays of S-parameters to ABCD matrices.
 
     Args:
-        spar (ComplexArray): Array of 2x2 S-parameter matrices.
-        Z0 (complex | float): Reference impedance.
-
-    Returns:
-        ComplexArray: Array of 2x2 ABCD matrices.
+        spar (ComplexArray): S-parameter matrices, shape (n, 2, 2).
+        Z0 (complex | float): Reference impedance in Ohm (positive real part).
     """
     assert spar.shape[1] == 2 and spar.shape[2] == 2
     assert np.real(Z0) > 0
@@ -135,15 +107,7 @@ def s2a(spar: ComplexArray, Z0: complex | float) -> ComplexArray:
 
 @nb.njit(cache=True)
 def a2z(abcd: ComplexArray) -> ComplexArray:
-    """
-    Convert arrays of ABCD matrices to arrays of Z-parameters.
-
-    Args:
-        abcd (ComplexArray): Array of 2x2 ABCD matrices.
-
-    Returns:
-        ComplexArray: Array of 2x2 Z-parameter matrices.
-    """
+    """Convert arrays of ABCD matrices, shape (n, 2, 2), to Z-parameters."""
     assert abcd.shape[1] == 2 and abcd.shape[2] == 2
     n_mat = abcd.shape[0]
     z_mat = np.empty((n_mat, 2, 2), dtype=np.complex128)
@@ -161,15 +125,7 @@ def a2z(abcd: ComplexArray) -> ComplexArray:
 
 @nb.njit(cache=True)
 def z2a(z_mat: ComplexArray) -> ComplexArray:
-    """
-    Convert arrays of Z-parameters to arrays of ABCD matrices.
-
-    Args:
-        z_mat (ComplexArray): Array of 2x2 Z-parameter matrices.
-
-    Returns:
-        ComplexArray: Array of 2x2 ABCD matrices.
-    """
+    """Convert arrays of Z-parameters, shape (n, 2, 2), to ABCD matrices."""
     assert z_mat.shape[1] == 2 and z_mat.shape[2] == 2
     n_mat = z_mat.shape[0]
     abcd = np.empty((n_mat, 2, 2), dtype=np.complex128)
@@ -187,29 +143,18 @@ def z2a(z_mat: ComplexArray) -> ComplexArray:
 
 @nb.njit(cache=True)
 def to_dB(values: FloatArray | ComplexArray) -> FloatArray:
-    """
-    Convert arrays of values to dB.
-
-    Args:
-        values (FloatArray | ComplexArray): Array of values to be converted to dB.
-
-    Returns:
-        FloatArray: Array of values in dB.
-    """
+    """Convert amplitudes to dB, ``20 log10 |values|``."""
     return 20.0 * np.log10(np.abs(values))
 
 
 @nb.njit(cache=True)
 def dBm_to_I(power: float, Z0: float = 50) -> float:
     """
-    Convert power from dBm to current in amperes.
+    Convert power in dBm to current amplitude in A, with ``P = Z0 I^2 / 2``.
 
     Args:
         power (float): Power in dBm.
-        Z0 (float, optional): Reference impedance, default is 50 ohms.
-
-    Returns:
-        float: Current amplitude in amperes.
+        Z0 (float, optional): Reference impedance in Ohm. Defaults to 50.
     """
     pw = 10 ** (power / 10) / 1000  # power in W
     return np.sqrt(pw / Z0 * 2)  # current amplitude, in A
@@ -218,14 +163,11 @@ def dBm_to_I(power: float, Z0: float = 50) -> float:
 @nb.njit(cache=True)
 def I_to_dBm(curr: float, Z0: float = 50) -> float:
     """
-    Convert current in amperes to power in dBm.
+    Convert current amplitude in A to power in dBm, with ``P = Z0 I^2 / 2``.
 
     Args:
-        curr (float): Current amplitude in amperes.
-        Z0 (float, optional): Reference impedance, default is 50 ohms.
-
-    Returns:
-        float: Power in dBm.
+        curr (float): Current amplitude in A.
+        Z0 (float, optional): Reference impedance in Ohm. Defaults to 50.
     """
     pw = curr**2 / 2 * Z0
     return 10 * np.log10(np.abs(pw) * 1000)

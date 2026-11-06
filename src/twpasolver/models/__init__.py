@@ -1,8 +1,8 @@
 """
 Models module.
 
-This module provides a collection of models for simulating and analyzing various RF components and networks. It includes models for one-port components such as resistors, capacitors,
-inductors, and stubs, as well as more complex two-port models and TWPAs.
+One-port components (resistors, capacitors, inductors, stubs), transmission lines,
+TWPA cells and two-port arrays, including the TWPA model.
 
 Imports
 -------
@@ -28,24 +28,22 @@ Utility functions:
 
 Usage
 -----
-These models can be used to construct and analyze RF networks, allowing for the study of their behavior
-under different conditions. The models support various operations such as impedance calculations,
-frequency response analysis, and composition of complex networks from simpler components.
-See the :ref:`tutorials` page for more examples.
+Networks are built by composing simpler components and expose impedance and
+frequency-response calculations. See the :ref:`tutorials` page for more examples.
 
 Example
 -------
 .. code-block:: python
 
+    import numpy as np
     from twpasolver.models.oneport import Resistance, Capacitance
     from twpasolver.models.twoportarrays import TwoPortArray
 
-    # Define a simple network with a resistor and capacitor in series
+    # Resistor and capacitor in series
     resistor = Resistance(R=50)
     capacitor = Capacitance(C=1e-12)
     network = TwoPortArray(cells=[resistor, capacitor])
 
-    # Compute the network parameters at a given frequency
     freqs = np.linspace(1e6, 1e9, 1000)
     abcd_params = network.single_abcd(freqs)
 """

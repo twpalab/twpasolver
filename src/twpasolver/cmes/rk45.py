@@ -1,27 +1,18 @@
 """Cacheable RK45 integrator for use inside njit dispatch functions.
 
 Adapted from CyRK's ``nbsolve_ivp`` (https://github.com/jrenaud90/CyRK,
-Copyright Joe P. Renaud and CyRK contributors, Apache License 2.0), trimmed
-to the Dormand-Prince RK45 path only, the only method this package ever
-used, with the RK23/DOP853 branches and the
-``capture_extra``/``interpolate_extra`` machinery (unused here) removed.
+Copyright Joe P. Renaud and CyRK contributors, Apache License 2.0), reduced
+to the Dormand-Prince RK45 path without ``capture_extra``/``interpolate_extra``.
 
-Why this exists, instead of just calling CyRK directly: CyRK's own
-``nbsolve_ivp`` ships with ``cache=False`` because its Butcher-tableau
-coefficients are module-level ``np.array`` globals, which Numba compiles as
-"dynamic globals" (baked-in runtime addresses that don't survive a process
-restart), and that taints caching for any njit function that calls it,
-including every parallel dispatch function in base.py/bloch_fb.py, even
-when they request ``cache=True`` themselves (confirmed via
-``NumbaWarning: Cannot cache ... as it uses dynamic globals``).
-
-``rk45_solve`` below avoids this two ways:
-  - The Butcher-tableau arrays are built locally, inside the function body,
-    instead of referenced from module scope, so there's no fixed address
-    to bake in, just ordinary (cacheable) constant-folded code.
-  - It is marked ``inline="always"`` and always called with a statically
-    known ``diffeq`` at each call site, so after inlining no runtime
-    function pointer survives into the caller's compiled code either.
+CyRK's ``nbsolve_ivp`` cannot be cached: its Butcher-tableau coefficients are
+module-level ``np.array`` globals, which Numba compiles as "dynamic globals"
+(runtime addresses that do not survive a restart), and that disables caching
+of every njit caller, including the parallel dispatch functions in
+base.py/bloch_fb.py (``NumbaWarning: Cannot cache ... as it uses dynamic
+globals``). ``rk45_solve`` avoids this by building the tableau inside the
+function body, and by being ``inline="always"`` with a statically known
+``diffeq`` at each call site, so no runtime function pointer survives into
+the caller's compiled code.
 """
 
 from typing import Tuple
@@ -55,7 +46,7 @@ def rk45_solve(
     max_steps_per_cell: float = 0.0,
 ) -> np.ndarray:
     """
-    Adaptive Dormand-Prince RK45, ported from CyRK's ``nbsolve_ivp``.
+    Adaptive Dormand-Prince RK45.
 
     Scalar tolerances, a given positive ``first_step`` and a non-empty
     ``t_eval`` (the only way it is called); returns the solution interpolated

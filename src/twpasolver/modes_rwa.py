@@ -1,70 +1,28 @@
 """
-``modes_rwa`` module.
+Mode management and rotating-wave-approximation (RWA) analysis.
 
-Mode Management and Rotating Wave Approximation Analysis
-========================================================
-
-Tools for managing complex mode relationships in TWPA analysis, enabling
-simulation of extended coupled mode equation (CME) systems with arbitrary
-numbers of modes beyond basic pump-signal-idler configuration.
+Builds coupled-mode-equation (CME) systems with an arbitrary number of modes
+beyond pump, signal and idler (pump harmonics ``p2``, conversion terms ``ps``,
+signal/idler harmonics ``s2``, ...).
 
 Key Components
 --------------
 
-**ModeArray**: Organizes related modes with automatic frequency propagation,
-parameter interpolation, and dependency graph management.
+**ModeArray**: modes linked by frequency relations; propagates frequencies from
+the independent modes and interpolates mode parameters.
 
-**RWAAnalyzer**: Identifies valid 3-wave and 4-wave mixing terms that satisfy
-the Rotating Wave Approximation for any given set of mode relationships.
+**RWAAnalyzer**: finds the 3WM and 4WM terms that survive the RWA for a given
+set of relations, with factorial coefficients for repeated modes.
 
-**ModeArrayFactory**: Factory methods for creating standard and custom mode
-configurations including pump harmonics, frequency conversion terms, and harmonics.
+**ModeArrayFactory**: standard and custom mode configurations.
 
-**ParameterInterpolator**: Interpolation of mode parameters (kappa, gamma, alpha)
-from base TWPA circuit data across frequency ranges.
-
-Capabilities
-------------
-
-**RWA Term Selection**:
-    - Automatic discovery of valid 3WM and 4WM mixing processes
-    - Coefficient calculation including factorial corrections for repeated modes
-    - Caching of RWA terms for performance
-
-**Mode Relationships**:
-    - Support for arbitrary frequency relationships between modes
-    - Forward and backward propagating modes
-    - Pump harmonics (p, p2, p3, ...)
-    - Frequency conversion terms (p+s, p+i, ...)
-    - Signal/idler harmonics (s2, i2, ...)
-
-**Symbolic Frequency Propagation**:
-    - O(n) frequency updates using pre-computed symbolic expressions
-    - Automatic identification of independent vs. dependent modes
-    - Topological sorting of mode dependencies
-    - Visualization of the mode relations with a graph
-
-**Parameter Management**:
-    - Easy interpolation of mode parameters from base circuit data
+**ParameterInterpolator**: interpolates mode parameters (k, gamma, alpha, Zb)
+from base circuit data.
 
 Examples
 --------
-See Tutorial 4 (:ref:`tutorials`) for complete examples covering:
-
-- Basic 3WM mode array creation and visualization
-- Extended mode arrays with pump harmonics and frequency conversion
-- Custom mode configurations for specific processes
-- RWA term analysis and CME integration
-
-The tutorial demonstrates the progression from simple mode relationships to
-complex multi-mode systems used in realistic TWPA simulations.
-
-Performance Notes
------------------
-- Symbolic frequency propagation enables O(n) scaling, useful when iterating over arrays.
-- RWA term caching eliminates redundant calculations during CME solving
-- Numba-compatible data structures for integration with fast CME solvers
-- Efficient interpolation supports faster parameter sweeps
+See Tutorial 4 (:ref:`tutorials`) for mode array creation, extended mode sets,
+custom configurations and RWA term analysis.
 """
 
 import itertools as it
@@ -87,19 +45,15 @@ from twpasolver.logger import log
 
 class ParameterInterpolator:
     """
-    Interpolates an arbitrary set of parameters over a sorted frequency array.
+    Cubic-spline interpolation of an arbitrary set of parameters over frequency.
 
     Parameters are passed as ``params={name: array}``. Each array may be:
 
-    * **1D** ``(n_freq,)`` — real or complex, interpolated directly.
-    * **2D** ``(n, n_freq)`` — every row interpolated along the frequency axis
-      (one vectorised spline per parameter); returns ``(n, n_freq_interp)``.
+    * **1D** ``(n_freq,)`` — real or complex.
+    * **2D** ``(n, n_freq)`` — every row interpolated along the frequency axis;
+      returns ``(n, n_freq_interp)``.
 
-    The base frequency array must be sorted (ascending). Uses ``CubicSpline``
-    for fast, accurate interpolation (~20× faster than ``interp1d`` with cubic).
-
-    A ``get_parameters`` compatibility shim returns ``(k, gamma, alpha, Zb)``
-    to preserve the existing call-sites unchanged.
+    The base frequency array must be sorted (ascending).
     """
 
     def __init__(self, frequencies: np.ndarray, params: Dict[str, np.ndarray]):
@@ -107,7 +61,7 @@ class ParameterInterpolator:
         Args:
             frequencies: Sorted 1-D array of base frequency points.
             params: Mapping of parameter name to array of shape ``(n_freq,)``
-                    or ``(n, n_freq)``. Complex arrays are handled transparently.
+                    or ``(n, n_freq)``, real or complex.
         """
         self.frequencies = np.asarray(frequencies)
         self._splines: Dict[str, Any] = {}
@@ -142,9 +96,6 @@ class ParameterInterpolator:
         """
         Interpolate all parameters at the requested frequency/frequencies.
 
-        Args:
-            frequencies: Scalar or array of frequencies.
-
         Returns:
             Dict mapping each parameter name to its interpolated array.
             2-D parameters return shape ``(n, len(frequencies))``.
@@ -168,11 +119,7 @@ class ParameterInterpolator:
     def get_parameters(
         self, frequency: Union[float, np.ndarray]
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Compatibility shim — returns ``(k, gamma, alpha, Zb)`` tuple.
-
-        Expects params dict to contain keys ``'k'``, ``'gamma'``, ``'alpha'``, ``'Zb'``.
-        """
+        """Return the ``(k, gamma, alpha, Zb)`` tuple; requires those four parameter keys."""
         p = self.interpolate(frequency)
         return p["k"], p["gamma"], p["alpha"], p["Zb"]
 
@@ -189,8 +136,8 @@ class Mode:
     Args:
         label: Mode identifier (e.g., 'p' for pump)
         frequency: Mode frequency
+        k: Wavenumber, interpolated at the mode frequency
         gamma: Reflection coefficient
-        k: Wavenumber (calculated from frequency)
         alpha: Attenuation constant
     """
 
@@ -206,7 +153,7 @@ class Mode:
         return self.label
 
     def __repr__(self):
-        """Get representation of class."""
+        """Return full representation with all mode parameters."""
         return (
             f'Mode("{self.label}", freq={self.frequency}, '
             f"gamma={self.gamma}, k={self.k}, alpha={self.alpha}, Zb={self.Zb})"
@@ -238,19 +185,11 @@ class RWAAnalyzer:
 
     @property
     def relations(self):
-        """Getter for mode relations."""
+        """Mode relations as ``[result, expression]`` pairs."""
         return self._relations
 
     def _parse_expression(self, expr: str) -> tuple:
-        """
-        Parse an expression string into a list of indices with proper signs.
-
-        Args:
-            expr: String expression like "p+s-i"
-
-        Returns:
-            Tuple of indices with signs indicating conjugation
-        """
+        """Parse e.g. ``"p+s-i"`` into ``(indices, signs)``; sign -1 means conjugation."""
         expr = expr.replace(" ", "")
         if not expr.startswith("-"):
             expr = "+" + expr
@@ -288,7 +227,7 @@ class RWAAnalyzer:
         return index_relations
 
     def _compute_substitutions(self) -> List:
-        """Compute all mode substitutions based on the relations."""
+        """Express every mode symbolically in terms of the independent modes."""
         graph = nx.DiGraph(
             (i, output) for output, inputs, _ in self.relations_idx for i in inputs
         )
@@ -317,7 +256,7 @@ class RWAAnalyzer:
         return modes_subs
 
     def _calculate_coefficient(self, terms: List[str]) -> float:
-        """Calculate coefficient based on term repetitions."""
+        """Return ``1 / prod(n_r!)`` over the repetition counts ``n_r`` of the terms."""
         coeff = 1.0
         if len(set(terms)) != len(terms):
             for repetitions in Counter(terms).values():
@@ -326,13 +265,15 @@ class RWAAnalyzer:
 
     def find_rwa_terms(self, power: int = 3) -> List[Tuple[Any, ...]]:
         """
-        Find all valid RWA terms of given power.
+        Find all valid RWA terms of given power (results are cached).
 
         Args:
-            power: Order of the interaction (default: 3 for three-wave mixing)
+            power: Number of mode factors per term (2 for 3WM, 3 for 4WM)
 
         Returns:
-            List of tuples (mode_idx, combination, mode_name, rhs_terms, coefficient)
+            List of tuples (mode_idx, combination, mode_name, rhs_terms, coefficient),
+            sorted by mode_idx. Indices in ``combination`` at or above the number of
+            modes refer to conjugated modes.
         """
         if power in self._rwa_terms_cache:
             return self._rwa_terms_cache[power]
@@ -372,8 +313,8 @@ class ModeArray:
 
         Args:
             modes: List of Mode objects
-            relations: List of [result, expression] pairs for mode relationships
-            interpolator: ParameterInterpolator instance for getting mode parameters
+            relations: List of [result, expression] pairs, e.g. ``["i", "p-s"]``
+            interpolator: Source of mode parameters (k, gamma, alpha, Zb)
         """
         self.modes = {mode.label: mode for mode in modes}
         self.relations = relations
@@ -389,7 +330,7 @@ class ModeArray:
         self._compute_mode_graph()
 
     def _parse_expression_for_propagation(self, expr: str) -> List[Tuple[str, int]]:
-        """Parse expression into list of (mode, coefficient) pairs for frequency propagation."""
+        """Parse expression into list of (mode, ±1) pairs."""
         expr = expr.replace(" ", "")
         if not expr.startswith(("+", "-")):
             expr = "+" + expr
@@ -413,7 +354,7 @@ class ModeArray:
         return terms
 
     def _build_dependency_graph(self):
-        """Build dependency graph for relation analysis."""
+        """Build forward and reverse mode-dependency maps."""
         self.dependency_graph = defaultdict(set)
         self.reverse_deps = defaultdict(set)
 
@@ -424,7 +365,7 @@ class ModeArray:
                 self.reverse_deps[result].add(mode)
 
     def _topological_sort(self) -> List[str]:
-        """Perform topological sort of dependencies."""
+        """Return mode labels in topological order of dependencies."""
         in_degree = defaultdict(int)
 
         for mode in self.modes.keys():
@@ -445,11 +386,7 @@ class ModeArray:
         return result
 
     def _build_symbolic_expressions(self):
-        """
-        Build symbolic expressions for each mode in terms of independent modes.
-
-        This enables O(n) frequency propagation instead of iterative solving.
-        """
+        """Express each mode frequency as a linear combination of independent modes."""
         self._build_dependency_graph()
 
         self.independent_modes = set(self.modes.keys())
@@ -500,15 +437,7 @@ class ModeArray:
     def _propagate_frequencies_symbolic(
         self, updated_freqs: Dict[str, float]
     ) -> Dict[str, Optional[float]]:
-        """
-        Symbolic frequency propagation - O(n) complexity.
-
-        Args:
-            updated_freqs: Dictionary of mode labels to their new frequencies
-
-        Returns:
-            Dictionary of all mode labels to their computed frequencies
-        """
+        """Return frequencies of all modes given the updated ones; None where undetermined."""
         frequencies: Dict[str, Optional[float]] = {
             label: mode.frequency for label, mode in self.modes.items()
         }
@@ -534,7 +463,7 @@ class ModeArray:
 
     def update_frequencies(self, new_frequencies: Dict[str, float]) -> None:
         """
-        Update mode frequencies using optimized symbolic propagation.
+        Set mode frequencies, propagate them to dependent modes and refresh parameters.
 
         Args:
             new_frequencies: Dictionary mapping mode labels to new frequencies
@@ -556,12 +485,7 @@ class ModeArray:
                 mode.Zb = Zb  # type: ignore
 
     def update_base_data(self, interpolator: ParameterInterpolator) -> None:
-        """
-        Update the base data interpolator and refresh all mode parameters.
-
-        Args:
-            interpolator: New ParameterInterpolator instance
-        """
+        """Replace the interpolator and refresh all mode parameters."""
         self.interpolator = interpolator
 
         current_freqs = {
@@ -576,16 +500,15 @@ class ModeArray:
         self, mode_label: str, frequencies: np.ndarray
     ) -> Dict[str, Dict[str, np.ndarray]]:
         """
-        Process an array of frequencies for a single mode, propagating to all related modes.
-
-        Uses symbolic expressions for optimal performance.
+        Sweep one mode over an array of frequencies, propagating to all related modes.
 
         Args:
-            mode_label: Label of the mode to update with array of frequencies
-            frequencies: Array of frequencies to process
+            mode_label: Label of the swept mode
+            frequencies: Array of frequencies for that mode
 
         Returns:
-            Dictionary with mode parameters for all related modes
+            ``{mode: {"freqs", "k", "gamma", "alpha", "Zb"}}`` for every mode, arrays
+            along the frequency axis; modes independent of the sweep are broadcast.
         """
         if mode_label not in self.modes:
             raise ValueError(f"Unknown mode: {mode_label}")
@@ -678,9 +601,6 @@ class ModeArray:
             font_size: Font size for labels
             show_frequencies: Whether to show current frequencies on nodes
             layout: Graph layout algorithm ('spring', 'circular', 'hierarchical')
-
-        Returns:
-            Figure: The matplotlib figure containing the plot.
         """
         G = self.mode_graph
 
@@ -857,13 +777,10 @@ class ModeArray:
 
     def get_rwa_terms(self, power: int = 3) -> List[Tuple[Any, ...]]:
         """
-        Get RWA terms for the specified mixing order with caching.
+        Get RWA terms (cached), see :meth:`RWAAnalyzer.find_rwa_terms`.
 
         Args:
-            power: Order of the interaction (2 for 3WM, 3 for 4WM)
-
-        Returns:
-            List of RWA terms
+            power: Number of mode factors per term (2 for 3WM, 3 for 4WM)
         """
         if power == 2:
             if self._rwa_terms_3wm is None:
@@ -921,16 +838,13 @@ class ModeArrayFactory:
         interpolator: Optional[ParameterInterpolator] = None,
     ) -> ModeArray:
         """
-        Create a basic 3WM ModeArray with pump, signal, and idler modes.
+        Create a ModeArray with pump, signal, and idler modes.
 
         Args:
-            base_data: Dictionary containing 'freqs', 'k', 'gammas', and 'alpha' arrays
-            three_wave: Whether to include 3WM or 4WM mode relations
+            base_data: Dictionary with 'freqs', 'k', 'reflection_coeff', 'alpha' and 'Zb' arrays
+            three_wave: Idler relation ``i = p - s`` if True, else ``i = 2p - s`` (4WM)
             interpolator: Optional shared ParameterInterpolator (built from
                 ``base_data`` when omitted)
-
-        Returns:
-            ModeArray: Configured for basic 3WM operation
         """
         interpolator = ModeArrayFactory._interpolator_from_data(base_data, interpolator)
 
@@ -954,15 +868,12 @@ class ModeArrayFactory:
         Create an extended 3WM ModeArray with pump harmonics and conversion terms.
 
         Args:
-            base_data: Dictionary containing 'freqs', 'k', 'gammas', and 'alpha' arrays
-            n_pump_harmonics: Number of pump harmonics to include
-            n_frequency_conversion: Number of frequency conversion terms
-            n_signal_harmonics: Number of signal and idler harmonics
+            base_data: Dictionary with 'freqs', 'k', 'reflection_coeff', 'alpha' and 'Zb' arrays
+            n_pump_harmonics: Number of pump harmonics (p2, p3, ...)
+            n_frequency_conversion: Number of up-conversion pairs (ps/pi, p2s/p2i, ...)
+            n_signal_harmonics: Number of signal and idler harmonics (s2/i2, ...)
             interpolator: Optional shared ParameterInterpolator (built from
                 ``base_data`` when omitted)
-
-        Returns:
-            ModeArray: Configured for extended 3WM operation with harmonics
         """
         interpolator = ModeArrayFactory._interpolator_from_data(base_data, interpolator)
 
@@ -1005,14 +916,11 @@ class ModeArrayFactory:
         Create a custom ModeArray with user-defined modes and relations.
 
         Args:
-            base_data: Dictionary containing 'freqs', 'k', 'gammas', and 'alpha' arrays
+            base_data: Dictionary with 'freqs', 'k', 'reflection_coeff', 'alpha' and 'Zb' arrays
             mode_labels: List of mode labels
-            relations: List of relations between modes
+            relations: List of [result, expression] pairs, e.g. ``["i", "p-s"]``
             interpolator: Optional shared ParameterInterpolator (built from
                 ``base_data`` when omitted)
-
-        Returns:
-            ModeArray: Custom configured ModeArray
         """
         interpolator = ModeArrayFactory._interpolator_from_data(base_data, interpolator)
 

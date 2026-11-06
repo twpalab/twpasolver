@@ -505,11 +505,9 @@ def stopband_edges(
     Stopband edges of a lossless supercell near a set of frequencies.
 
     Scans ``|tr T / 2|`` on a grid of step ``step_hz`` over the union of the
-    intervals ``f +- span_hz`` (one vectorised supercell evaluation per
-    contiguous block), and refines every edge, ``|tr T / 2| = 1``, and its
-    reference frequency on the passband side, where the splitting equals
-    ``e_ref``, as :func:`edge_reference_frequency` does for a single
-    frequency. Used to look up the edge of many flagged entries at once.
+    intervals ``f +- span_hz`` and refines every edge, ``|tr T / 2| = 1``, and
+    its reference frequency on the passband side, where the splitting equals
+    ``e_ref``, as :func:`edge_reference_frequency` does for a single frequency.
 
     Returns
     -------

@@ -1,16 +1,11 @@
 """Pre-compile and disk-cache the package's Numba CME solver kernels.
 
-Numba's ``@njit(cache=True)`` only writes a cache entry once a function has
-actually been called with a given argument-type signature, the first call
-in a fresh install (or a fresh venv/container) still pays full compile time
-(minutes, for the kernels in :mod:`twpasolver.cmes`). Run this module once
-right after installing twpasolver (``twpasolver-warmup``) to pay that cost
-up front instead of on first real use.
-
-This is not literally "compile at install time", pip/Poetry have no
-supported post-install hook, it's the practical equivalent: a one-command
-step you run after installing (locally, in a Dockerfile, in CI/deploy
-setup).
+Numba's ``@njit(cache=True)`` writes a cache entry only once a function has
+been called with a given signature, so the first call in a fresh environment
+pays the full compile time (minutes, for the kernels in
+:mod:`twpasolver.cmes`). Run ``twpasolver-warmup`` once after installing
+(locally, in a Dockerfile, in CI) to pay that cost up front; pip/Poetry have
+no post-install hook to do it automatically.
 """
 
 from __future__ import annotations

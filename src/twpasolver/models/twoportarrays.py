@@ -1,10 +1,4 @@
-"""
-Generic models for user-defined abcd matrices and TwoPortModel lists.
-
-This module provides a generic container class for arrays of TwoPortModels, allowing for the
-organization and manipulation of multiple two-port network models, including nested lists.
-It also includes specific models like TWPA for specialized applications.
-"""
+"""Arrays of TwoPortModels, including nested lists, and the TWPA model."""
 
 # mypy: ignore-errors
 from __future__ import annotations
@@ -30,15 +24,7 @@ class TwoPortArray(ModelArray):
     )
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
-        """
-        Compute abcd of combined models.
-
-        Args:
-            freqs (np.ndarray): Array of frequencies.
-
-        Returns:
-            ABCDArray: The combined ABCD matrix of the models.
-        """
+        """Cascade the ABCD matrices of the cells."""
         sc = abcd_identity(len(freqs))
         for cell in self.cells:
             sc = sc @ cell.get_abcd(freqs)
@@ -47,12 +33,7 @@ class TwoPortArray(ModelArray):
     @computed_field
     @property
     def N_tot(self) -> NonNegativeInt:
-        """
-        Total number of base cells in the model.
-
-        Returns:
-            NonNegativeInt: The total number of base cells.
-        """
+        """Total number of base cells, counting nested arrays and repetitions ``N``."""
         N_tot = 0
         for cell in self.cells:
             if hasattr(cell, "N_tot"):
@@ -83,9 +64,6 @@ class TWPA(TwoPortArray):
 
         With L(I) = Lk (1 + (I/Istar)^2 + (I/Istar2)^4) and I = Idc + i,
         L = L(Idc) (1 + epsilon i + xi i^2 + O(i^3)).
-
-        Returns:
-            NonNegativeFloat: The epsilon value.
         """
         if self.Istar2 is None:
             return 2 * self.Idc * self.xi
@@ -100,12 +78,7 @@ class TWPA(TwoPortArray):
     @computed_field
     @property
     def xi(self) -> NonNegativeFloat:
-        """
-        Coefficient of second-order term in inductance.
-
-        Returns:
-            NonNegativeFloat: The xi value.
-        """
+        """Coefficient of second-order term in inductance (see ``epsilon``)."""
 
         if self.Istar2 is None:
             return 1 / (self.Istar**2 + self.Idc**2)
@@ -130,23 +103,13 @@ class TWPA(TwoPortArray):
     @computed_field
     @property
     def chi(self) -> NonNegativeFloat:
-        """
-        Coefficient for second term of phase matching relation.
-
-        Returns:
-            NonNegativeFloat: The chi value.
-        """
+        """Coefficient for second term of phase matching relation."""
         return self.Ip0**2 * self.xi / 8
 
     @computed_field
     @property
     def alpha(self) -> NonNegativeFloat:
-        """
-        Second-order correction term for inductance as function of dc current.
-
-        Returns:
-            NonNegativeFloat: The alpha value.
-        """
+        """Second-order correction term for inductance as function of dc current."""
         alpha = 1 + self.Idc**2 / self.Istar**2
         if self.Istar2 is not None:
             alpha += self.Idc**4 / self.Istar2**4
@@ -155,12 +118,7 @@ class TWPA(TwoPortArray):
     @computed_field
     @property
     def Iratio(self) -> NonNegativeFloat:
-        """
-        Ratio between bias and nonlinearity current parameter.
-
-        Returns:
-            NonNegativeFloat: The Iratio value.
-        """
+        """Ratio ``Idc / Istar`` between bias and nonlinearity current."""
         return self.Idc / self.Istar
 
 

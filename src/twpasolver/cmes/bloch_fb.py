@@ -26,9 +26,10 @@ Physics summary (package convention exp(+j omega t), forward ~ exp(-gamma x))
   (own direction vs counter direction). Reciprocal vectors ``2 pi m / d_s``,
   term selection and stopband-edge treatment are those of each segment.
 * Because the expansion fixes voltage and current at every supercell
-  boundary, ``V = Zb+ A+ - Zb- A-`` and ``I = A+ + A-`` hold exactly at the
-  device ends. The boundary coefficients are therefore constant (no
-  derivative correction, no damping of a self-consistent update):
+  boundary (``phi = 1`` there), ``V = Zb+ A+ - Zb- A-`` and ``I = A+ + A-``
+  hold exactly, with the nonlinearity on, at the device ends and at every
+  junction. The boundary coefficients are therefore constant (no derivative
+  correction, no damping of a self-consistent update):
 
     input  (x=0):  A+ = t_in a_in + rho_in A-,
                    t_in = 2 Ze / (apcz_in (Zb+ + Zout_in)),
@@ -46,11 +47,9 @@ Physics summary (package convention exp(+j omega t), forward ~ exp(-gamma x))
 
 Junction conditions
 -------------------
-Every junction lies on a supercell boundary of both neighbours, where
-``I = A+ + A-`` and ``V = Zb+ A+ - Zb- A-`` hold exactly (``phi = 1`` at
-supercell boundaries), with the nonlinearity on. Continuity of (V, I) and the
-projection with the reciprocity invariant give, for the junction between a
-left segment L and a right segment R,
+Every junction lies on a supercell boundary of both neighbours. Continuity of
+(V, I) and the projection with the reciprocity invariant give, for the junction
+between a left segment L and a right segment R,
 
     A+_R = t  A+_L + rho_R A-_R,      t   = W_L / (Zb+_R + Zb-_L),
     A-_L = t' A-_R + rho_L A+_L,      t'  = W_R / (Zb+_R + Zb-_L),
@@ -1349,10 +1348,10 @@ def bloch_fb_segmented_cmes_solve(
     Returns
     -------
     ndarray, shape (2 * n_freq [* passes], n_modes, n_x)
-        Slow envelopes on ``x_array``
-        (forward on ``x``, backward on the mirrored coordinate), last point
-        replaced by the current coupled out to the external line. Restore the
-        propagation phase with :func:`segmented_phase`.
+        Slow envelopes on ``x_array`` (forward on ``x``, backward on the
+        mirrored coordinate), last point replaced by the current coupled out
+        to the external line. Restore the propagation phase with
+        :func:`segmented_phase`.
     """
     gammas_seg = np.asarray(gammas_seg, dtype=np.complex128)
     if gammas_seg.ndim != 3:

@@ -28,10 +28,9 @@ def _cubic_stencil(xp, x):
     First index and weights of the 4-point Lagrange stencil around ``x``.
 
     The stored envelopes oscillate with the residual mismatch of the kept
-    terms, up to ``kappa_cutoff * pi`` per supercell; 4-point cubic
-    interpolation keeps the error of a table lookup at about ``phi^4 / 50``
-    for a phase ``phi`` per grid step (linear: ``phi^2 / 8``) without storing
-    anything more. Outside the grid the value is clamped as in ``np.interp``;
+    terms, up to ``kappa_cutoff * pi`` per supercell; for a phase ``phi`` per
+    grid step the cubic lookup error is about ``phi^4 / 50`` (linear:
+    ``phi^2 / 8``). Outside the grid the value is clamped as in ``np.interp``;
     grids shorter than 4 points fall back to linear interpolation. Unused
     weights are zero.
     """
@@ -198,6 +197,12 @@ def _bloch_row_coeffs(
     """
     Coefficient of every kept (sign-expanded) mixing row for one solve direction.
 
+    The coefficient of a row with index ``m`` is the Fourier component
+    ``(1/d) sum_j F_j exp(-i G x_j)`` of its intracell profile, with
+    ``G = 2 pi m / d`` in the solve coordinate. The backward solve runs in the
+    mirrored coordinate ``s = L - x``, where ``exp(i G s)`` corresponds to the
+    physical component ``-G``, hence the sign flip of the phase.
+
     Parameters
     ----------
     rows : (n_rows, n_in + 3) int
@@ -217,12 +222,6 @@ def _bloch_row_coeffs(
         Unit cells per supercell.
     own_forward : bool
         True for the forward solve, False for the backward one.
-
-    The coefficient of a row with index ``m`` is the Fourier component
-    ``(1/d) sum_j F_j exp(-i G x_j)`` of its intracell profile, with
-    ``G = 2 pi m / d`` in the solve coordinate. The backward solve runs in the
-    mirrored coordinate ``s = L - x``, where ``exp(i G s)`` corresponds to the
-    physical component ``-G``, hence the sign flip of the phase below.
     """
     n_rows = rows.shape[0]
     n_in = rows.shape[1] - 3
@@ -360,8 +359,8 @@ def _anderson_mix(g, f, dG, dF, n_hist, head, depth, scales):
 
     ``gamma`` minimises the weighted norm ``|| f - sum_a gamma_a dF_a ||``,
     with every mode weighted by ``1 / scales_j`` so that weak modes (signal,
-    idlers) count as much as the pump. The small normal-equation system is
-    Tikhonov-regularised for robustness.
+    idlers) count as much as the pump. The normal equations are
+    Tikhonov-regularised.
     """
     n_modes, n_x = g.shape
     w2 = 1.0 / scales**2

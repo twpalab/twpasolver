@@ -1,11 +1,4 @@
-"""
-Functions for saving to json and hdf5 files.
-
-This module provides functions to read from and write to JSON and HDF5 files. It includes utility
-functions to ensure file extensions and directories are correctly handled, as well as recursive
-functions to handle nested dictionaries when working with HDF5 files.
-
-"""
+"""Read and write nested dictionaries as JSON or HDF5 files."""
 
 import json
 import os
@@ -18,14 +11,11 @@ from h5py import Group
 
 def read_file(savename: str, writer: str = "json") -> Dict[str, Any]:
     """
-    Read data from a file and return it as a dictionary.
+    Read a dictionary from a file.
 
     Args:
-        savename (str): The name of the file to read.
-        writer (str): The file format to use (default is "json").
-
-    Returns:
-        Dict[str, Any]: Dictionary containing the read data.
+        savename (str): File name; the extension is added if missing.
+        writer (str): ``"json"`` or ``"hdf5"``.
     """
     savename = add_extension(savename, writer)
     if not os.path.exists(savename):
@@ -35,12 +25,12 @@ def read_file(savename: str, writer: str = "json") -> Dict[str, Any]:
 
 def save_to_file(savename: str, d: Dict[str, Any], writer: str = "json") -> None:
     """
-    Save data to a file in the specified format.
+    Save a dictionary to a file, creating its directory if needed.
 
     Args:
-        savename (str): The name of the file to save.
-        d (Dict[str, Any]): Dictionary containing data to be saved.
-        writer (str): The file format to use (default is "json").
+        savename (str): File name; the extension is added if missing.
+        d (Dict[str, Any]): Data to save.
+        writer (str): ``"json"`` or ``"hdf5"``.
     """
     savename = add_extension(savename, writer)
     ensure_directory_exists(savename)
@@ -48,28 +38,14 @@ def save_to_file(savename: str, d: Dict[str, Any], writer: str = "json") -> None
 
 
 def add_extension(filename: str, extension: str) -> str:
-    """
-    Add the specified extension to the filename if not already present.
-
-    Args:
-        filename (str): The name of the file.
-        extension (str): The extension to add.
-
-    Returns:
-        str: Filename with the specified extension.
-    """
+    """Add ``.extension`` to the filename if not already present."""
     if not filename.endswith(f".{extension}"):
         return f"{filename}.{extension}"
     return filename
 
 
 def ensure_directory_exists(filename: str) -> None:
-    """
-    Ensure that the directory for the given filename exists; create it if necessary.
-
-    Args:
-        filename (str): The name of the file.
-    """
+    """Create the parent directory of ``filename`` if it does not exist."""
     directory = os.path.dirname(filename)
     if directory:
         if not os.path.exists(directory):
@@ -77,41 +53,19 @@ def ensure_directory_exists(filename: str) -> None:
 
 
 def read_hdf5(savename: str) -> Dict[str, Any]:
-    """
-    Read data from an HDF5 file and return it as a dictionary.
-
-    Args:
-        savename (str): The name of the HDF5 file to read.
-
-    Returns:
-        Dict[str, Any]: Dictionary containing the read data.
-    """
+    """Read a dictionary from an HDF5 file."""
     with h5py.File(savename, "r") as f:
         return _recursively_load_dict_contents_from_group(f)
 
 
 def read_json(savename: str) -> Dict[str, Any]:
-    """
-    Read data from a JSON file and return it as a dictionary.
-
-    Args:
-        savename (str): The name of the JSON file to read.
-
-    Returns:
-        Dict[str, Any]: Dictionary containing the read data.
-    """
+    """Read a dictionary from a JSON file."""
     with open(savename) as f:
         return json.load(f)
 
 
 def save_to_hdf5(savename: str, d: Dict[str, Any]) -> None:
-    """
-    Save data to an HDF5 file.
-
-    Args:
-        savename (str): The name of the HDF5 file to save.
-        d (Dict[str, Any]): Dictionary containing data to be saved.
-    """
+    """Save a dictionary to an HDF5 file; a failed save keeps the previous file."""
     if not isinstance(d, dict):
         return
 
@@ -128,25 +82,13 @@ def save_to_hdf5(savename: str, d: Dict[str, Any]) -> None:
 
 
 def save_to_json(savename: str, d: Dict[str, Any]) -> None:
-    """
-    Save data to a JSON file.
-
-    Args:
-        savename (str): The name of the JSON file to save.
-        d (Dict[str, Any]): Dictionary containing data to be saved.
-    """
+    """Save a dictionary to a JSON file, encoding NumPy types."""
     with open(savename, "w", encoding="utf-8") as fp:
         json.dump(d, fp, cls=NpEncoder, indent=4)
 
 
 def _recursively_save_dict_contents_to_group(f: Group, d: Dict[Any, Any]) -> None:
-    """
-    Recursively save dictionary contents to an HDF5 group.
-
-    Args:
-        f (Group): The HDF5 group.
-        d (Dict[str, Any]): The dictionary to save.
-    """
+    """Recursively save a dictionary to an HDF5 group; ``None`` values are skipped."""
     if d and all(isinstance(key, (int, np.integer)) for key in d):
         f.attrs["int_keys"] = True
     for key, item in d.items():
@@ -185,15 +127,7 @@ def _recursively_save_dict_contents_to_group(f: Group, d: Dict[Any, Any]) -> Non
 
 
 def _recursively_load_dict_contents_from_group(f: Group) -> Dict[Any, Any]:
-    """
-    Recursively load dictionary contents from an HDF5 group.
-
-    Args:
-        f (Group): The HDF5 group.
-
-    Returns:
-        Dict[str, Any]: The loaded dictionary.
-    """
+    """Recursively load a dictionary from an HDF5 group."""
     ans: Dict[Any, Any] = {}
     int_keys = bool(f.attrs.get("int_keys", False))
     for key, item in f.items():
@@ -213,15 +147,7 @@ class NpEncoder(json.JSONEncoder):
     """JSON encoder for handling NumPy types."""
 
     def default(self, o: Any) -> int | float | List[Any] | str:
-        """
-        Return default encoding for NumPy types.
-
-        Args:
-            o (Any): The object to encode.
-
-        Returns:
-            int | float | List[Any] | str: The encoded object.
-        """
+        """Encode NumPy scalars and arrays; complex numbers become strings."""
         if isinstance(o, np.integer):
             return int(o)
         if isinstance(o, np.floating):

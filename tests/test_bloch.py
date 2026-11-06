@@ -158,8 +158,8 @@ def _connector(z0, length, L_series, C_shunt, R_series):
 @pytest.mark.parametrize("segmented", [False, True])
 def test_fb_linear_limit_with_connectors(segmented):
     """
-    Without pump, the Bloch FB model with different connectors at the two ends
-    reproduces all four S-parameters of the cascade connector-device-connector.
+    Without pump, the Bloch FB model with different end connectors gives all four
+    S-parameters of the cascade connector-device-connector.
 
     Both connectors have port 2 facing the device, so the output one enters the
     cascade reversed (A and D swapped). S12 and S22 come from a signal injected

@@ -26,8 +26,8 @@ def _sorted_interp_bracket(xp: nb_float1d, x: nb.float64):
     """
     Return (lo, hi) bracket indices for x in the sorted grid xp.
 
-    Callers compute frac = (x - xp[lo]) / (xp[hi] - xp[lo]) and apply it
-    to as many value arrays as needed, paying for the binary search only once.
+    Callers compute frac = (x - xp[lo]) / (xp[hi] - xp[lo]) once and apply it
+    to several value arrays.
 
     Boundary behaviour (matching np.interp):
       x <= xp[0]       → lo = hi = 0        (frac = 0 → clamp to fp[0])
@@ -246,12 +246,9 @@ def _no_reflections_solve_segmented(
     Parallel solve for segmented device; gammas_array shape (n_freq, n_modes, n_segments).
 
     For each frequency the cumulative phase Phi_m(x[k]) is precomputed on the
-    output grid via the cumulative trapezoid rule applied to kappa_m linearly
-    interpolated at x_array from segment_midpoints.  This table is then passed
-    to the RHS so that _interp1d_sorted(x_array, phi_table[m], x) gives the exact
-    phase at any integrator step x via a single binary search per mode per step.
-    Both grids are sorted, so all interpolations use O(log n) binary search instead
-    of O(n) linear scan.
+    output grid (trapezoid rule on kappa_m linearly interpolated from
+    segment_midpoints, exact for that interpolant) and passed to the RHS, which
+    interpolates it at every integrator step.
     """
     n_freq = y0_broadcast.shape[0]
     n_modes = y0_broadcast.shape[1]
