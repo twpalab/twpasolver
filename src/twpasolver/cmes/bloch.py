@@ -247,7 +247,7 @@ def bloch_mode_tables(
 # c+- = a~+- exp(+-j kappa_e x), kappa_e d = m pi, the amplitudes obey
 #     dc/dx = K c + (nonlinear source),   K = log((-1)^m P) / d,
 # a constant 2x2 matrix that is regular at the exceptional point (it is never
-# diagonalised). See ``Claude outputs/edge_basis_physics.tex``.
+# diagonalised). The full derivation will go into the documentation.
 
 
 def lossless_copy(model: Any) -> Any:
