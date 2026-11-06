@@ -483,9 +483,22 @@ Items (each step keeps golden gains bit-identical on the holotype, the segmented
     methods became functions taking `segments`, `seg_bounds`, `unit_multiplier`. `analysis.py` 1,836 → 1,275,
     `prep.py` 594. Golden reference (scratch `golden.py`: holotype edge/guard/simple, segmented holotype,
     3-cell simple/bloch, uniform and two-segment phase matching; 33 arrays) bit-identical; 140 tests.
-- [ ] **4.2 Uniform is the one-segment case everywhere:** drop the dual shapes in `_prepare_cme_inputs`, the
+- [x] **4.2 Uniform is the one-segment case everywhere:** drop the dual shapes in `_prepare_cme_inputs`, the
   two branches of `_apply_phase_carrier`, `_drop_segment_axis` and `_is_segmented` branching; the segment axis
   is internal and never in results.
+  - Done 2026-11-07 (audit-fixes): `data["segments"]` always present (one entry for a uniform device);
+    `_prepare_cme_inputs`, `_apply_phase_carrier`, `_bloch_segments` and `phase_matching` have one path; the
+    `bloch` driver no longer adds the axis; `simple` always runs the segmented kernel (uniform kernel and
+    `no_reflections_cmes` deleted, warmup compiles one `simple` kernel). Golden: `bloch` and phase matching
+    bit-identical, uniform `simple` within 7e-11 dB (rounding of the cumulative phase); uniform `simple` is
+    ~1/3 slower (0.18 → 0.24 s for 400 signals on the holotype). Public shapes unchanged on purpose:
+    `data["k"]` stays 1-D for uniform devices until 4.3b, and `_drop_segment_axis` stays as the one squeeze
+    of the uniform `bloch` diagnostics until 4.5b fixes the result layout. `analysis.py` 1,275 → 1,225,
+    `cmes/base.py` 381 → 278.
+  - **Found, open:** the segmented `simple` kernel interpolates the phase table linearly between output-grid
+    points (`thin`), while the phase of the piecewise-linear κ is piecewise quadratic, so segmented `simple`
+    results depend slightly on `thin`. Exact fix: evaluate the quadratic phase in the RHS, or put the
+    segment midpoints into the phase grid. Not measured yet.
 - [ ] **4.3b `linear.py` + lazy `an.linear`:** replaces `update_base_data`, the `data` dict and the
   `analysis_function` decorator. `parameter_sweep` becomes a loop that stacks results.
 - [ ] **4.3c Flatten the facade's base classes:** `TWPAnalysis` stops inheriting from `Analyzer` (an abstract

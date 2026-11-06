@@ -258,13 +258,8 @@ class TWPAnalysis(Analyzer, Frequencies):
 
         A uniform device is a single segment spanning the whole line.
         """
-        if self._is_segmented():
-            segments = list(self.twpa.cells)
-            bounds = np.asarray(self.data["segments"]["boundaries"], dtype=float)
-        else:
-            segments = [self.twpa]
-            bounds = np.array([0.0, float(self.twpa.N_tot)])
-        return segments, bounds
+        segments = list(self.twpa.cells) if self._is_segmented() else [self.twpa]
+        return segments, np.asarray(self.data["segments"]["boundaries"], dtype=float)
 
     def _bloch_params_for_cell(self, cell: TWPA, T: Any = None) -> dict[str, Any]:
         """
@@ -419,16 +414,14 @@ class TWPAnalysis(Analyzer, Frequencies):
             seg_N_tot = np.array([seg.N_tot for seg in segments], dtype=np.float64)
             if segmented:
                 log.info("Detected %d TWPA segments.", len(segments))
-                bounds = np.concatenate([[0.0], np.cumsum(seg_N_tot)])
-                self.data["segments"] = {
-                    "boundaries": bounds,
-                    "midpoints": 0.5 * (bounds[:-1] + bounds[1:]),
-                    "N_tot": seg_N_tot,
-                    "epsilon": np.array([seg.epsilon for seg in segments]),
-                    "xi": np.array([seg.xi for seg in segments]),
-                }
-            else:
-                self.data.pop("segments", None)
+            bounds = np.concatenate([[0.0], np.cumsum(seg_N_tot)])
+            self.data["segments"] = {
+                "boundaries": bounds,
+                "midpoints": 0.5 * (bounds[:-1] + bounds[1:]),
+                "N_tot": seg_N_tot,
+                "epsilon": np.array([seg.epsilon for seg in segments]),
+                "xi": np.array([seg.xi for seg in segments]),
+            }
 
             # k_star from the length-weighted mean wavenumber per unit cell.
             k_full = np.average(
@@ -526,47 +519,37 @@ class TWPAnalysis(Analyzer, Frequencies):
         I_array: np.ndarray,
         gammas: np.ndarray,
         x: np.ndarray,
-        segment_midpoints: Optional[np.ndarray] = None,
+        segment_midpoints: np.ndarray,
     ) -> np.ndarray:
         """
         Multiply slow-envelope amplitudes by the propagation phase exp(i·Φ_m(x)).
 
-        Uniform device (gammas.ndim == 2, shape (n_freq, n_modes)):
-            Φ_m(x) = κ_m · x  (exact for constant κ_m).
-
-        Segmented device (gammas.ndim == 3, shape (n_freq, n_modes, n_seg)):
-            κ_m(x) is piecewise-linear on *segment_midpoints*; the cumulative
-            trapezoid rule is exact for that interpolant, consistent with the
-            segmented Numba kernel.
+        κ_m(x) is piecewise-linear on ``segment_midpoints`` (constant for one
+        segment); the cumulative trapezoid rule is exact for that interpolant,
+        consistent with the Numba kernel.
 
         Parameters
         ----------
         I_array          : (n_freq, n_modes, n_x)
-        gammas           : (n_freq, n_modes) or (n_freq, n_modes, n_seg)
+        gammas           : (n_freq, n_modes, n_seg)
         x                : (n_x,)
-        segment_midpoints: (n_seg,), required when gammas.ndim == 3
+        segment_midpoints: (n_seg,)
         """
-        if gammas.ndim == 3:
-            if segment_midpoints is None:
-                raise ValueError("segment_midpoints is required when gammas.ndim == 3.")
-            # Interpolate κ_m onto the output grid: (n_freq, n_modes, n_x)
-            kappa_at_x = np.array(
+        kappa_at_x = np.array(
+            [
                 [
-                    [
-                        np.interp(x, segment_midpoints, gammas[i, j].imag)
-                        for j in range(gammas.shape[1])
-                    ]
-                    for i in range(gammas.shape[0])
+                    np.interp(x, segment_midpoints, gammas[i, j].imag)
+                    for j in range(gammas.shape[1])
                 ]
-            )
-            dx = np.diff(x)
-            dphi = 0.5 * (kappa_at_x[..., :-1] + kappa_at_x[..., 1:]) * dx
-            phi = np.concatenate(
-                [np.zeros((*gammas.shape[:2], 1)), np.cumsum(dphi, axis=-1)], axis=-1
-            )
-            return I_array * np.exp(1j * phi)
-        else:
-            return I_array * np.exp(np.einsum("ij,k->ijk", 1j * gammas.imag, x))
+                for i in range(gammas.shape[0])
+            ]
+        )
+        dx = np.diff(x)
+        dphi = 0.5 * (kappa_at_x[..., :-1] + kappa_at_x[..., 1:]) * dx
+        phi = np.concatenate(
+            [np.zeros((*gammas.shape[:2], 1)), np.cumsum(dphi, axis=-1)], axis=-1
+        )
+        return I_array * np.exp(1j * phi)
 
     def _prepare_cme_inputs(
         self,
@@ -577,12 +560,10 @@ class TWPAnalysis(Analyzer, Frequencies):
         pump_mode: str,
     ) -> dict[str, Any]:
         """
-        Inputs shared by the CME solvers.
+        Inputs shared by the CME solvers; a uniform device is one segment.
 
-        Uniform devices: mode_params values (n_freq,), gammas/reflections
-        (n_freq, n_modes). Segmented devices: mode_params values
-        (n_segments, n_freq), gammas/reflections (n_freq, n_modes, n_segments),
-        coefficient tables (n_relations, n_segments).
+        gammas/reflections/Zb_table (n_freq, n_modes, n_segments), coefficient
+        tables (n_relations, n_segments).
         """
         mode_array.update_frequencies({pump_mode: pump})
         mode_params = mode_array.process_frequency_array(signal_mode, signal_freqs)
@@ -591,39 +572,24 @@ class TWPAnalysis(Analyzer, Frequencies):
         terms_3wm = mode_array.get_rwa_terms(power=2)
         terms_4wm = mode_array.get_rwa_terms(power=3)
 
-        complex_gammas = [
-            -mode_params[m]["alpha"] - 1j * mode_params[m]["k"] for m in mode_labels
-        ]
-        gamma_vals = [mode_params[m]["gamma"] for m in mode_labels]
-        Zb_vals = [mode_params[m]["Zb"] for m in mode_labels]
+        segments = self.data["segments"]
+        n_seg = len(segments["N_tot"])
 
-        segments = self.data.get("segments")
-        if segments is not None:
-            # Relations are segment-independent. Only the scalar
-            # nonlinearity coefficients (epsilon, xi) vary.
-            relations_3wm, relations_4wm, c3_unit, c4_unit = (
-                prepare_relations_coefficients(terms_3wm, terms_4wm, 1.0, 1.0)
-            )
-            coeffs_3wm = np.stack(
-                [c3_unit * eps for eps in segments["epsilon"]], axis=-1
-            )
-            coeffs_4wm = np.stack([c4_unit * xi for xi in segments["xi"]], axis=-1)
-            # mode_params[m]["k"] is (n_segments, n_freq) from the 2-D interpolator;
-            # final shapes: (n_freq, n_modes, n_segments)
-            gammas = np.stack(complex_gammas, axis=-2).transpose(2, 1, 0)
-            reflections = np.stack(gamma_vals, axis=-2).transpose(2, 1, 0)
-            Zb_table = np.stack(Zb_vals, axis=-2).transpose(2, 1, 0)
-            segment_midpoints = segments["midpoints"]
-        else:
-            relations_3wm, relations_4wm, coeffs_3wm, coeffs_4wm = (
-                prepare_relations_coefficients(
-                    terms_3wm, terms_4wm, self.twpa.epsilon, self.twpa.xi
-                )
-            )
-            gammas = np.stack(complex_gammas, axis=-1)
-            reflections = np.stack(gamma_vals, axis=-1)
-            Zb_table = np.stack(Zb_vals, axis=-1)
-            segment_midpoints = None
+        def table(key):
+            """(n_freq, n_modes, n_seg) from per-mode (n_seg, n_freq) parameters."""
+            vals = [np.reshape(mode_params[m][key], (n_seg, -1)) for m in mode_labels]
+            return np.stack(vals, axis=-2).transpose(2, 1, 0)
+
+        # Relations are segment-independent; only epsilon and xi vary.
+        relations_3wm, relations_4wm, c3_unit, c4_unit = prepare_relations_coefficients(
+            terms_3wm, terms_4wm, 1.0, 1.0
+        )
+        coeffs_3wm = np.stack([c3_unit * eps for eps in segments["epsilon"]], axis=-1)
+        coeffs_4wm = np.stack([c4_unit * xi for xi in segments["xi"]], axis=-1)
+        gammas = -table("alpha") - 1j * table("k")
+        reflections = table("gamma")
+        Zb_table = table("Zb")
+        segment_midpoints = segments["midpoints"]
 
         return {
             "mode_params": mode_params,
@@ -694,9 +660,9 @@ class TWPAnalysis(Analyzer, Frequencies):
         Ip0 = self.twpa.Ip0 if pump_Ip0 is None else pump_Ip0
         # Segmented devices: the accumulated mismatch is sum_s N_s dk_s, so delta
         # is the length-weighted mean of the per-segment dk_s (own k, gamma, xi).
-        seg = self.data.get("segments")
-        weights = seg["N_tot"] / seg["N_tot"].sum() if seg else np.ones(1)
-        chi = Ip0**2 * (seg["xi"] if seg else np.array([self.twpa.xi])) / 8
+        seg = self.data["segments"]
+        weights = seg["N_tot"] / seg["N_tot"].sum()
+        chi = Ip0**2 * seg["xi"] / 8
         n_seg = len(weights)
 
         f_triplets = []
@@ -1011,11 +977,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         )
         mode_labels = cme_inputs["mode_labels"]
         n_freq = cme_inputs["n_freq"]
-        gammas = cme_inputs["gammas"]
         mode_params = cme_inputs["mode_params"]
-        if not segmented:
-            # A uniform device is the one-segment case.
-            cme_inputs = {**cme_inputs, "gammas": cme_inputs["gammas"][..., None]}
         segments, seg_bounds = self._bloch_segments()
         bloch = prepare_bloch_segmented(
             mode_array, cme_inputs, segments, seg_bounds, self.unit_multiplier

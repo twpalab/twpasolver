@@ -89,14 +89,11 @@ def _warm_analysis(twpa: TWPA, label: str, models: tuple, verbose: bool) -> None
 def warmup(verbose: bool = True) -> None:
     """Trigger and disk-cache compilation of the CME solver kernels.
 
-    ``simple`` has one kernel for uniform and one for segmented devices;
-    ``bloch`` has a single kernel (a uniform device is one segment). Safe to
+    Each model has a single kernel (a uniform device is one segment). Safe to
     run repeatedly: once the cache is populated, later runs finish in seconds.
     """
     uniform = TWPA.model_validate(_TWPA_KWARGS)
     _warm_analysis(uniform, "uniform", (GainModel.SIMPLE, GainModel.BLOCH), verbose)
-    segmented = TWPA(cells=[uniform, uniform.model_copy(deep=True)], Ip0=250e-6)
-    _warm_analysis(segmented, "segmented", (GainModel.SIMPLE,), verbose)
     if verbose:
         print("twpasolver warmup: done, Numba cache populated.")
 

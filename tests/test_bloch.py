@@ -23,10 +23,9 @@ def _forward_gamma(twpa, freqs, n_cells):
 
 def _segment_bloch_tables(analysis, mode_array, cme_inputs):
     """Bloch tables of a uniform device solved as one segment."""
-    ci = {**cme_inputs, "gammas": cme_inputs["gammas"][..., None]}
     segments, bounds = analysis._bloch_segments()
     return prepare_bloch_segmented(
-        mode_array, ci, segments, bounds, analysis.unit_multiplier
+        mode_array, cme_inputs, segments, bounds, analysis.unit_multiplier
     )
 
 
@@ -43,7 +42,7 @@ def _solve_one_segment(x, y0_fwd, y0_bwd, ci, sg, **kwargs):
         sg["seg_bounds"],
         y0_fwd,
         y0_bwd,
-        ci["gammas"][:, None],
+        np.transpose(ci["gammas"], (0, 2, 1)),
         ci["relations_3wm"],
         ci["relations_4wm"],
         sg["base_3wm"],
@@ -383,7 +382,7 @@ def test_bloch_rhs_conserves_energy_with_reciprocal_vectors():
     mode_array = analysis.get_mode_array("basic_3wm")
     ci = analysis._prepare_cme_inputs(mode_array, np.array([12.5]), 14.3, "s", "p")
     bl = _uniform_bloch_tables(analysis, mode_array, ci)
-    kappas = np.ascontiguousarray(ci["gammas"][0].imag)
+    kappas = np.ascontiguousarray(ci["gammas"][0, :, 0].imag)
     W = bl["W"][0].real
     L = float(analysis.twpa.N_tot)
     rows3, rows4 = _filter_wm_terms_bloch(
@@ -688,7 +687,7 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
     mode_array = analysis.get_mode_array("basic_3wm")
     ci = analysis._prepare_cme_inputs(mode_array, np.array([12.5]), 14.3, "s", "p")
     bl = _uniform_bloch_tables(analysis, mode_array, ci)
-    kappas = np.ascontiguousarray(ci["gammas"][0].imag)
+    kappas = np.ascontiguousarray(ci["gammas"][0, :, 0].imag)
     W = bl["W"][0].real
     L = float(analysis.twpa.N_tot)
     rows3, rows4 = _filter_wm_terms_bloch(

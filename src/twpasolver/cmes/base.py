@@ -47,49 +47,6 @@ def _sorted_interp_bracket(xp: nb_float1d, x: nb.float64):
     nb_complex1d(
         nb.float64,
         nb_complex1d,
-        nb_float1d,
-        nb_float1d,
-        nb_int2d,
-        nb_int2d,
-        nb_complex1d,
-        nb_complex1d,
-    ),
-    cache=True,
-)
-def no_reflections_cmes(
-    x,
-    currents,
-    alphas,
-    kappas,
-    relations_3wm,
-    relations_4wm,
-    coeffs_3wm,
-    coeffs_4wm,
-):
-    """RHS of the no-reflections CME system for a uniform device."""
-    num_modes = len(currents)
-    derivs = np.zeros(num_modes, nb.complex128)
-    exp_pos = np.exp(1j * kappas * x)
-
-    alphas_rhs = np.zeros(2 * num_modes, dtype=np.complex128)
-    for i in range(num_modes):
-        alphas_rhs[i] = currents[i] * exp_pos[i]
-        alphas_rhs[i + num_modes] = np.conj(alphas_rhs[i])
-
-    for i, (idx, idx1, idx2) in enumerate(relations_3wm):
-        derivs[idx] += coeffs_3wm[i] * alphas_rhs[idx1] * alphas_rhs[idx2]
-    for i, (idx, idx1, idx2, idx3) in enumerate(relations_4wm):
-        derivs[idx] += (
-            coeffs_4wm[i] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
-        )
-    derivs = (alphas + 1j * kappas) * derivs / exp_pos + alphas * currents
-    return derivs
-
-
-@nb.njit(
-    nb_complex1d(
-        nb.float64,
-        nb_complex1d,
         nb_float2d,
         nb_float2d,
         nb_int2d,
@@ -191,46 +148,6 @@ def no_reflections_cmes_segmented(
 
 
 @nb.njit(parallel=True, cache=True)
-def _no_reflections_solve_uniform(
-    x_array,
-    y0_broadcast,
-    gammas_array,
-    relations_3wm,
-    relations_4wm,
-    coeffs_3wm,
-    coeffs_4wm,
-    rk,
-):
-    """Parallel solve for uniform device; gammas_array shape (n_freq, n_modes)."""
-    n_freq = y0_broadcast.shape[0]
-    n_modes = y0_broadcast.shape[1]
-    x_span = (x_array[0], x_array[-1])
-    I_tuples = np.empty((n_freq, n_modes, len(x_array)), dtype=nb.complex128)
-
-    for i in nb.prange(n_freq):
-        I_tuples[i] = rk45_solve(
-            no_reflections_cmes,
-            x_span,
-            y0_broadcast[i],
-            args=(
-                gammas_array[i].real,
-                gammas_array[i].imag,
-                relations_3wm,
-                relations_4wm,
-                coeffs_3wm,
-                coeffs_4wm,
-            ),
-            atol=rk[0],
-            rtol=rk[1],
-            t_eval=x_array,
-            first_step=rk[2],
-            max_steps_per_cell=rk[3],
-        )
-
-    return I_tuples
-
-
-@nb.njit(parallel=True, cache=True)
 def _no_reflections_solve_segmented(
     x_array,
     y0_broadcast,
@@ -321,18 +238,15 @@ def no_reflections_cmes_solve(
     relations_4wm,
     coeffs_3wm,
     coeffs_4wm,
-    segment_midpoints: FloatArray | None = None,
+    segment_midpoints: FloatArray,
     rk_config: RKSolverConfig | None = None,
 ) -> ComplexArray:
     """
     Solve the no-reflections CME system for every signal frequency in parallel.
 
-    Dispatches to the segmented or uniform Numba kernel based on
-    ``gammas_array.ndim``:
-
-    - Uniform: ``gammas_array`` shape (n_freq, n_modes), ``coeffs_*`` 1-D.
-    - Segmented: ``gammas_array`` shape (n_freq, n_modes, n_seg),
-      ``coeffs_*`` shape (n_rel, n_seg); ``segment_midpoints`` required.
+    ``gammas_array`` has shape (n_freq, n_modes, n_seg), ``coeffs_*`` shape
+    (n_rel, n_seg) and ``segment_midpoints`` shape (n_seg,); a uniform device is
+    one segment.
 
     Returns
     -------
@@ -341,34 +255,17 @@ def no_reflections_cmes_solve(
         ``_apply_phase_carrier`` in the caller to recover the full-phase field.
     """
     rk = (rk_config if rk_config is not None else RKSolverConfig()).kernel_args()
-    if gammas_array.ndim == 3:
-        if segment_midpoints is None:
-            raise ValueError(
-                "segment_midpoints is required for segmented devices "
-                "(gammas_array.ndim == 3)."
-            )
-        I_tuples = _no_reflections_solve_segmented(
-            np.ascontiguousarray(x_array),
-            y0_broadcast,
-            gammas_array,
-            relations_3wm,
-            relations_4wm,
-            np.ascontiguousarray(coeffs_3wm),
-            np.ascontiguousarray(coeffs_4wm),
-            np.ascontiguousarray(segment_midpoints),
-            rk,
-        )
-    else:
-        I_tuples = _no_reflections_solve_uniform(
-            x_array,
-            y0_broadcast,
-            gammas_array,
-            relations_3wm,
-            relations_4wm,
-            coeffs_3wm,
-            coeffs_4wm,
-            rk,
-        )
+    I_tuples = _no_reflections_solve_segmented(
+        np.ascontiguousarray(x_array),
+        y0_broadcast,
+        gammas_array,
+        relations_3wm,
+        relations_4wm,
+        np.ascontiguousarray(coeffs_3wm),
+        np.ascontiguousarray(coeffs_4wm),
+        np.ascontiguousarray(segment_midpoints),
+        rk,
+    )
     bad = np.flatnonzero(~np.isfinite(I_tuples).all(axis=(1, 2)))
     if bad.size:
         log.warning(
