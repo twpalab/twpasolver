@@ -482,7 +482,8 @@ cold compile time measured and noted here; the line count noted here.
   - Replace the two parsers (`RWAAnalyzer._parse_expression` `~269`, `ModeArray._parse_expression_for_propagation`
     `~425`) and the two resolvers (sympy substitution, dict linear combination) with integer coefficient vectors.
     This drops the sympy dependency (current build: 18 modes, 1363 terms, 0.12 s).
-  - Remove `n_sidebands` (`~1066`) and the unused `edge_colors`/`edge_styles`.
+  - Remove `n_sidebands` (`~1066`) and the unused `edge_colors`/`edge_styles`. Done 2026-11-06 (audit-fixes),
+    together with the `general_no_reflections` alias of `GainModel`.
   - `get_dependent_modes` has no docstring and no caller.
   - No `plt.show()` in library code (`~914`); deduplicate `plot_mode_relations`/`print_symbolic_expressions`.
 - [x] **5.4 Logging:** `logger.py:39-40` sets INFO and adds a handler at import, so messages print twice under

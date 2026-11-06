@@ -63,22 +63,10 @@ class GainModel(str, enum.Enum):
         fixed edge basis for modes close to a stopband edge. Segmented devices
         (whole supercells per segment) are solved on per-segment Bloch modes
         joined by exact junction conditions. Configured by ``BlochSolverConfig``.
-
-    ``"general_no_reflections"`` is a deprecated alias of ``"simple"``.
     """
 
     SIMPLE = "simple"
     BLOCH = "bloch"
-
-    @classmethod
-    def _missing_(cls, value):
-        if value == "general_no_reflections":
-            log.warning(
-                "Gain model 'general_no_reflections' is now called 'simple'; "
-                "the old name will be removed in a future version."
-            )
-            return cls.SIMPLE
-        return None
 
 
 def _ratio_db(out: np.ndarray, ref: np.ndarray) -> np.ndarray:

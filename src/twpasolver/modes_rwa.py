@@ -861,7 +861,6 @@ class ModeArrayFactory:
         n_pump_harmonics: int = 1,
         n_frequency_conversion: int = 1,
         n_signal_harmonics: int = 1,
-        n_sidebands: int = 1,
         interpolator: Optional[ParameterInterpolator] = None,
     ) -> ModeArray:
         """

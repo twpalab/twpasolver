@@ -279,15 +279,14 @@ def test_fb_energy_balance_lossless(m_max):
         assert np.all(np.abs(PL - P0) < 1e-6 * np.abs(P0))
 
 
-@pytest.mark.parametrize("model", ["simple", "general_no_reflections"])
-def test_backward_inputs_rejected_without_reflections(model):
+def test_backward_inputs_rejected_without_reflections():
     """The simple model propagates only +x waves: backward inputs must raise."""
     twpa = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10, Ip0=2.5e-4)
     analysis = TWPAnalysis(twpa=twpa, f_arange=(0.05, 20, 1e-2))
     analysis.update_base_data()
     with pytest.raises(ValueError, match="initial_amplitudes_bwd"):
         analysis.gain(
-            [2.0], pump=14.3, model=model, initial_amplitudes_bwd=[2.5e-4, 0.0, 0.0]
+            [2.0], pump=14.3, model="simple", initial_amplitudes_bwd=[2.5e-4, 0.0, 0.0]
         )
 
 
