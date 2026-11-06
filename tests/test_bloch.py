@@ -6,7 +6,7 @@ import pytest
 from twpasolver.analysis import GainModel, TWPAnalysis, _drop_segment_axis
 from twpasolver.cmes.bloch import bloch_mode_tables
 from twpasolver.cmes.bloch_fb import bloch_fb_cmes_solve
-from twpasolver.cmes.solver_config import FBSolverConfig
+from twpasolver.cmes.solver_config import BlochSolverConfig
 from twpasolver.models import TWPA, LCLfBaseCell
 
 CELL_U = {"name": "LCLfBaseCell", "N": 30, "L": 49.9e-12, "C": 24.2e-15, "Lf": 0.87e-9}
@@ -70,7 +70,7 @@ def test_fb_linear_limit_matches_abcd():
         pump=16.0,
         Is0=1e-6,
         model=GainModel.BLOCH,
-        fb_config=FBSolverConfig(passes=40, convergence_threshold=1e-8),
+        bloch_config=BlochSolverConfig(passes=40, convergence_threshold=1e-8),
         thin=20,
     )
     s21 = 20 * np.log10(np.abs(analysis.data["S21"][idx]))
@@ -147,7 +147,7 @@ def test_fb_linear_limit_with_connectors(segmented):
     kw = dict(
         pump=16.0,
         model=GainModel.BLOCH,
-        fb_config=FBSolverConfig(passes=60, convergence_threshold=1e-10),
+        bloch_config=BlochSolverConfig(passes=60, convergence_threshold=1e-10),
         thin=20,
     )
     fwd = analysis.gain(f, Is0=1e-6, **kw)
@@ -514,14 +514,14 @@ def test_result_does_not_depend_on_anderson_depth():
     kw = dict(pump=14.3, Is0=1e-8, model=GainModel.BLOCH, thin=20)
     shallow = analysis.gain(
         freqs[idx],
-        fb_config=FBSolverConfig(
+        bloch_config=BlochSolverConfig(
             passes=60, convergence_threshold=1e-8, anderson_depth=1
         ),
         **kw,
     )
     acc = analysis.gain(
         freqs[idx],
-        fb_config=FBSolverConfig(
+        bloch_config=BlochSolverConfig(
             passes=60, convergence_threshold=1e-8, anderson_depth=5
         ),
         **kw,
@@ -540,27 +540,36 @@ def test_nan_iterate_stops_unconverged():
         pump=14.3,
         Is0=np.nan,
         model=GainModel.BLOCH,
-        fb_config=FBSolverConfig(passes=30, save_all_passes=True),
+        bloch_config=BlochSolverConfig(passes=30, save_all_passes=True),
         thin=20,
     )
     assert not res["bloch"]["converged"].any()
     assert np.isinf(res["bloch"]["residuals"]).all()
 
 
-def test_simple_nan_output_is_reported(caplog):
-    """The simple model warns when a point comes back NaN."""
-    analysis = _mismatched_analysis(Ip0=1.5e-4)
+@pytest.mark.parametrize("model", ["simple", "bloch"])
+def test_rk_config_step_cap_is_live_and_reported(caplog, model):
+    """RKSolverConfig reaches the cached kernels; a capped run is reported."""
+    from twpasolver.cmes.solver_config import RKSolverConfig
     from twpasolver.logger import log
 
+    analysis = _mismatched_analysis(Ip0=1.5e-4)
+    kw = dict(pump=14.3, Is0=1e-8, model=model, thin=20)
+    ok = analysis.gain(np.array([6.0]), **kw)
+    assert np.isfinite(ok["gain_db"]).all()
     log.addHandler(caplog.handler)
     try:
-        res = analysis.gain(
-            np.array([2.0]), pump=14.3, Is0=np.nan, model="simple", thin=20
+        capped = analysis.gain(
+            # 2 steps (at most 10 + 100 cells) cannot cross the 6600-cell device
+            np.array([6.0]),
+            rk_config=RKSolverConfig(max_steps_per_cell=1e-6),
+            **kw,
         )
     finally:
         log.removeHandler(caplog.handler)
-    assert np.isnan(res["gain_db"]).all()
-    assert any("step cap" in r.getMessage() for r in caplog.records)
+    assert np.isnan(capped["gain_db"]).all()
+    expected = "step cap" if model == "simple" else "did not converge"
+    assert any(expected in r.getMessage() for r in caplog.records)
 
 
 def test_unconverged_points_are_reported(caplog):
@@ -577,7 +586,7 @@ def test_unconverged_points_are_reported(caplog):
             pump=14.3,
             Is0=1e-8,
             model=GainModel.BLOCH,
-            fb_config=FBSolverConfig(passes=1),
+            bloch_config=BlochSolverConfig(passes=1),
             thin=20,
         )
     finally:

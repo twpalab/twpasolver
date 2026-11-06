@@ -1,4 +1,4 @@
-"""Global integrator settings and the forward-backward solver configuration."""
+"""Settings of the RK45 integrator and of the forward-backward Bloch solver."""
 
 from __future__ import annotations
 
@@ -8,28 +8,48 @@ from pydantic import ConfigDict, Field, field_validator
 
 from twpasolver.basemodel import BaseModel
 
-# Global solver configuration
-SOLVER_ATOL = 1e-12
-SOLVER_RTOL = 1e-8
-SOLVER_MAX_STEPS = 0
-SOLVER_FIRST_STEP = 10
-# Cap on the accepted RK45 steps per unit cell of the integration interval
-# (device or segment length): ceil(length * SOLVER_MAX_STEPS_PER_CELL) + 1.
-# A run that needs more is stopped and its unreached points are NaN, instead of
-# shrinking the step forever. <= 0 disables the cap (only SOLVER_MAX_STEPS
-# applies). It is compiled into the Numba kernels: after changing it here,
-# clear the __pycache__ of twpasolver/cmes so the cached kernels are rebuilt.
-SOLVER_MAX_STEPS_PER_CELL = 1
-# Same cap for the 'simple' model. It keeps every mixing term unfiltered, so
-# strongly mismatched terms legitimately need a few steps per cell.
-SIMPLE_MAX_STEPS_PER_CELL = 10
 
-# Harmonic limit of the modes away from stopbands with FBSolverConfig.m_max =
+class RKSolverConfig(BaseModel):
+    """
+    Settings of the adaptive RK45 integrator used by every CME kernel.
+
+    They are passed to the Numba kernels as arguments, so changing them takes
+    effect at once (no recompilation, no stale cache).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    atol: float = Field(default=1e-12, gt=0, description="Absolute tolerance.")
+    rtol: float = Field(default=1e-8, gt=0, description="Relative tolerance.")
+    first_step: float = Field(
+        default=10, gt=0, description="Initial step, in unit cells."
+    )
+    max_steps_per_cell: float = Field(
+        default=10,
+        ge=0,
+        description="Cap on the accepted steps per unit cell of the integration"
+        " interval (device or segment length): ceil(length * max_steps_per_cell)"
+        " + 1. The CME envelopes vary slowly on the scale of a cell, so a run that"
+        " needs more is running away; it is stopped and its unreached points are"
+        " NaN (reported as a warning). 0 disables the cap.",
+    )
+
+    def kernel_args(self) -> tuple[float, float, float, float]:
+        """``(atol, rtol, first_step, max_steps_per_cell)`` for the kernels."""
+        return (
+            float(self.atol),
+            float(self.rtol),
+            float(self.first_step),
+            float(self.max_steps_per_cell),
+        )
+
+
+# Harmonic limit of the modes away from stopbands with BlochSolverConfig.m_max =
 # 'auto'.
 BLOCH_M_MAX_AUTO_BASE = 1
 
 
-class FBSolverConfig(BaseModel):
+class BlochSolverConfig(BaseModel):
     """
     Settings of the forward-backward Bloch CME solver (``model="bloch"``).
 

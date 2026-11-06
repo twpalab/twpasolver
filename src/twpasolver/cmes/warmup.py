@@ -20,7 +20,7 @@ import warnings
 import numpy as np
 
 from twpasolver.analysis import GainModel, TWPAnalysis
-from twpasolver.cmes.solver_config import FBSolverConfig
+from twpasolver.cmes.solver_config import BlochSolverConfig
 from twpasolver.models.twoportarrays import TWPA
 
 # Same cell physics as tests/conftest.py's `twpa` fixture, an arbitrary but
@@ -77,7 +77,7 @@ def _warm_analysis(twpa: TWPA, label: str, models: tuple, verbose: bool) -> None
         warnings.simplefilter("ignore", RuntimeWarning)
         for model in models:
             analysis.gain(
-                _SIGNAL_FREQS, model=model, fb_config=FBSolverConfig(passes=1)
+                _SIGNAL_FREQS, model=model, bloch_config=BlochSolverConfig(passes=1)
             )
 
 

@@ -29,8 +29,6 @@ from typing import Tuple
 import numba as nb
 import numpy as np
 
-from twpasolver.cmes.solver_config import SOLVER_MAX_STEPS_PER_CELL
-
 EPS = np.finfo(np.float64).eps
 EMPTY_ARR = np.empty(0, dtype=np.float64)
 
@@ -58,7 +56,7 @@ def rk45_solve(
     first_step: float = None,
     t_eval: np.ndarray = EMPTY_ARR,
     max_num_steps: int = 0,
-    max_steps_per_cell: float = SOLVER_MAX_STEPS_PER_CELL,
+    max_steps_per_cell: float = 0.0,
 ) -> np.ndarray:
     """
     Adaptive Dormand-Prince RK45, ported from CyRK's ``nbsolve_ivp``.

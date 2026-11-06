@@ -60,9 +60,44 @@ See the :ref:`tutorials` section for detailed examples from simple linear compon
 multi-mode simulations with pump harmonics and frequency conversion processes.
 """
 
+import hashlib
 import importlib.metadata as im
+import os
+import re
+from pathlib import Path
 
 __version__ = im.version(__package__)
+
+
+def _drop_stale_numba_cache(root: Path) -> None:
+    """
+    Delete the cached Numba kernels under ``root`` when any jitted source changed.
+
+    Numba re-checks only the file that defines a cached kernel, so editing a
+    callee in another module (e.g. ``cmes/rk45.py``) would keep the stale kernel.
+    """
+    jitted = re.compile(r"^@(nb\.)?njit", re.MULTILINE)
+    sources = sorted(
+        p for p in root.rglob("*.py") if jitted.search(p.read_text(encoding="utf-8"))
+    )
+    digest = hashlib.sha1(b"".join(p.read_bytes() for p in sources)).hexdigest()
+    stamp = root / "__pycache__" / "numba_sources.sha1"
+    try:
+        if stamp.exists() and stamp.read_text() == digest:
+            return
+        for src in sources:
+            for f in (src.parent / "__pycache__").glob(f"{src.stem}.*.nb[ic]"):
+                f.unlink(missing_ok=True)
+        stamp.parent.mkdir(exist_ok=True)
+        stamp.write_text(digest)
+    except OSError:
+        pass  # read-only install: Numba caches elsewhere and nothing is edited
+
+
+# shortcut: a user-set NUMBA_CACHE_DIR is not managed, clear it by hand after
+# editing jitted code.
+if not os.environ.get("NUMBA_CACHE_DIR"):
+    _drop_stale_numba_cache(Path(__file__).parent)
 
 from twpasolver.analysis import TWPAnalysis
 from twpasolver.file_utils import read_file, save_to_file

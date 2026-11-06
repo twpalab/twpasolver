@@ -13,13 +13,7 @@ from twpasolver.bonus_types import (
     nb_int2d,
 )
 from twpasolver.cmes.rk45 import rk45_solve
-from twpasolver.cmes.solver_config import (
-    SIMPLE_MAX_STEPS_PER_CELL,
-    SOLVER_ATOL,
-    SOLVER_FIRST_STEP,
-    SOLVER_MAX_STEPS,
-    SOLVER_RTOL,
-)
+from twpasolver.cmes.solver_config import RKSolverConfig
 from twpasolver.logger import log
 
 
@@ -205,6 +199,7 @@ def _no_reflections_solve_uniform(
     relations_4wm,
     coeffs_3wm,
     coeffs_4wm,
+    rk,
 ):
     """Parallel solve for uniform device; gammas_array shape (n_freq, n_modes)."""
     n_freq = y0_broadcast.shape[0]
@@ -225,12 +220,11 @@ def _no_reflections_solve_uniform(
                 coeffs_3wm,
                 coeffs_4wm,
             ),
-            atol=SOLVER_ATOL,
-            rtol=SOLVER_RTOL,
-            max_num_steps=SOLVER_MAX_STEPS,
-            max_steps_per_cell=SIMPLE_MAX_STEPS_PER_CELL,
+            atol=rk[0],
+            rtol=rk[1],
             t_eval=x_array,
-            first_step=SOLVER_FIRST_STEP,
+            first_step=rk[2],
+            max_steps_per_cell=rk[3],
         )
 
     return I_tuples
@@ -246,6 +240,7 @@ def _no_reflections_solve_segmented(
     coeffs_3wm_table,
     coeffs_4wm_table,
     segment_midpoints,
+    rk,
 ):
     """
     Parallel solve for segmented device; gammas_array shape (n_freq, n_modes, n_segments).
@@ -311,12 +306,11 @@ def _no_reflections_solve_segmented(
                 x_array,
                 phi_table,
             ),
-            atol=SOLVER_ATOL,
-            rtol=SOLVER_RTOL,
-            max_num_steps=SOLVER_MAX_STEPS,
-            max_steps_per_cell=SIMPLE_MAX_STEPS_PER_CELL,
+            atol=rk[0],
+            rtol=rk[1],
             t_eval=x_array,
-            first_step=SOLVER_FIRST_STEP,
+            first_step=rk[2],
+            max_steps_per_cell=rk[3],
         )
 
     return I_tuples
@@ -331,6 +325,7 @@ def no_reflections_cmes_solve(
     coeffs_3wm,
     coeffs_4wm,
     segment_midpoints: FloatArray | None = None,
+    rk_config: RKSolverConfig | None = None,
 ) -> ComplexArray:
     """
     Solve the no-reflections CME system for every signal frequency in parallel.
@@ -348,6 +343,7 @@ def no_reflections_cmes_solve(
         Slow-envelope amplitudes (no propagation phase).  Apply
         ``_apply_phase_carrier`` in the caller to recover the full-phase field.
     """
+    rk = (rk_config if rk_config is not None else RKSolverConfig()).kernel_args()
     if gammas_array.ndim == 3:
         if segment_midpoints is None:
             raise ValueError(
@@ -363,6 +359,7 @@ def no_reflections_cmes_solve(
             np.ascontiguousarray(coeffs_3wm),
             np.ascontiguousarray(coeffs_4wm),
             np.ascontiguousarray(segment_midpoints),
+            rk,
         )
     else:
         I_tuples = _no_reflections_solve_uniform(
@@ -373,6 +370,7 @@ def no_reflections_cmes_solve(
             relations_4wm,
             coeffs_3wm,
             coeffs_4wm,
+            rk,
         )
     bad = np.flatnonzero(~np.isfinite(I_tuples).all(axis=(1, 2)))
     if bad.size:

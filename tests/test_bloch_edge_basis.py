@@ -95,7 +95,7 @@ def test_edge_basis_tables_exact():
 
 
 def _gain(analysis, sig, threshold, passes=80, depth=15):
-    from twpasolver.cmes.solver_config import FBSolverConfig
+    from twpasolver.cmes.solver_config import BlochSolverConfig
 
     return analysis.gain(
         signal_freqs=np.asarray(sig),
@@ -103,7 +103,7 @@ def _gain(analysis, sig, threshold, passes=80, depth=15):
         pump=16.0,
         model="bloch",
         mode_array_config="ext2",
-        fb_config=FBSolverConfig(
+        bloch_config=BlochSolverConfig(
             passes=passes, anderson_depth=depth, edge_threshold=threshold
         ),
     )
@@ -386,18 +386,18 @@ def test_per_mode_harmonic_limits_in_filter():
 
 
 def test_auto_m_max_config():
-    from twpasolver.cmes.solver_config import FBSolverConfig
+    from twpasolver.cmes.solver_config import BlochSolverConfig
 
-    assert FBSolverConfig(m_max="auto").m_max_fixed == 1
-    assert FBSolverConfig(m_max=3).m_max_fixed == 3
+    assert BlochSolverConfig(m_max="auto").m_max_fixed == 1
+    assert BlochSolverConfig(m_max=3).m_max_fixed == 3
     with pytest.raises(ValueError):
-        FBSolverConfig(m_max=-1)
+        BlochSolverConfig(m_max=-1)
     with pytest.raises(ValueError):
-        FBSolverConfig(m_max="automatic")
+        BlochSolverConfig(m_max="automatic")
 
 
 def _gain_m(analysis, sig, m_max):
-    from twpasolver.cmes.solver_config import FBSolverConfig
+    from twpasolver.cmes.solver_config import BlochSolverConfig
 
     return analysis.gain(
         signal_freqs=np.asarray(sig),
@@ -405,7 +405,7 @@ def _gain_m(analysis, sig, m_max):
         pump=16.0,
         model="bloch",
         mode_array_config="ext2",
-        fb_config=FBSolverConfig(
+        bloch_config=BlochSolverConfig(
             passes=80,
             anderson_depth=15,
             edge_threshold=0.10,
@@ -527,7 +527,7 @@ def test_stopband_guard_weights():
 @pytest.mark.parametrize("segmented", [False, True])
 def test_stopband_modes_switched_off(segmented):
     """simulate_stopband_modes=False: no edge basis, p2s processes off at its edge."""
-    from twpasolver.cmes.solver_config import FBSolverConfig
+    from twpasolver.cmes.solver_config import BlochSolverConfig
 
     analysis = _segmented_holotype() if segmented else _holotype_analysis()
     res = analysis.gain(
@@ -536,7 +536,7 @@ def test_stopband_modes_switched_off(segmented):
         pump=16.0,
         model="bloch",
         mode_array_config="ext2",
-        fb_config=FBSolverConfig(
+        bloch_config=BlochSolverConfig(
             passes=80, anderson_depth=15, simulate_stopband_modes=False
         ),
     )
@@ -666,7 +666,7 @@ def test_contra_qpm_survives_edge_basis():
     The converted tone sits on the folding point k_c D = 5 pi by construction;
     the default edge threshold must leave it in the native basis.
     """
-    from twpasolver.cmes.solver_config import FBSolverConfig
+    from twpasolver.cmes.solver_config import BlochSolverConfig
     from twpasolver.modes_rwa import ModeArrayFactory
 
     D, fp, Ip, Is = 102, 18.3, 1e-4, 1e-9
@@ -687,7 +687,7 @@ def test_contra_qpm_survives_edge_basis():
             mode_array_config="c",
             initial_amplitudes_fwd=[Ip, Is, 0],
             initial_amplitudes_bwd=[0, 0, 0],
-            fb_config=FBSolverConfig(
+            bloch_config=BlochSolverConfig(
                 passes=100, anderson_depth=20, m_max=6, edge_threshold=th
             ),
         )

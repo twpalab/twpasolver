@@ -156,13 +156,25 @@ Each fix gets a test.
     because it keeps every mixing term unfiltered and strongly mismatched terms need a few steps per cell.
     Case: uniform LCLf, N=2000, `create_extended_3wm(n_pump_harmonics=2, nfc=1)`, pump 18 GHz, signals 8.5/8.8
     GHz gave `[nan, nan]` with cap 1. `no_reflections_cmes_solve` now logs a warning for any NaN point.
-- [ ] **2.6 Global solver constants are frozen into cached numba kernels.** Changing `SOLVER_MAX_STEPS_PER_CELL`
+  - **Superseded with 2.6:** one `RKSolverConfig.max_steps_per_cell = 10` for both models. Cap 1 vs 10 is
+    bit-identical (max |ΔG| = 0) on the holotype `ext2` set: uniform edge basis, native, `simulate_stopband_modes
+    =False`, segmented, and `simple`; same convergence and NaN pattern (native edge points still blow up).
+- [x] **2.6 Global solver constants are frozen into cached numba kernels.** Changing `SOLVER_MAX_STEPS_PER_CELL`
   and similar has no effect until `__pycache__` is wiped. Remove `configure_solver`/`get_solver_config`
   (`solver_config.py:81-115`), which are never called and misleading, and pass tolerances as arguments.
   - **Audit 2026-11-06: wider than constants.** Numba re-checks only the caller's own file, so editing a callee
     in another module (`rk45.py`, `bloch_common.py`, `solver_config.py`) also keeps the stale kernels in
     `base.py`/`bloch_fb.py` (reproduced with a toy two-file kernel). Fix: pass constants as arguments, and set
     `numba.config.CACHE_DIR` to a folder keyed by a hash of `cmes/*.py` in `cmes/__init__.py`.
+  - **Done 2026-11-06 (branch `audit-fixes`):**
+    - `RKSolverConfig` (`atol`, `rtol`, `first_step`, `max_steps_per_cell`) replaces the `SOLVER_*` constants. It
+      is passed to every kernel as an argument (`rk` tuple; `gain(rk_config=...)`), so changes act at once. The
+      dead `max_step` plumbing of `bloch_fb` is gone (its slot carries `rk`).
+    - `twpasolver/__init__.py::_drop_stale_numba_cache` hashes the modules with `@njit` decorators and deletes
+      their `__pycache__/*.nb[ic]` when the hash changes (stamp `__pycache__/numba_sources.sha1`). A user-set
+      `NUMBA_CACHE_DIR` is not managed. Test: `tests/test_numba_cache.py`.
+    - `FBSolverConfig` is renamed `BlochSolverConfig` and `gain(fb_config=)` is `gain(bloch_config=)`, with no
+      alias (the Bloch CMEs were never published).
 
 ### API bugs (confirmed by running them)
 
@@ -307,7 +319,7 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
   `general` branches and options (`update_rate`, `BOUNDARY_CORR_MAX`) and `_filter_wm_terms`; also
   `_convergence_step`/`_store_pass` once `bloch_fb` no longer imports them.
 - [ ] **3.9 Dead options and near-copies in `cmes/` (audit 2026-11-06, about 260 lines):**
-  - Never set by any caller: `max_step`, `edge_substeps`, `SOLVER_MAX_STEPS`; rk45 `rtols`/`atols` arrays, the
+  - Never set by any caller: `edge_substeps` (`max_step` and `SOLVER_MAX_STEPS` removed with 2.6); rk45 `rtols`/`atols` arrays, the
     automatic `first_step` block, `y_size == 0` and `t_eval_size == 0` branches; `FBSolverConfig.m_max_fixed`.
   - Test-only: `bloch_fb_cmes_solve` (3 uses in `test_bloch.py`).
   - Forward and backward sweeps in `bloch_fb.py` (~90 lines each) differ only in index direction: one sweep with
@@ -645,6 +657,10 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
     `no_reflections_cmes_solve`.
   - **Regression:** finite results are unchanged by construction (converged `bloch` runs take the same path; the
     cap only acts on runs that hit it, which were NaN before).
+
+- 2026-11-06, 2.6 on `audit-fixes`: `RKSolverConfig` passed to every kernel, shared step cap 10 per cell,
+  `FBSolverConfig`/`fb_config` renamed `BlochSolverConfig`/`bloch_config` (no alias), and the cached kernels are
+  dropped when any `@njit` module changes. Cap 1 vs 10 is bit-identical on the regression set; mypy 22 errors.
 
 ## Where to pick up (end of session 2026-11-06)
 

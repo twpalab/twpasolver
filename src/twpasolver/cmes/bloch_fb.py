@@ -129,12 +129,7 @@ from twpasolver.cmes.bloch_common import (
     _store_pass,
 )
 from twpasolver.cmes.rk45 import rk45_solve
-from twpasolver.cmes.solver_config import (
-    SOLVER_ATOL,
-    SOLVER_FIRST_STEP,
-    SOLVER_MAX_STEPS,
-    SOLVER_RTOL,
-)
+from twpasolver.cmes.solver_config import RKSolverConfig
 from twpasolver.logger import log
 
 # --------------------------------------------------------------------------- #
@@ -774,7 +769,7 @@ def _forward_sweep(
     t_j,
     rhoR_j,
     end,
-    max_step,
+    rk,
     edge_code,
     own_full,
     lin_own_seg,
@@ -836,12 +831,11 @@ def _forward_sweep(
                 np.ascontiguousarray(lin_ctr_seg[s]),
                 ctr_phase,
             ),
-            atol=SOLVER_ATOL,
-            rtol=SOLVER_RTOL,
-            max_num_steps=SOLVER_MAX_STEPS,
+            atol=rk[0],
+            rtol=rk[1],
             t_eval=seg_x,
-            first_step=SOLVER_FIRST_STEP,
-            max_step=max_step,
+            first_step=rk[2],
+            max_steps_per_cell=rk[3],
         )
         A[:, a:b] = sol
     return A
@@ -870,7 +864,7 @@ def _backward_sweep(
     tp_j,
     rhoL_j,
     end,
-    max_step,
+    rk,
     edge_code,
     own_full,
     lin_own_seg,
@@ -928,12 +922,11 @@ def _backward_sweep(
                 np.ascontiguousarray(lin_ctr_seg[s]),
                 ctr_phase,
             ),
-            atol=SOLVER_ATOL,
-            rtol=SOLVER_RTOL,
-            max_num_steps=SOLVER_MAX_STEPS,
+            atol=rk[0],
+            rtol=rk[1],
             t_eval=seg_s,
-            first_step=SOLVER_FIRST_STEP,
-            max_step=max_step,
+            first_step=rk[2],
+            max_steps_per_cell=rk[3],
         )
         B[:, a:b] = sol
     return B
@@ -983,7 +976,7 @@ def _bloch_fb_solve_segmented(
     apcz_out_table,
     tof_in_table,
     tof_out_table,
-    max_step,
+    rk,
     edge_K_table,
     edge_mode_table,
     edge_substeps,
@@ -1113,7 +1106,7 @@ def _bloch_fb_solve_segmented(
         head = 0
         have_last = False
         res_last = np.inf
-        scale_floor = 10.0 * SOLVER_ATOL
+        scale_floor = 10.0 * rk[0]
 
         A_fwd_x = np.empty((n_modes, n_x), dtype=np.complex128)
         A_bwd_x = np.empty((n_modes, n_x), dtype=np.complex128)
@@ -1144,7 +1137,7 @@ def _bloch_fb_solve_segmented(
                 t_j,
                 rhoR_j,
                 end,
-                max_step,
+                rk,
                 code_fwd,
                 own_bwd,
                 lin_own_seg,
@@ -1180,7 +1173,7 @@ def _bloch_fb_solve_segmented(
                 tp_j,
                 rhoL_j,
                 end,
-                max_step,
+                rk,
                 code_bwd,
                 own_bwd,
                 lin_own_seg,
@@ -1378,7 +1371,7 @@ def bloch_fb_segmented_cmes_solve(
     Zout_out: ComplexArray | None = None,
     abcd_in: ComplexArray | None = None,
     abcd_out: ComplexArray | None = None,
-    max_step: float = np.inf,
+    rk_config: RKSolverConfig | None = None,
     edge_K: ComplexArray | None = None,
     edge_mode: np.ndarray | None = None,
     edge_substeps: int = 4,
@@ -1422,6 +1415,8 @@ def bloch_fb_segmented_cmes_solve(
         Modes solved exactly across the line (flagged in at least one
         segment). Their tables, ``prefac`` and kernel gammas must already be
         the edge-basis ones where flagged. Default: none.
+    rk_config : RKSolverConfig, optional
+        Settings of the RK45 integrator (default ``RKSolverConfig()``).
     edge_substeps : int
         Grid points per supercell of the exact edge-mode solve.
     m_max : int or (n_freq, n_seg, n_modes) int array
@@ -1565,7 +1560,7 @@ def bloch_fb_segmented_cmes_solve(
         c(apcz_out),
         c(tof_in),
         c(tof_out),
-        float(max_step),
+        (rk_config if rk_config is not None else RKSolverConfig()).kernel_args(),
         c(edge_K, dtype=np.complex128),
         c(edge_mode_f),
         int(edge_substeps),

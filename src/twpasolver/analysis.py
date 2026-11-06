@@ -25,7 +25,7 @@ from twpasolver.cmes.bloch import (
     stopband_edges,
 )
 from twpasolver.cmes.bloch_fb import bloch_fb_segmented_cmes_solve, segmented_phase
-from twpasolver.cmes.solver_config import FBSolverConfig
+from twpasolver.cmes.solver_config import BlochSolverConfig, RKSolverConfig
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.frequency import Frequencies
 from twpasolver.logger import log
@@ -61,7 +61,7 @@ class GainModel(str, enum.Enum):
         reflections, exact boundary conditions with the port/connector models,
         fixed edge basis for modes close to a stopband edge. Segmented devices
         (whole supercells per segment) are solved on per-segment Bloch modes
-        joined by exact junction conditions. Configured by ``FBSolverConfig``.
+        joined by exact junction conditions. Configured by ``BlochSolverConfig``.
 
     The name ``"general_no_reflections"`` of earlier versions is accepted for
     ``"simple"`` with a deprecation warning.
@@ -106,11 +106,11 @@ def _harmonic_limits(
     e_edge: float,
 ) -> np.ndarray:
     """
-    Per-mode harmonic limits of ``FBSolverConfig.m_max='auto'``.
+    Per-mode harmonic limits of ``BlochSolverConfig.m_max='auto'``.
 
     ``base`` for every mode, raised to the Bragg order ``m = round(k d / pi)``
     of a mode inside a stopband (``|arg W| > 45 deg``) or close to its edge
-    (``split < e_edge``, twice ``FBSolverConfig.edge_threshold``): its counter-propagating component, at
+    (``split < e_edge``, twice ``BlochSolverConfig.edge_threshold``): its counter-propagating component, at
     ``-m pi / d``, is reached only through ``G_m``. The zone centre
     (``k d / pi < 0.5``) is excluded. All arrays share the shape
     ``(..., n_modes)``.
@@ -128,7 +128,7 @@ def _stopband_guard_weights(
     e_edge: float,
 ) -> np.ndarray:
     """
-    Per-mode weights of ``FBSolverConfig.simulate_stopband_modes=False``.
+    Per-mode weights of ``BlochSolverConfig.simulate_stopband_modes=False``.
 
     1 for ``split >= e_edge``, smoothstep down to 0 at the edge on the passband
     side, and 0 inside a stopband (``|arg W| > 45 deg``). The zone centre
@@ -170,7 +170,7 @@ def _edge_basis_entries(
         Threshold on the splitting, also the anchor of the fixed basis.
     in_gap : (n_freq, n_modes) bool, optional
         Entries inside a stopband to flag as well, whatever their splitting
-        (``FBSolverConfig.simulate_stopband_modes``).
+        (``BlochSolverConfig.simulate_stopband_modes``).
 
     Returns
     -------
@@ -1022,13 +1022,13 @@ class TWPAnalysis(Analyzer, Frequencies):
         cme_inputs: dict[str, Any],
         gammas: np.ndarray,
         injected: np.ndarray,
-        fb_config: FBSolverConfig,
+        bloch_config: BlochSolverConfig,
     ) -> dict[str, Any]:
         """
         Stopband treatment and harmonic limits of the Bloch forward-backward models.
 
-        ``fb_config.edge_threshold`` marks the modes close to an edge;
-        ``fb_config.simulate_stopband_modes`` either expands them, and every
+        ``bloch_config.edge_threshold`` marks the modes close to an edge;
+        ``bloch_config.simulate_stopband_modes`` either expands them, and every
         mode inside a stopband, on the fixed edge basis
         (:meth:`_apply_edge_basis_segmented`), or switches their processes off
         with :func:`_stopband_guard_weights`. Modes with an input are never
@@ -1039,14 +1039,14 @@ class TWPAnalysis(Analyzer, Frequencies):
         None), ``m_max`` (int or per-mode table) and the process weights ``pw3``,
         ``pw4`` (None when every process has weight 1).
         """
-        e = fb_config.edge_threshold
+        e = bloch_config.edge_threshold
         labels = cme_inputs["mode_labels"]
         kd_pi = (
             np.abs(np.transpose(gammas.imag, (0, 2, 1)))
             * np.asarray(bloch["n_cells"])[None, :, None]
             / np.pi
         )
-        if fb_config.m_max == "auto":
+        if bloch_config.m_max == "auto":
             m_max = _harmonic_limits(
                 bloch["split"],
                 bloch["W"],
@@ -1056,13 +1056,13 @@ class TWPAnalysis(Analyzer, Frequencies):
             )
             bloch["m_lim"] = m_max
         else:
-            m_max = fb_config.m_max
+            m_max = bloch_config.m_max
         out: dict[str, Any] = dict(
             gammas=gammas, edge=None, m_max=m_max, pw3=None, pw4=None
         )
         if e is None:
             return out
-        if fb_config.simulate_stopband_modes:
+        if bloch_config.simulate_stopband_modes:
             edge = self._apply_edge_basis_segmented(
                 bloch, cme_inputs, injected, e, True
             )
@@ -1454,7 +1454,8 @@ class TWPAnalysis(Analyzer, Frequencies):
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
         thin: int = 100,
-        fb_config: Optional[FBSolverConfig] = None,
+        bloch_config: Optional[BlochSolverConfig] = None,
+        rk_config: Optional[RKSolverConfig] = None,
     ) -> dict[str, Any]:
         """
         Compute the TWPA gain using coupled mode equation models.
@@ -1487,9 +1488,12 @@ class TWPAnalysis(Analyzer, Frequencies):
             nonzero.
         thin : int, default 100
             Position array thinning factor.
-        fb_config : FBSolverConfig, optional
-            Settings of the 'bloch' solver (default ``FBSolverConfig()``);
+        bloch_config : BlochSolverConfig, optional
+            Settings of the 'bloch' solver (default ``BlochSolverConfig()``);
             ignored by 'simple'.
+        rk_config : RKSolverConfig, optional
+            Settings of the RK45 integrator of both models (default
+            ``RKSolverConfig()``).
 
         Returns
         -------
@@ -1542,7 +1546,8 @@ class TWPAnalysis(Analyzer, Frequencies):
                 x,
                 initial_amplitudes_fwd,
                 initial_amplitudes_bwd,
-                fb_config,
+                bloch_config,
+                rk_config,
             )
         return self._compute_simple_gain(
             signal_freqs,
@@ -1554,6 +1559,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             x,
             initial_amplitudes_fwd,
             Is0,
+            rk_config,
         )
 
     # Private CME solvers
@@ -1569,6 +1575,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         x: FloatArray,
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         Is0: float = 1e-6,
+        rk_config: Optional[RKSolverConfig] = None,
     ) -> dict[str, Any]:
         """Gain with the traditional forward-only CMEs (``model="simple"``)."""
         mode_array = self.get_mode_array(mode_array_config)
@@ -1598,6 +1605,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             cme_inputs["coeffs_3wm"],
             cme_inputs["coeffs_4wm"],
             segment_midpoints=cme_inputs["segment_midpoints"],
+            rk_config=rk_config,
         )
 
         I_tuples_array = self._apply_phase_carrier(
@@ -1641,7 +1649,8 @@ class TWPAnalysis(Analyzer, Frequencies):
         x: FloatArray,
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
-        fb_config: Optional[FBSolverConfig] = None,
+        bloch_config: Optional[BlochSolverConfig] = None,
+        rk_config: Optional[RKSolverConfig] = None,
     ) -> dict[str, Any]:
         """
         Compute gain with the forward-backward CMEs in the Bloch-mode basis.
@@ -1655,7 +1664,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         :mod:`twpasolver.cmes.bloch_fb`.
         """
         segmented = self._is_segmented()
-        fb_config = fb_config if fb_config is not None else FBSolverConfig()
+        bloch_config = bloch_config if bloch_config is not None else BlochSolverConfig()
         mode_array = self.get_mode_array(mode_array_config)
 
         y0_fwd = self._setup_initial_conditions(
@@ -1699,7 +1708,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             np.abs(y0_bwd_broadcast) > 0, axis=0
         )
         sb = self._fb_stopbands(
-            bloch, cme_inputs, cme_inputs["gammas"], injected, fb_config
+            bloch, cme_inputs, cme_inputs["gammas"], injected, bloch_config
         )
         gammas, edge = sb["gammas"], sb["edge"]
         diag: dict[str, Any] = {}
@@ -1721,14 +1730,14 @@ class TWPAnalysis(Analyzer, Frequencies):
             bloch["n_cells"],
             bloch["Zb_plus"],
             bloch["Zb_minus"],
-            passes=fb_config.passes,
-            kappa_cutoff=fb_config.kappa_cutoff,
+            passes=bloch_config.passes,
+            kappa_cutoff=bloch_config.kappa_cutoff,
             m_max=sb["m_max"],
             process_weights_3wm=sb["pw3"],
             process_weights_4wm=sb["pw4"],
-            convergence_threshold=fb_config.convergence_threshold,
-            save_all_passes=fb_config.save_all_passes,
-            anderson_depth=fb_config.anderson_depth,
+            convergence_threshold=bloch_config.convergence_threshold,
+            save_all_passes=bloch_config.save_all_passes,
+            anderson_depth=bloch_config.anderson_depth,
             Ze=self.port_Z_ext,
             Zout_in=Zout_in,
             Zout_out=Zout_out,
@@ -1737,6 +1746,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             edge_K=None if edge is None else edge["edge_K"],
             edge_mode=None if edge is None else edge["edge_mode"],
             diagnostics=diag,
+            rk_config=rk_config,
         )
         bloch.update(diag)
         # Exact phase of the piecewise-constant wavenumber (k x for one segment).
@@ -1750,7 +1760,7 @@ class TWPAnalysis(Analyzer, Frequencies):
         if not segmented:
             bloch = _drop_segment_axis(bloch, n_freq)
 
-        num_saved_passes = fb_config.passes if fb_config.save_all_passes else 1
+        num_saved_passes = bloch_config.passes if bloch_config.save_all_passes else 1
         I_tuples_all_passes = {}
         for p in range(num_saved_passes):
             I_tuples_all_passes[p] = {
@@ -1825,7 +1835,7 @@ class TWPAnalysis(Analyzer, Frequencies):
             "gain_db_11": final["gain_db_11"],
             "gain_db_22": final["gain_db_22"],
             "gains_all_passes": gains_all_passes,
-            "passes": fb_config.passes,
+            "passes": bloch_config.passes,
             "bloch": bloch,
             "mode_info": {
                 "mode_array": mode_array_config,
