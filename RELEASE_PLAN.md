@@ -154,6 +154,16 @@ Each fix gets a test.
   - **Fix:** detect the primitive period of the linear cells, or at least document this and scale the auto base
     by q.
   - The auto window also falls back to a hardcoded 0.10 when `edge_threshold=None` (`~1234`).
+  - **Experiment 2026-11-06 (snapshot 95a9250, scripts and logs in the job tmp `mmax/`):** scaling *both* the
+    harmonic limit and the π/D cap by q (102 cells: m=12, kc=0.6) matches the 34-cell run to 0.02–0.03 dB;
+    scaling only m makes it worse (0.55 dB at 4 GHz). Auto vs converged reference (34 cells, m=17, kc=1,
+    13× slower): 0.028 dB. q can be read from the cell list; the c_m spectrum also shows it (non-zero only at
+    multiples of q, threshold ~1e-6).
+  - **Rejected:** DFT weight rule w = |c_m|·min(L, 1/|Δk+G_m|) with one tolerance per process: 1.3–2 dB off at
+    every tol (1e-1…3e-4), mostly unconverged at the edge. Exactly matched Kerr rows set W_ref (weight |c|·L) and
+    drop pump-driven 4WM rows; 3WM chains are cut partially; a shared 3WM/4WM reference drops all 3WM (units).
+    A viable weight needs field amplitudes (Ip for pump rows) and separate references. `kappa_cutoff`'s π/d cap
+    is a validity bound, not a strength criterion, so it stays.
 - [x] **2.5 Silent NaN.** The rk45 step cap (`rk45.py:~182`) produces NaN; the no-reflections and `general`
   models return NaN gain without a warning. Add a warning, or a `converged`/`finite` flag on every model.
   - **Done 2026-11-06 (branch `audit-fixes`):** the cap is an `rk45_solve` argument (`max_steps_per_cell`).
