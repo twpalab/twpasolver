@@ -688,6 +688,6 @@ def test_contra_qpm_survives_edge_basis():
             ),
         )
         c = r["mode_info"]["mode_map"]["ps"]
-        out[th] = np.abs(r["I_tuples_bwd"][0, c, -1] / Is) ** 2 * 4.5335 / (4.5335 + fp)
+        out[th] = np.abs(r["ports"]["b_in"][0, c] / Is) ** 2 * 4.5335 / (4.5335 + fp)
     assert out[None] > 0.8
     assert abs(out[0.10] - out[None]) < 1e-9

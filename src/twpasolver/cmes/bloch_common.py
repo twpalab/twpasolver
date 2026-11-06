@@ -8,8 +8,7 @@ Numba helpers shared by the forward-backward Bloch CME solver.
   (``_bloch_row_coeffs``, ``_rows_with_targets``);
 * closed-form exponential of a 2x2 generator (``_expm_2x2``);
 * fixed-point iteration: residual scales, relative residual, Anderson mixing
-  and pass bookkeeping (``_mode_scales``, ``_relative_residual``,
-  ``_anderson_mix``, ``_store_pass``).
+  (``_mode_scales``, ``_relative_residual``, ``_anderson_mix``).
 """
 
 import numba as nb
@@ -398,27 +397,3 @@ def _anderson_mix(g, f, dG, dF, n_hist, head, depth, scales):
             for t in range(n_x):
                 u[j, t] -= gam[a] * dG[ia, j, t]
     return u
-
-
-@nb.njit(inline="always")
-def _store_pass(
-    I_out,
-    A_fwd_i,
-    A_bwd_i,
-    refl_end_out,
-    refl_0_out,
-    tof_out,
-    tof_in,
-    idx_fwd,
-    idx_bwd,
-    n_modes,
-):
-    """Write one forward/backward pass into I_out, overwriting the last x-point
-    with the physical outcoupled current: forward-out (S21) at idx_fwd,
-    backward-out (S11) at idx_bwd.
-    """
-    I_out[idx_fwd] = A_fwd_i
-    I_out[idx_bwd] = A_bwd_i
-    for j in range(n_modes):
-        I_out[idx_fwd, j, -1] = A_fwd_i[j, -1] * (1.0 + refl_end_out[j]) * tof_out[j]
-        I_out[idx_bwd, j, -1] = A_bwd_i[j, -1] * (1.0 + refl_0_out[j]) * tof_in[j]

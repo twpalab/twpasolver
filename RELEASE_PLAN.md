@@ -524,6 +524,18 @@ Items (each step keeps golden gains bit-identical on the holotype, the segmented
 - [ ] **4.4 `problem.py`: one builder for both models**, computing relations and coefficients once per call;
   absorbs 3.3 (shared port tables and post-processing). Ignored parameters go: `idler_mode` is derived from the
   relations; `Z0`/`Ze` duplicates removed.
+  - **Ports, decided with Pietro 2026-11-07 (separate port fields):** the outgoing currents were split
+    between the kernel (`_store_pass` overwrote the last profile point with the transmitted part, a leftover
+    of the derivative-based boundary update), `_compute_bloch_gain` (prompt reflection from the connector
+    ABCD) and a local `_gains`, and the backward profile was stored mirrored (`I_bwd[..., k]` at `L - x[k]`).
+    Done 2026-11-07 (audit-fixes): the kernel returns plain envelopes; `bloch_fb_segmented_cmes_solve`
+    applies the carriers, un-mirrors the backward profile and returns `I_fwd`, `I_bwd` (physical currents on
+    `x`, true internal values at the ends) and the external currents `a_in`, `a_out`, `b_in`, `b_out`. One
+    helper `_port_gains` gives `gain_db` (S21), `gain_db_12`, `gain_db_11`, `gain_db_22` for every model and
+    every saved pass (per-pass keys now match the top-level ones); `simple` reports `a_in = y0`,
+    `b_out = I(L)`, `a_out = 0`, `b_in = NaN`. Results gain a `ports` field. Golden: gains within 1e-14 dB,
+    profile interiors bit-identical, last points now internal currents (reference re-recorded). This also
+    fixes `plot_mode_currents(backward=True)`, which drew the mirrored profile.
 - [ ] **4.5b Result dataclasses** (`GainResult`, `PhaseMatchingResult`): every model has the same fields
   (`I_fwd`, `I_bwd` zeros for `simple`, `gain_db`, `gain_db_11/12/22` NaN for `simple`, `converged`,
   `diagnostics`, the optional per-pass history of `save_all_passes`), one naming scheme, NaN-safe dB;

@@ -12,7 +12,7 @@ from twpasolver.basemodel import BaseModel
 from twpasolver.bonus_types import FloatArray, FrequencyArange, FrequencyList
 from twpasolver.cmes.base import no_reflections_cmes_solve
 from twpasolver.cmes.bloch import bloch_wavenumber, in_stopband, lossless_copy
-from twpasolver.cmes.bloch_fb import bloch_fb_segmented_cmes_solve, segmented_phase
+from twpasolver.cmes.bloch_fb import bloch_fb_segmented_cmes_solve
 from twpasolver.cmes.prep import (
     fb_stopbands,
     prepare_bloch_segmented,
@@ -71,6 +71,24 @@ def _ratio_db(out: np.ndarray, ref: np.ndarray) -> np.ndarray:
     ok = np.abs(ref) > 0
     res[ok] = to_dB(np.abs(out[ok] / ref[ok]))
     return res
+
+
+def _port_gains(ports: dict[str, np.ndarray], idx: int) -> dict[str, np.ndarray]:
+    """
+    Port gains of mode ``idx`` from the external currents (``a`` in, ``b`` out).
+
+    ``gain_db`` is S21 (``b_out / a_in``), ``gain_db_12`` S12 (``b_in / a_out``),
+    ``gain_db_11`` and ``gain_db_22`` the reflections; NaN where undefined.
+    """
+    a_in, a_out, b_in, b_out = (
+        ports[k][..., idx] for k in ("a_in", "a_out", "b_in", "b_out")
+    )
+    return {
+        "gain_db": _ratio_db(b_out, a_in),
+        "gain_db_12": _ratio_db(b_in, a_out),
+        "gain_db_11": _ratio_db(b_in, a_in),
+        "gain_db_22": _ratio_db(b_out, a_out),
+    }
 
 
 def _mode_info(mode_array, mode_labels, signal_mode, pump_mode, idler_mode) -> dict:
@@ -891,11 +909,14 @@ class TWPAnalysis(BaseModel):
             I_tuples_array, gammas, x, cme_inputs["segment_midpoints"]
         )
 
-        signal_idx = mode_labels.index(signal_mode)
-        initial_signal = y0[signal_idx] if y0.ndim == 1 else y0[:, signal_idx]
-        gain_db = 10 * np.log10(
-            np.abs(I_tuples_array[:, signal_idx, -1] / initial_signal) ** 2
-        )
+        # Forward waves only, no ports: nothing goes out at x=0 (not modelled).
+        a_in = self._broadcast_ic(y0, n_freq)
+        ports = {
+            "a_in": a_in,
+            "a_out": np.zeros_like(a_in),
+            "b_in": np.full_like(a_in, np.nan),
+            "b_out": I_tuples_array[..., -1],
+        }
 
         return {
             "model": GainModel.SIMPLE.value,
@@ -903,7 +924,8 @@ class TWPAnalysis(BaseModel):
             "signal_freqs": signal_freqs,
             "x": x,
             "I_tuples": I_tuples_array,
-            "gain_db": gain_db,
+            "ports": ports,
+            **_port_gains(ports, mode_labels.index(signal_mode)),
             "mode_info": _mode_info(
                 mode_array_config, mode_labels, signal_mode, pump_mode, idler_mode
             ),
@@ -981,7 +1003,7 @@ class TWPAnalysis(BaseModel):
         )
         gammas, edge = sb["gammas"], sb["edge"]
         diag: dict[str, Any] = {}
-        I_tuples_raw = bloch_fb_segmented_cmes_solve(
+        out = bloch_fb_segmented_cmes_solve(
             x,
             bloch["seg_bounds"],
             y0_fwd_broadcast,
@@ -1018,90 +1040,37 @@ class TWPAnalysis(BaseModel):
             rk_config=rk_config,
         )
         bloch.update(diag)
-        # Exact phase of the piecewise-constant wavenumber (k x for one segment).
-        Phi_f, Phi_b = segmented_phase(gammas.imag, bloch["seg_bounds"], x)
-        carrier_fwd = np.exp(1j * Phi_f)
-        carrier_bwd = np.exp(1j * Phi_b)
-        # Launched waves: forward mode of the first segment at x=0,
-        # backward mode of the last segment at x=L.
-        Zp_launch = bloch["Zb_plus"][:, 0]
-        Zm_launch = bloch["Zb_minus"][:, -1]
         if not segmented:
             bloch = _drop_segment_axis(bloch, n_freq)
 
-        num_saved_passes = bloch_config.passes if bloch_config.save_all_passes else 1
-        I_tuples_all_passes = {}
-        for p in range(num_saved_passes):
-            I_tuples_all_passes[p] = {
-                "forward": I_tuples_raw[p * n_freq : (p + 1) * n_freq] * carrier_fwd,
-                "backward": I_tuples_raw[
-                    num_saved_passes * n_freq
-                    + p * n_freq : num_saved_passes * n_freq
-                    + (p + 1) * n_freq
-                ]
-                * carrier_bwd,
-            }
-
-        I_tuples_fwd = I_tuples_all_passes[num_saved_passes - 1]["forward"]
-        I_tuples_bwd = I_tuples_all_passes[num_saved_passes - 1]["backward"]
-
         signal_idx = mode_labels.index(signal_mode)
+        I_fwd, I_bwd = out["I_fwd"], out["I_bwd"]
+        n_saved = len(I_fwd)
 
-        # Prompt reflections of the injected waves: the wave launched at x=0
-        # is the forward Bloch mode (Zb+), the one launched at x=L is the
-        # backward mode (Zb-).
-        Ze = self.port_Z_ext
-        Zb_launch_in = Zp_launch[:, signal_idx]
-        Zb_launch_out = Zm_launch[:, signal_idx]
-
-        A_in, B_in, C_in, D_in = (abcd_in[:, signal_idx, k] for k in range(4))
-        Zin_in = (A_in * Zb_launch_in + B_in) / (C_in * Zb_launch_in + D_in)
-        refl_in = (Ze - Zin_in) / (Ze + Zin_in)
-
-        A_out, B_out, C_out, D_out = (abcd_out[:, signal_idx, k] for k in range(4))
-        Zin_out = (A_out * Zb_launch_out + B_out) / (C_out * Zb_launch_out + D_out)
-        refl_out = (Ze - Zin_out) / (Ze + Zin_out)
-
-        Is0_rep = y0_fwd_broadcast[:, signal_idx]
-        Ib0_rep = y0_bwd_broadcast[:, signal_idx]
-
-        def _gains(I_fwd_arr, I_bwd_arr):
-            out_fwd = (
-                I_fwd_arr[:, signal_idx, -1]
-                + y0_bwd_broadcast[:, signal_idx] * refl_out
-            )
-            out_bwd = (
-                I_bwd_arr[:, signal_idx, -1] + y0_fwd_broadcast[:, signal_idx] * refl_in
-            )
+        def ports(p):
             return {
-                "gain_db_fwd": _ratio_db(out_fwd, Is0_rep),
-                "gain_db_bwd": _ratio_db(out_bwd, Ib0_rep),
-                "gain_db_11": _ratio_db(out_bwd, Is0_rep),
-                "gain_db_22": _ratio_db(out_fwd, Ib0_rep),
+                "a_in": out["a_in"],
+                "a_out": out["a_out"],
+                "b_in": out["b_in"][p],
+                "b_out": out["b_out"][p],
             }
-
-        final = _gains(I_tuples_fwd, I_tuples_bwd)
-        gains_all_passes = [
-            _gains(
-                I_tuples_all_passes[p]["forward"], I_tuples_all_passes[p]["backward"]
-            )
-            for p in range(num_saved_passes)
-        ]
 
         return {
             "model": GainModel.BLOCH.value,
             "pump_freq": pump,
             "signal_freqs": signal_freqs,
             "x": x,
-            "I_tuples": I_tuples_fwd,
-            "I_tuples_fwd": I_tuples_fwd,
-            "I_tuples_bwd": I_tuples_bwd,
-            "I_tuples_all_passes": I_tuples_all_passes,
-            "gain_db": final["gain_db_fwd"],
-            "gain_db_12": final["gain_db_bwd"],
-            "gain_db_11": final["gain_db_11"],
-            "gain_db_22": final["gain_db_22"],
-            "gains_all_passes": gains_all_passes,
+            "I_tuples": I_fwd[-1],
+            "I_tuples_fwd": I_fwd[-1],
+            "I_tuples_bwd": I_bwd[-1],
+            "I_tuples_all_passes": {
+                p: {"forward": I_fwd[p], "backward": I_bwd[p]} for p in range(n_saved)
+            },
+            "ports": ports(-1),
+            **_port_gains(ports(-1), signal_idx),
+            "gains_all_passes": [
+                _port_gains(ports(p), signal_idx) for p in range(n_saved)
+            ],
             "passes": bloch_config.passes,
             "bloch": bloch,
             "mode_info": _mode_info(

@@ -264,13 +264,9 @@ def test_fb_energy_balance_lossless(m_max):
         anderson_depth=5,
     )
     W = bl["W"].real
-    Zp, Zm = bl["Zb_plus"], bl["Zb_minus"]
-    rho_in = (Zm - Z_ext) / (Zp + Z_ext)
-    rho_out = (Zp - Z_ext) / (Zm + Z_ext)
     # Exact integration endpoints (interior points are interpolated).
-    fwd_0, bwd_L = out[:n, :, 0], out[n:, :, 0]
-    fwd_L = -out[:n, :, -1] / (1 + rho_out)
-    bwd_0 = out[n:, :, -1] / (1 + rho_in)
+    fwd, bwd = out["I_fwd"][0], out["I_bwd"][0]
+    fwd_0, fwd_L, bwd_0, bwd_L = fwd[..., 0], fwd[..., -1], bwd[..., 0], bwd[..., -1]
     P0 = (W * (np.abs(fwd_0) ** 2 - np.abs(bwd_0) ** 2)).sum(1)
     PL = (W * (np.abs(fwd_L) ** 2 - np.abs(bwd_L) ** 2)).sum(1)
     P_signal = W[:, s] * np.abs(fwd_L[:, s]) ** 2
@@ -536,7 +532,7 @@ def test_anderson_converges_near_bragg_coupling():
             m_max=5,
             anderson_depth=depth,
         )
-        return 20 * np.log10(np.abs(out[: len(sig), is_, -1]) / Is0)
+        return 20 * np.log10(np.abs(out["b_out"][0, :, is_]) / Is0)
 
     ref = _circuit_reference_3wm(twpa, pump, sig, Ip0, Ze)
     accelerated = solve(5, 30)

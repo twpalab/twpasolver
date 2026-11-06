@@ -124,7 +124,6 @@ from twpasolver.cmes.bloch_common import (
     _relative_residual,
     _rows_with_targets,
     _stencil_value,
-    _store_pass,
 )
 from twpasolver.cmes.rk45 import rk45_solve
 from twpasolver.cmes.solver_config import BlochSolverConfig, RKSolverConfig
@@ -893,8 +892,6 @@ def _bloch_fb_solve_segmented(
     Zout_out_table,
     apcz_in_table,
     apcz_out_table,
-    tof_in_table,
-    tof_out_table,
     rk,
     edge_K_table,
     edge_mode_table,
@@ -947,8 +944,6 @@ def _bloch_fb_solve_segmented(
         rho_in = (Zm0 - Zout_in) / (Zp0 + Zout_in)
         t_out = 2.0 * Ze_i / (apcz_out_table[i] * (ZmL + Zout_out))
         rho_out = (ZpL - Zout_out) / (ZmL + Zout_out)
-        tof_in = tof_in_table[i]
-        tof_out_signed = -tof_out_table[i]
 
         t_j = np.ascontiguousarray(t_table[i])
         tp_j = np.ascontiguousarray(tp_table[i])
@@ -1220,18 +1215,8 @@ def _bloch_fb_solve_segmented(
             if save_all_passes:
                 id_add_fwd = k * n_freq
                 id_add_bwd = k * n_freq + n_freq * passes
-            _store_pass(
-                I_out,
-                A_fwd_x,
-                A_bwd_x,
-                rho_out,
-                rho_in,
-                tof_out_signed,
-                tof_in,
-                i + id_add_fwd,
-                i + id_add_bwd,
-                n_modes,
-            )
+            I_out[i + id_add_fwd] = A_fwd_x
+            I_out[i + id_add_bwd] = A_bwd_x
 
             u_k = np.ascontiguousarray(u_next)
 
@@ -1239,18 +1224,8 @@ def _bloch_fb_solve_segmented(
                 converged_flags[i] = converged
                 if save_all_passes:
                     for kk in range(k + 1, passes):
-                        _store_pass(
-                            I_out,
-                            A_fwd_x,
-                            A_bwd_x,
-                            rho_out,
-                            rho_in,
-                            tof_out_signed,
-                            tof_in,
-                            i + kk * n_freq,
-                            i + kk * n_freq + n_freq * passes,
-                            n_modes,
-                        )
+                        I_out[i + kk * n_freq] = A_fwd_x
+                        I_out[i + kk * n_freq + n_freq * passes] = A_bwd_x
                 break
 
     return I_out, converged_flags, residuals
@@ -1296,7 +1271,7 @@ def bloch_fb_segmented_cmes_solve(
     edge_K: ComplexArray | None = None,
     edge_mode: np.ndarray | None = None,
     diagnostics: dict | None = None,
-) -> ComplexArray:
+) -> dict[str, np.ndarray]:
     """
     Solve the forward/backward Bloch CMEs of a segmented device.
 
@@ -1347,11 +1322,15 @@ def bloch_fb_segmented_cmes_solve(
 
     Returns
     -------
-    ndarray, shape (2 * n_freq [* passes], n_modes, n_x)
-        Slow envelopes on ``x_array`` (forward on ``x``, backward on the
-        mirrored coordinate), last point replaced by the current coupled out
-        to the external line. Restore the propagation phase with
-        :func:`segmented_phase`.
+    dict
+        ``I_fwd``, ``I_bwd`` : (n_saved, n_freq, n_modes, n_x)
+            Forward and backward mode currents (with the propagation phase) on
+            ``x_array``; ``n_saved`` is ``passes`` with ``save_all_passes``, else 1.
+        ``a_in``, ``a_out`` : (n_freq, n_modes)
+            Currents incident from the external lines at x=0 and x=L.
+        ``b_in``, ``b_out`` : (n_saved, n_freq, n_modes)
+            Currents going out into the external lines at x=0 and x=L: the
+            transmitted device wave plus the prompt reflection of the incident one.
     """
     gammas_seg = np.asarray(gammas_seg, dtype=np.complex128)
     if gammas_seg.ndim != 3:
@@ -1477,8 +1456,6 @@ def bloch_fb_segmented_cmes_solve(
         c(Zout_out_table),
         c(apcz_in),
         c(apcz_out),
-        c(tof_in),
-        c(tof_out),
         (rk_config if rk_config is not None else RKSolverConfig()).kernel_args(),
         c(edge_K, dtype=np.complex128),
         c(edge_mode_f),
@@ -1500,4 +1477,47 @@ def bloch_fb_segmented_cmes_solve(
     if diagnostics is not None:
         diagnostics["converged"] = converged
         diagnostics["residuals"] = residuals
-    return I_out
+
+    n_saved = passes if save_all_passes else 1
+    raw = I_out.reshape(2, n_saved, n_freq, n_modes, len(x_array))
+    Phi_f, Phi_b = segmented_phase(
+        np.transpose(gammas_seg.imag, (0, 2, 1)), seg_bounds, x_array
+    )
+    I_fwd = raw[0] * np.exp(1j * Phi_f)
+    # Backward envelopes are solved on s = L - x; x_array is symmetric.
+    I_bwd = (raw[1] * np.exp(1j * Phi_b))[..., ::-1]
+
+    a_in = np.asarray(y0_array_fwd, dtype=np.complex128)
+    a_out = np.asarray(y0_array_bwd, dtype=np.complex128)
+    Zp0, Zm0, ZpL, ZmL = Zp[:, 0], Zm[:, 0], Zp[:, -1], Zm[:, -1]
+    rho_in = (Zm0 - Zout_in_table) / (Zp0 + Zout_in_table)
+    rho_out = (ZpL - Zout_out_table) / (ZmL + Zout_out_table)
+    b_in = (
+        tof_in * (1 + rho_in) * I_bwd[..., 0]
+        + _prompt_reflection(abcd_in, Zp0, Ze_table) * a_in
+    )
+    b_out = (
+        -tof_out * (1 + rho_out) * I_fwd[..., -1]
+        + _prompt_reflection(abcd_out, ZmL, Ze_table) * a_out
+    )
+    return {
+        "I_fwd": I_fwd,
+        "I_bwd": I_bwd,
+        "a_in": a_in,
+        "a_out": a_out,
+        "b_in": b_in,
+        "b_out": b_out,
+    }
+
+
+def _prompt_reflection(abcd, Zb_launch, Ze):
+    """
+    Current reflected into the external line per unit incident current, off the
+    connector ``abcd`` (port 2 on the device) loaded by the launched Bloch mode.
+    """
+    if abcd is None:
+        Zin = Zb_launch
+    else:
+        A, B, C, D = (np.asarray(abcd)[..., k] for k in range(4))
+        Zin = (A * Zb_launch + B) / (C * Zb_launch + D)
+    return (Ze - Zin) / (Ze + Zin)
