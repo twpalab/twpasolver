@@ -1370,7 +1370,8 @@ class TWPAnalysis(Analyzer, Frequencies):
             Includes ``optimal_pump_freq``: the pump of ``pump_freqs`` with the
             smallest mean ``|delta|`` over ``signal_freqs`` for the chosen process
             and mixing (None if all NaN); restrict ``signal_arange`` to the band
-            of interest.
+            of interest. Pumps inside a stopband (``data["stopbands"]``) get a NaN
+            ``delta`` column and are never chosen.
         """
         mode_array = self.get_mode_array(mode_array_config)
         pump_f = (
@@ -1437,13 +1438,22 @@ class TWPAnalysis(Analyzer, Frequencies):
                 if relative:
                     deltas[:, i] = deltas[:, i] / signal_k_array
 
-        mean_delta = np.nanmean(np.abs(deltas), axis=0)
+        # A pump inside a stopband does not propagate: no phase matching there.
+        stopbands = self.data["stopbands"]
+        in_gap = (
+            (pump_f[:, None] >= stopbands[:, 0]) & (pump_f[:, None] <= stopbands[:, 1])
+        ).any(axis=1)
+        deltas[:, in_gap] = np.nan
+
+        valid = ~np.isnan(deltas).all(axis=0)
+        mean_delta = np.full(len(pump_f), np.inf)
+        mean_delta[valid] = np.nanmean(np.abs(deltas[:, valid]), axis=0)
         return {
             "delta": deltas,
             "triplets": {"f": f_triplets, "k": k_triplets},
             "pump_freqs": pump_f,
             "optimal_pump_freq": (
-                None if np.isnan(mean_delta).all() else pump_f[np.nanargmin(mean_delta)]
+                pump_f[np.argmin(mean_delta)] if valid.any() else None
             ),
             "signal_freqs": signal_f,
             "mode_info": {

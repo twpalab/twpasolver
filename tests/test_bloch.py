@@ -103,6 +103,23 @@ def test_phase_matching_optimal_pump():
     assert best == pm["pump_freqs"][np.argmin(mean)]
 
 
+def test_phase_matching_masks_stopband_pumps():
+    """Pumps inside a stopband get NaN mismatch and are never the optimum."""
+    analysis = _mismatched_analysis(Ip0=1e-12)
+    pm = analysis.phase_matching(
+        process="PA",
+        mixing="3WM",
+        signal_arange=(2.0, 6.5, 0.25),
+        pump_arange=(12.5, 16.0, 0.05),
+    )
+    sb = analysis.data["stopbands"]
+    pumps = pm["pump_freqs"]
+    in_gap = ((pumps[:, None] >= sb[:, 0]) & (pumps[:, None] <= sb[:, 1])).any(axis=1)
+    assert in_gap.any() and (~in_gap).any()
+    assert np.isnan(pm["delta"][:, in_gap]).all()
+    assert not in_gap[pumps == pm["optimal_pump_freq"]].any()
+
+
 def test_fb_linear_limit_matches_abcd():
     """Without pump, the Bloch FB model reproduces the exact device S-parameters."""
     analysis = _mismatched_analysis(Ip0=1e-12)
