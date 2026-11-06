@@ -110,6 +110,93 @@ def test_fb_linear_limit_matches_abcd():
     assert np.allclose(res["gain_db_11"], s11, atol=1e-2)
 
 
+def _connector(z0, length, L_series, C_shunt, R_series):
+    """Lossy connector model: line section, series L, shunt C, series R."""
+    from twpasolver.models.oneport import Capacitance, Inductance, Resistance
+    from twpasolver.models.transmission_lines import LosslessTL
+    from twpasolver.models.twoportarrays import TwoPortArray
+
+    return TwoPortArray(
+        cells=[
+            LosslessTL.from_z_vp(z0, 1.2e8, length),
+            Inductance(L=L_series),
+            Capacitance(C=C_shunt, twoport_parallel=True),
+            Resistance(R=R_series),
+        ]
+    )
+
+
+@pytest.mark.parametrize("segmented", [False, True])
+def test_fb_linear_limit_with_connectors(segmented):
+    """
+    Without pump, the Bloch FB model with different connectors at the two ends
+    reproduces all four S-parameters of the cascade connector-device-connector.
+
+    Both connectors have port 2 facing the device, so the output one enters the
+    cascade reversed (A and D swapped). S12 and S22 come from a signal injected
+    at x = L.
+    """
+    Ze = 50.0
+    conn_in = _connector(45.0, 3e-3, 0.4e-9, 60e-15, 1.5)
+    conn_out = _connector(58.0, 5e-3, 0.2e-9, 120e-15, 0.5)
+    base = TWPA.from_file(str(HOLOTYPE))
+    base.Ip0 = 1e-12
+    if segmented:
+        segs = []
+        for g in (1.0, 1.01, 0.99, 1.02):
+            seg = base.model_copy(deep=True, update={"N": base.N // 4})
+            for cell in seg.cells:
+                cell.L, cell.Lf = cell.L * g, cell.Lf * g
+            segs.append(seg)
+        device = TWPA(cells=segs, Z0_ref=base.Z0_ref, Ip0=base.Ip0)
+    else:
+        device = base
+    analysis = TWPAnalysis(
+        twpa=device,
+        f_arange=(0.2, 40, 1e-3),
+        port_Z_ext=Ze,
+        port=conn_in,
+        port_out=conn_out,
+    )
+    analysis.update_base_data()
+    idx = np.searchsorted(analysis.data["freqs"], [2.0, 5.0, 8.0, 11.0, 12.5])
+    f = analysis.data["freqs"][idx]
+
+    T_in = np.asarray(conn_in.get_abcd(f * 1e9))
+    T_out = np.asarray(conn_out.get_abcd(f * 1e9))[:, ::-1, ::-1].copy()
+    T_out[:, 0, 1], T_out[:, 1, 0] = T_out[:, 1, 0].copy(), T_out[:, 0, 1].copy()
+    T = T_in @ np.asarray(analysis.data["abcd"])[idx] @ T_out
+    A, B, C, D = T[:, 0, 0], T[:, 0, 1], T[:, 1, 0], T[:, 1, 1]
+    den = A + B / Ze + C * Ze + D
+    ref = {
+        "21": 2 / den,
+        "11": (A + B / Ze - C * Ze - D) / den,
+        "12": 2 * (A * D - B * C) / den,
+        "22": (-A + B / Ze - C * Ze + D) / den,
+    }
+
+    kw = dict(
+        pump=16.0,
+        model=GainModel.BLOCH,
+        fb_config=FBSolverConfig(passes=60, convergence_threshold=1e-10),
+        thin=20,
+    )
+    fwd = analysis.gain(f, Is0=1e-6, **kw)
+    labels = list(fwd["mode_info"]["mode_map"])
+    y_f, y_b = np.zeros(len(labels)), np.zeros(len(labels))
+    y_f[labels.index("p")] = base.Ip0
+    y_b[labels.index("s")] = 1e-6
+    bwd = analysis.gain(f, initial_amplitudes_fwd=y_f, initial_amplitudes_bwd=y_b, **kw)
+    sim = {
+        "21": fwd["gain_db"],
+        "11": fwd["gain_db_11"],
+        "12": bwd["gain_db_12"],
+        "22": bwd["gain_db_22"],
+    }
+    for k, tol in (("21", 1e-3), ("12", 1e-3), ("11", 1e-2), ("22", 1e-2)):
+        assert np.allclose(sim[k], 20 * np.log10(np.abs(ref[k])), atol=tol), k
+
+
 @pytest.mark.parametrize("m_max", [0, 5])
 def test_fb_energy_balance_lossless(m_max):
     """Lossless FB solution: net power flux sum W(|A+|^2 - |A-|^2) equal at both ends.

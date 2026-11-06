@@ -371,7 +371,9 @@ cold compile time measured and noted here; the line count noted here.
   cache them. Pandoc is needed for the build and is not installed locally.
 - [ ] **7.5 README:** what twpasolver is, the models and when to use which, install, warmup, a minimal example,
   citation, license.
-- [ ] **7.6 Physics notes for users:** the edge-basis derivation (`edge_basis_physics.tex`, cited by
+- [ ] **7.6 Physics notes for users:** document that the forward-only `general_no_reflections` (future `simple`)
+  ignores `port`, `port_out` and `port_Z_ext`: its gain is output over input inside the line, with no connector
+  losses or end reflections. Either say so or warn when connectors are set. the edge-basis derivation (`edge_basis_physics.tex`, cited by
   `cmes/bloch.py`) now lives in `notebooks/amplification/twpasolver_thesis/claude_outputs/`; adapt it for the docs.
   - the edge basis, and when to set `edge_threshold`;
   - `m_max` per supercell (2.4);
@@ -514,3 +516,10 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
   - **Numerics:** identical to WP3.1 on the whole regression set.
   - **Still to remove:** `_prepare_bloch_coefficients` stays only for `bloch_no_reflections` and the RHS energy
     tests; it goes with that model (WP3.4–3.6), and the energy tests then use the segmented preparation.
+- 2026-11-06, connectors test: `test_fb_linear_limit_with_connectors` (uniform and 4-segment holotype) checks that
+  the unpumped Bloch forward–backward model with different lossy connectors at the two ends reproduces S21, S11,
+  S12 and S22 of the cascade connector–device–reversed connector.
+  - **Agreement:** S21/S12 within 6e-5 dB, S11/S22 within 5e-3 dB.
+  - **Sensitivity:** ignoring the connectors would be off by 0.5 dB on S21 and 12 dB on S11/S22; reversing the
+    output connector by 0.1 dB and 3-15 dB.
+  - **No test covered connectors before.** Finding: `general_no_reflections` ignores connectors (WP7.6).
