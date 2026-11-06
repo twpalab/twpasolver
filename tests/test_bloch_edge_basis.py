@@ -351,8 +351,8 @@ def test_per_mode_harmonic_limits_in_filter():
     from test_bloch import CELL_L, CELL_U
 
     from twpasolver import TWPAnalysis
-    from twpasolver.analysis import prepare_relations_coefficients
     from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
+    from twpasolver.cmes.prep import prepare_relations_coefficients
     from twpasolver.models import TWPA
     from twpasolver.modes_rwa import ModeArrayFactory
 
@@ -441,8 +441,8 @@ def test_mismatch_cutoff_capped_at_zone_edge():
     from test_bloch import CELL_L, CELL_U
 
     from twpasolver import TWPAnalysis
-    from twpasolver.analysis import prepare_relations_coefficients
     from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
+    from twpasolver.cmes.prep import prepare_relations_coefficients
     from twpasolver.models import TWPA
     from twpasolver.modes_rwa import ModeArrayFactory
 
@@ -515,7 +515,7 @@ def test_cubic_table_interpolation():
 
 def test_stopband_guard_weights():
     """1 away from edges, smoothstep to 0 at the edge, 0 in the gap, 1 at the zone centre."""
-    from twpasolver.analysis import _stopband_guard_weights
+    from twpasolver.cmes.prep import _stopband_guard_weights
 
     split = np.array([[0.5, 0.1, 0.05, 0.0, 0.3, 0.02]])
     W = np.array([[50.0, 50.0, 50.0, 50.0, 40j, 50.0]])
@@ -619,7 +619,7 @@ def _unfolded_holotype(q=3, nl_scale=None, delta=None):
 
 def test_folding_point_is_not_an_edge():
     """On an unfolded supercell, k D = n pi without a gap keeps the native basis."""
-    from twpasolver.analysis import _edge_basis_entries
+    from twpasolver.cmes.prep import _edge_basis_entries
 
     analysis = _unfolded_holotype()
     tw, D = analysis.twpa, 102

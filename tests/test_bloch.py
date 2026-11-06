@@ -6,6 +6,7 @@ import pytest
 from twpasolver.analysis import GainModel, TWPAnalysis, _drop_segment_axis
 from twpasolver.cmes.bloch import bloch_mode_tables
 from twpasolver.cmes.bloch_fb import bloch_fb_segmented_cmes_solve
+from twpasolver.cmes.prep import prepare_bloch_segmented
 from twpasolver.cmes.solver_config import BlochSolverConfig
 from twpasolver.models import TWPA, LCLfBaseCell
 
@@ -23,7 +24,10 @@ def _forward_gamma(twpa, freqs, n_cells):
 def _segment_bloch_tables(analysis, mode_array, cme_inputs):
     """Bloch tables of a uniform device solved as one segment."""
     ci = {**cme_inputs, "gammas": cme_inputs["gammas"][..., None]}
-    return analysis._prepare_bloch_segmented(mode_array, ci)
+    segments, bounds = analysis._bloch_segments()
+    return prepare_bloch_segmented(
+        mode_array, ci, segments, bounds, analysis.unit_multiplier
+    )
 
 
 def _uniform_bloch_tables(analysis, mode_array, cme_inputs):
@@ -331,8 +335,8 @@ def _process_signatures(rows, n_modes, n_in):
 
 def test_mismatch_filter_keeps_partner_terms_together():
     """Partner terms of a process are always kept or dropped together."""
-    from twpasolver.analysis import prepare_relations_coefficients
     from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
+    from twpasolver.cmes.prep import prepare_relations_coefficients
     from twpasolver.modes_rwa import ModeArrayFactory
 
     twpa = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10)

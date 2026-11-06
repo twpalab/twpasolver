@@ -10,10 +10,12 @@ and merging code over adding options.
 
 ## How to work on this
 
-- **Repo:** `/home/pietro/work/phd/twpas/twpasolver`. **Work branch: `bloch-cmes`**, created 2026-11-06 from
-  `edge-basis`. `edge-basis` holds the state before the clean-up and contains every other local branch (see WP7.8).
-  Commit only when Pietro asks.
-- **Python:** `~/.virtualenvs/twpaenv/bin/python`. Poetry is broken on this machine; use pip/pytest directly.
+- **Repo:** `/home/pietro/work/phd/twpas/twpasolver`. **Main branch of the clean-up: `bloch-cmes`**, created
+  2026-11-06 from `edge-basis`. `edge-basis` holds the state before the clean-up and contains every other local
+  branch (see WP7.8). Work happens in worktree branches (e.g. `audit-fixes`) that commit freely and never push;
+  Pietro fast-forwards `bloch-cmes` with `git merge --ff-only <branch>`.
+- **Python:** `~/.virtualenvs/twpaenv/bin/python`; from a worktree set `PYTHONPATH=src` (the editable install
+  points to the main checkout). Poetry: `~/.virtualenvs/twpaenv/bin/poetry` (the one on PATH is broken).
 - **Tests:** `~/.virtualenvs/twpaenv/bin/python -m pytest tests -q -p no:cacheprovider` takes about 30 s with a
   warm numba cache. A cold compile takes minutes: uniform `bloch` about 55 s, segmented about 80 s, `general`
   about 30 s.
@@ -28,7 +30,7 @@ and merging code over adding options.
   `notebooks/wideiso/sim/run7`, and the thesis figure scripts in `docs/source/notebooks/*_canon.py`. A breaking
   change goes into the changelog in WP7.
 
-## Current state (2026-11-06)
+## State at the first review (2026-11-06; see "Where to pick up" for the current state)
 
 - **Size:** about 14.8k lines in `src`. The largest files are `analysis.py` (2.6k), `cmes/cmes_fb.py` (1.66k),
   `cmes/bloch_fb_segmented.py` (1.57k), `cmes/bloch_fb.py` (1.35k), `modes_rwa.py` (1.14k), `cmes/bloch.py`
@@ -384,7 +386,7 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
   - Stop computing the unused `coeffs_3wm`/`coeffs_4wm` on the forward–backward path (rebuilt at `~1356-1360`
     and never used by the kernel).
 - [ ] **3.3 One boundary-table helper, one forward–backward post-processing helper** (per-pass split, port gains,
-  prompt reflections, `mode_info`), shared by every forward–backward driver.
+  prompt reflections, `mode_info`), shared by every forward–backward driver. Folded into WP4.4 (2026-11-07).
 - [x] **3.4 Guard systems** (per D2/D3/D4). Mostly done 2026-11-06: the `bloch_no_reflections` guard stack is
   removed and `process_weights` is the single N-d version. With `quantum/` gone (D3), the only guard left is the
   `simulate_stopband_modes=False` path (kept, D4). Leftover: the 45° reactive-angle threshold is repeated in
@@ -451,7 +453,7 @@ twpasolver/analysis/
   phase_matching.py from LinearData + modes (segment-weighted, as in 2.9)
   results.py        GainResult / PhaseMatchingResult dataclasses: same fields for every model, save/load, plot
   core.py           TWPAnalysis facade (~200 lines)
-cmes/bloch_prep.py  edge basis, stopband guard, harmonic limits, relation coefficients (moved out of analysis)
+cmes/prep.py       edge basis, stopband guard, harmonic limits, relation coefficients (moved out of analysis)
 ```
 
 ```python
@@ -474,9 +476,13 @@ Decisions (Pietro, 2026-11-07):
   optional extra.
 
 Items (each step keeps golden gains bit-identical on the holotype, the segmented holotype and the 3-cell device):
-- [ ] **4.1 Move solver preparation to `cmes/bloch_prep.py`:** `_edge_basis_entries`, `_harmonic_limits`,
+- [x] **4.1 Move solver preparation to `cmes/bloch_prep.py`:** `_edge_basis_entries`, `_harmonic_limits`,
   `_stopband_guard_weights`, `prepare_relations_coefficients`, `_fb_stopbands`, `_apply_edge_basis_segmented`,
   `_prepare_bloch_segmented`, `_log_edge_basis_skipped`. Mechanical, ~600 lines out of `analysis.py`.
+  - Done 2026-11-07 (audit-fixes): module named `cmes/prep.py` (relation coefficients also feed `simple`);
+    methods became functions taking `segments`, `seg_bounds`, `unit_multiplier`. `analysis.py` 1,836 → 1,275,
+    `prep.py` 594. Golden reference (scratch `golden.py`: holotype edge/guard/simple, segmented holotype,
+    3-cell simple/bloch, uniform and two-segment phase matching; 33 arrays) bit-identical; 140 tests.
 - [ ] **4.2 Uniform is the one-segment case everywhere:** drop the dual shapes in `_prepare_cme_inputs`, the
   two branches of `_apply_phase_carrier`, `_drop_segment_axis` and `_is_segmented` branching; the segment axis
   is internal and never in results.
