@@ -151,6 +151,8 @@ def _recursively_save_dict_contents_to_group(f: Group, d: Dict[Any, Any]) -> Non
         f.attrs["int_keys"] = True
     for key, item in d.items():
         key = str(key)
+        if item is None:  # e.g. no stopband in the grid; read back as missing
+            continue
 
         if isinstance(item, (list, tuple)):
             array = None

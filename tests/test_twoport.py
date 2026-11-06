@@ -5,6 +5,7 @@ import pytest
 
 from twpasolver.mathutils import s2a
 from twpasolver.matrices_arrays import ABCDArray
+from twpasolver.models import LosslessTL
 from twpasolver.models.rf_functions import inductance, series_impedance_abcd
 from twpasolver.twoport import TwoPortCell
 
@@ -77,6 +78,15 @@ def test_interpolate():
     cell_interp_polar = cell_base.interpolate(freqs_interp, polar=True)
     assert np.allclose(cell_interp_cartesian.abcd.B, L_interp)
     assert np.allclose(cell_interp_polar.abcd.B, L_interp)
+
+
+def test_interpolate_default_handles_sign_changes():
+    """Cartesian default: A = cos(beta l) of a lossless line changes sign."""
+    line = LosslessTL.from_z_vp(50, 1e8, 0.015)
+    coarse, fine = np.linspace(1e9, 10e9, 31), np.linspace(1e9, 10e9, 301)
+    A_interp = line.get_cell(coarse).interpolate(fine).abcd.A
+    assert np.max(np.abs(A_interp - line.get_cell(fine).abcd.A)) < 0.02
+    assert np.all(A_interp.imag == 0)
 
 
 def test_model_update(random_model):

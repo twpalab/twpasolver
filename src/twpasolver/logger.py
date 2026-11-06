@@ -38,3 +38,5 @@ class CustomHandler(logging.StreamHandler):
 log = logging.getLogger(__name__)
 log.setLevel(LOG_LEVEL)
 log.addHandler(CustomHandler())
+# Own handler only: with a root handler configured, messages would print twice.
+log.propagate = False

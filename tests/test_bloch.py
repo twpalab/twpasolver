@@ -5,7 +5,7 @@ import pytest
 
 from twpasolver.analysis import GainModel, TWPAnalysis, _drop_segment_axis
 from twpasolver.cmes.bloch import bloch_mode_tables
-from twpasolver.cmes.bloch_fb import bloch_fb_cmes_solve
+from twpasolver.cmes.bloch_fb import bloch_fb_segmented_cmes_solve
 from twpasolver.cmes.solver_config import BlochSolverConfig
 from twpasolver.models import TWPA, LCLfBaseCell
 
@@ -20,11 +20,40 @@ def _forward_gamma(twpa, freqs, n_cells):
     return np.where(gamma.imag < 0, -gamma, gamma)
 
 
+def _segment_bloch_tables(analysis, mode_array, cme_inputs):
+    """Bloch tables of a uniform device solved as one segment."""
+    ci = {**cme_inputs, "gammas": cme_inputs["gammas"][..., None]}
+    return analysis._prepare_bloch_segmented(mode_array, ci)
+
+
 def _uniform_bloch_tables(analysis, mode_array, cme_inputs):
     """Bloch tables of a uniform device, without the segment axis."""
-    ci = {**cme_inputs, "gammas": cme_inputs["gammas"][..., None]}
-    tables = analysis._prepare_bloch_segmented(mode_array, ci)
+    tables = _segment_bloch_tables(analysis, mode_array, cme_inputs)
     return _drop_segment_axis(tables, cme_inputs["n_freq"])
+
+
+def _solve_one_segment(x, y0_fwd, y0_bwd, ci, sg, **kwargs):
+    """``bloch_fb_segmented_cmes_solve`` on the one-segment tables ``sg``."""
+    return bloch_fb_segmented_cmes_solve(
+        x,
+        sg["seg_bounds"],
+        y0_fwd,
+        y0_bwd,
+        ci["gammas"][:, None],
+        ci["relations_3wm"],
+        ci["relations_4wm"],
+        sg["base_3wm"],
+        sg["base_4wm"],
+        sg["prefac"],
+        sg["phi_plus"],
+        sg["phi_minus"],
+        sg["L_nl"],
+        sg["positions"],
+        sg["n_cells"],
+        sg["Zb_plus"],
+        sg["Zb_minus"],
+        **kwargs,
+    )
 
 
 @pytest.mark.parametrize("n_cells, centered", [(1, False), (5, False), (3, True)])
@@ -182,34 +211,25 @@ def test_fb_energy_balance_lossless(m_max):
     signal_freqs = np.array([1.75, 2.0, 12.5])
     mode_array = analysis.get_mode_array("basic_3wm")
     ci = analysis._prepare_cme_inputs(mode_array, signal_freqs, 14.3, "s", "p")
-    bl = _uniform_bloch_tables(analysis, mode_array, ci)
+    sg = _segment_bloch_tables(analysis, mode_array, ci)
+    bl = _drop_segment_axis(sg, ci["n_freq"])
     labels = ci["mode_labels"]
     p, s = labels.index("p"), labels.index("s")
     n = len(signal_freqs)
     y0 = np.zeros((n, len(labels)), dtype=complex)
     y0[:, p], y0[:, s] = Ip0, 1e-6
     x = np.linspace(0, analysis.twpa.N_tot, 500)
-    out = bloch_fb_cmes_solve(
+    out = _solve_one_segment(
         x,
         y0,
         0 * y0,
-        ci["gammas"],
-        ci["relations_3wm"],
-        ci["relations_4wm"],
-        bl["base_3wm"],
-        bl["base_4wm"],
-        bl["prefac"],
-        bl["phi_plus"],
-        bl["phi_minus"],
-        bl["L_nl"],
-        bl["positions"],
-        bl["n_cells"],
-        bl["Zb_plus"],
-        bl["Zb_minus"],
+        ci,
+        sg,
         passes=60,
         convergence_threshold=1e-8,
         Ze=Z_ext,
         m_max=m_max,
+        anderson_depth=5,
     )
     W = bl["W"].real
     Zp, Zm = bl["Zb_plus"], bl["Zb_minus"]
@@ -467,7 +487,8 @@ def test_anderson_converges_near_bragg_coupling():
     sig = np.array([7.46, 7.48, 7.50, 7.52])
     mode_array = analysis.get_mode_array("basic_3wm")
     ci = analysis._prepare_cme_inputs(mode_array, sig, pump, "s", "p")
-    bl = _uniform_bloch_tables(analysis, mode_array, ci)
+    sg = _segment_bloch_tables(analysis, mode_array, ci)
+    sg["base_4wm"] = 0 * sg["base_4wm"]
     labels = ci["mode_labels"]
     ip, is_ = labels.index("p"), labels.index("s")
     x = np.linspace(0, twpa.N_tot, 400)
@@ -476,23 +497,12 @@ def test_anderson_converges_near_bragg_coupling():
     y0b = np.zeros_like(y0f)
 
     def solve(depth, passes):
-        out = bloch_fb_cmes_solve(
+        out = _solve_one_segment(
             x,
             y0f,
             y0b,
-            ci["gammas"],
-            ci["relations_3wm"],
-            ci["relations_4wm"],
-            bl["base_3wm"],
-            0 * bl["base_4wm"],
-            bl["prefac"],
-            bl["phi_plus"],
-            bl["phi_minus"],
-            bl["L_nl"],
-            bl["positions"],
-            bl["n_cells"],
-            bl["Zb_plus"],
-            bl["Zb_minus"],
+            ci,
+            sg,
             passes=passes,
             convergence_threshold=1e-6,
             Ze=Ze,

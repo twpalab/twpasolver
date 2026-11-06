@@ -134,9 +134,10 @@ Each fix gets a test.
 - [x] **2.1 Asymmetric cutoff in `cmes_fb._filter_wm_terms`** (`cmes_fb.py:~111`). It normalises the mismatch
   by the target mode's k, so partner terms of one process are kept or dropped separately, which breaks
   Manley–Rowe. Use the process-wide `k_proc` as `_filter_wm_terms_bloch` does. (Moot if D1 removes the model.)
-- [ ] **2.2 4WM Kerr factor in `phase_matching`** (`analysis.py:~1672`, `~1699-1705`). `pump_coeff=2` is applied
+- [x] **2.2 4WM Kerr factor in `phase_matching`** (`analysis.py:~1672`, `~1699-1705`). `pump_coeff=2` is applied
   only to the linear k_p, so |Δk_Kerr| = 3χk_p on a flat line; the CMEs give 2χk_p (weak tones k(1+2χ), pump
   k(1+χ), χ = ξI_p²/8). `notebooks/amplification/uniform_line.py` has a reference implementation.
+  - Done 2026-11-06 (audit-fixes): Kerr bracket uses `pump_coeff * k_p`; a flat line gives -2 chi k_p (4WM) and -chi k_p (3WM), as `uniform_line.py`. Test `test_phase_matching_kerr_mismatch_on_flat_line`.
 - [ ] **2.3 k unwrap above resonator notches.** `_bloch_params_for_cell` (`analysis.py:~528`) unwraps 2·Im γ and
   halves it, so k is fixed only modulo π per supercell. Above an LC notch (cos kd passes +1), k lands on
   k + π/d.
@@ -188,16 +189,18 @@ Each fix gets a test.
   `np.empty` with garbage when `gamma` is None (`~1663`).
 - [x] **2.10 `k_star` fit guard:** `len(freqs_mask) > 2` (`~715`) should be `freqs_mask.sum() > 2`.
   - Done 2026-11-06 (audit-fixes). Test `test_k_star_guard_with_coarse_grid`.
-- [ ] **2.11 Stopband detection from argmin/argmax of `diff(S21_db)`** (`~665-670`) can return start > end; it
+- [x] **2.11 Stopband detection from argmin/argmax of `diff(S21_db)`** (`~665-670`) can return start > end; it
   gave `[19.13, 14.07]` on the device in `tests/test_bloch.py`. That reversed pair feeds the default ranges and
   the pump estimate. Use the supercell half-trace (`passband_mask`/`in_stopband` from the edge-basis fix).
   - **Audit 2026-11-06:** the result depends on where the grid ends. Same device: `f_arange` to 20 GHz gives
     `[19.06, 14.16]`, to 10 GHz `[6.79, 7.50]`, to 40 GHz `[39.55, 39.54]`. `_estimate_optimal_pump` then works
     on the single point `freqs[idx:-1]`.
+  - Done 2026-11-06 (audit-fixes): lowest run of `in_stopband` on the lossless supercell (first segment for segmented devices); None plus a warning when the grid has none (`gain(pump=None)` and default `phase_matching` ranges then raise). The pump estimate searches the passband between that stopband and the next. Tests `test_stopband_does_not_depend_on_grid_end`, `test_no_stopband_needs_explicit_pump`.
 - [ ] **2.12 Base data is never computed automatically.** `gain()` on a fresh `TWPAnalysis` raises
   `KeyError 'optimal_pump_freq'`, and edits to `twpa` leave stale data without warning. Call `update_base_data()`
   from the decorator, as it did before 6097a93. Exclude `Ip0` from the state check.
-- [ ] **2.13 `gain(Ip0=...)` permanently sets `self.twpa.Ip0`** (`~1816`). Use a local value instead.
+- [x] **2.13 `gain(Ip0=...)` permanently sets `self.twpa.Ip0`** (`~1816`). Use a local value instead.
+  - Done 2026-11-06 (audit-fixes): `Ip0` is passed down to the initial conditions. Test `test_gain_ip0_does_not_change_twpa`.
 - [ ] **2.14 Shared mutable default** `fb_config=FBSolverConfig()` (`~1738`): use `None`.
 - [x] **2.15 `parameter_sweep` `log.warning` format** has an argument but no `%s` (`~414`).
   - Done 2026-11-06 (audit-fixes) with 2.32. Test `test_parameter_sweep_target_in_result_keys`.
@@ -206,8 +209,9 @@ Each fix gets a test.
   - Done 2026-11-06 (audit-fixes). Test `test_overwrite_message_checks_save_name`.
 - [x] **2.17 `bandwidth()` with no stored gain** raises a `TypeError`; with kwargs it overwrites `data["gain"]`.
   - Done 2026-11-06 (audit-fixes): no stored gain and no kwargs raises `ValueError`; all-NaN gain raises; `nanargmax` for partial NaN. The kwargs path still re-runs `gain()` (unchanged). Test `test_bandwidth_errors`.
-- [ ] **2.18 `thin`** is a point count in `gain` (zero points if `N_tot < thin`) but a stride in
+- [x] **2.18 `thin`** is a point count in `gain` (zero points if `N_tot < thin`) but a stride in
   `phase_matching`. Make both a stride, or rename one of them.
+  - Done 2026-11-06 (audit-fixes): `thin` removed from `phase_matching` (ranges used as given, default ranges unthinned); in `gain` it is the position spacing in unit cells, at least 2 points. Test `test_gain_position_grid_has_two_points_at_least`.
 - [x] **2.19 `TWPAnalysis(freqs_arange=...)`** (a typo) is silently ignored and gives an empty grid. Set
   `extra="forbid"` on the pydantic models. The unused fixture at `tests/test_analysis.py:30` has exactly this typo.
   - Done 2026-11-06 (audit-fixes): `extra="forbid"` on `TWPAnalysis` and `Frequencies` only (circuit models unchanged); dead fixture removed. Test `test_twpanalysis_rejects_unknown_fields`.
@@ -284,7 +288,8 @@ Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` da
   - A list-valued `port` fills only `Zout`; its ABCD stays the identity (`analysis.py:643-646`), read only.
   - CI venv cache key (`analysis.yml:26-27`) ignores `matrix.python-version`. **Done:** key has OS and Python.
   - `warmup` with `passes=1` logs a "did not converge" warning every time. **Done** with 3.8.
-  - Done 2026-11-06 (audit-fixes) for `N=0` (identity), `Z0=0`, `Resistance.Z`, arange step > 0 (tests `test_zero_repetitions_is_identity`, `test_impedance_must_have_positive_real_part`, `test_resistance_on_integer_freqs`, `test_frequencies_validation`). Still open: polar `interpolate`, list-valued `port`, CI cache key, warmup warning.
+  - Done 2026-11-06 (audit-fixes) for `N=0` (identity), `Z0=0`, `Resistance.Z`, arange step > 0 (tests `test_zero_repetitions_is_identity`, `test_impedance_must_have_positive_real_part`, `test_resistance_on_integer_freqs`, `test_frequencies_validation`). Still open: list-valued `port`.
+  - Done 2026-11-06 (audit-fixes): `TwoPortCell.interpolate` defaults to `polar=False`. Test `test_interpolate_default_handles_sign_changes`.
 - [x] **2.36 Test for `TWPAnalysis`:** no test runs `phase_matching`, `bandwidth`, stopband detection or a save and
   reload of a real result; the `twpanalysis_instance` fixture asks for a `twpa_model` fixture that does not exist.
   One test on the 3-cell device (`gain` simple and bloch, `phase_matching`, `save_data`/`load_data`, stopband
@@ -350,8 +355,9 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
     repeated in `edge_reference_frequency` and `stopband_edges`.
   - Done 2026-11-06 (audit-fixes): all of the above except `bloch_fb_cmes_solve` (undecided) and rk45
     `max_num_steps` (kept: `notebooks/ripples/kern.py` passes it); `edge_substeps` is the constant `EDGE_SUBSTEPS`.
-- [ ] **3.7 Unify defaults:** `m_max` (config 2 vs wrapper 5), `anderson_depth` (10 vs 5), and the `general`
+- [x] **3.7 Unify defaults:** `m_max` (config 2 vs wrapper 5), `anderson_depth` (10 vs 5), and the `general`
   defaults (`passes` 3 vs 10, `kappa_cutoff` 0.1 vs 0.2, ...). Use `FBSolverConfig` as the single source.
+  - Done 2026-11-06 (audit-fixes): `bloch_fb_segmented_cmes_solve` takes its defaults from `BlochSolverConfig()` (m_max 2, anderson_depth 10); `bloch_fb_cmes_solve` removed, tests call the segmented solver.
 - [x] **3.8 `warmup.py`:** also compile the Bloch kernels (today it compiles only the `general` models). Add the
   `twpasolver-warmup` script entry to `pyproject` (the README advertises it, but it exists only in old install
   metadata). Fix its 13 mypy errors (`**dict[str, object]` passed into `TWPA`, lines 100-101).
@@ -430,8 +436,9 @@ cold compile time measured and noted here; the line count noted here.
   - Remove `n_sidebands` (`~1066`) and the unused `edge_colors`/`edge_styles`.
   - `get_dependent_modes` has no docstring and no caller.
   - No `plt.show()` in library code (`~914`); deduplicate `plot_mode_relations`/`print_symbolic_expressions`.
-- [ ] **5.4 Logging:** `logger.py:39-40` sets INFO and adds a handler at import, so messages print twice under
+- [x] **5.4 Logging:** `logger.py:39-40` sets INFO and adds a handler at import, so messages print twice under
   pytest. A library should add only a `NullHandler`; keep a helper (`twpasolver.logger.enable(level)`) for users.
+  - Done 2026-11-06 (audit-fixes): `log.propagate = False` (own handler and INFO kept, so notebooks still print once). Test `test_log_does_not_reach_root_handler`.
 - [x] **5.7 Dead code outside `cmes/` (audit 2026-11-06, grepped incl. docs and notebooks):**
   `mathutils.compute_phase_matching` (~58 lines, also crashes when `pump_f/2 < freqs[0]`), `TwoPortCell.from_z`,
   `bonus_types.FrequencyLinspace` and `nb_complex3d`, `ModeArray.get_dependent_modes`,
@@ -500,6 +507,10 @@ cold compile time measured and noted here; the line count noted here.
   - the convergence/residual meaning (4.7);
   - the nonlinear-element hook (5.2).
 - [ ] **7.7 Changelog of breaking changes** (return keys, removed models and options).
+  - Breaking so far (audit-fixes): `phase_matching(thin=)` removed; `bloch_fb_cmes_solve` removed;
+    `bloch_fb_segmented_cmes_solve` defaults are now those of `BlochSolverConfig` (m_max 2, anderson_depth 10);
+    the `twpasolver` logger no longer propagates to the root logger; `interpolate` defaults to `polar=False`;
+    `stopband_freqs`/`optimal_pump_freq` come from the supercell half trace (None without a stopband).
 - [ ] **7.8 Branches.**
   - Reconcile `origin/main` (4 commits, the simple_4wm PR: `create_basic(three_wave=)`, `basic_4wm` array,
     placeholder relations; already present in substance on `edge-basis`). `git merge-tree` shows conflicts in
@@ -697,6 +708,9 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
 - 2026-11-06, dead code and near-copies on `audit-fixes` (3.9, 5.5, 5.7, 2.24, 2.26): one `_sweep` for both
   directions, `bloch.py` traversal and edge walk shared, rk45 trimmed, descriptor arrays; 15 files, +229 -717 (net -488 lines). Gains and
   currents bit-identical on the regression set, warm bloch timing unchanged (0.8 s / 4.7 s), mypy 20 -> 19.
+- 2026-11-06, group B on `audit-fixes`: 2.2, 2.11, 2.13, 2.18, 3.7, 5.4, polar `interpolate` (2.35), and
+  `bloch_fb_cmes_solve` removed. Gains bit-identical on the regression set (explicit pump); default pump,
+  stopband and phase-matching results change as intended. mypy 19 -> 13.
 
 ## Where to pick up (end of session 2026-11-06)
 

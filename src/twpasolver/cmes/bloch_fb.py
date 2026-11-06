@@ -4,9 +4,8 @@ Forward-backward coupled mode equations in the Bloch-mode basis.
 Extension of :mod:`twpasolver.cmes.bloch` to counter-propagating waves,
 reflections at the device terminations and segmented (piecewise-uniform)
 devices. A segmented device is a chain of uniform segments, each made of whole
-supercells of its own; a uniform device is the one-segment case
-(:func:`bloch_fb_cmes_solve` adds the segment axis and calls
-:func:`bloch_fb_segmented_cmes_solve`).
+supercells of its own; a uniform device is the one-segment case of
+:func:`bloch_fb_segmented_cmes_solve`.
 
 Physics summary (package convention exp(+j omega t), forward ~ exp(-gamma x))
 ----------------------------------------------------------------------------
@@ -129,8 +128,10 @@ from twpasolver.cmes.bloch_common import (
     _store_pass,
 )
 from twpasolver.cmes.rk45 import rk45_solve
-from twpasolver.cmes.solver_config import RKSolverConfig
+from twpasolver.cmes.solver_config import BlochSolverConfig, RKSolverConfig
 from twpasolver.logger import log
+
+_DEFAULTS = BlochSolverConfig()
 
 # Grid points per supercell of the exact edge-mode solve.
 EDGE_SUBSTEPS = 4
@@ -1279,12 +1280,12 @@ def bloch_fb_segmented_cmes_solve(
     n_cells: np.ndarray,
     Zb_plus: ComplexArray,
     Zb_minus: ComplexArray,
-    passes: int = 10,
-    kappa_cutoff: float = 0.2,
-    m_max: int | np.ndarray = 5,
-    convergence_threshold: float = 0.01,
-    save_all_passes: bool = False,
-    anderson_depth: int = 5,
+    passes: int = _DEFAULTS.passes,
+    kappa_cutoff: float = _DEFAULTS.kappa_cutoff,
+    m_max: int | np.ndarray = int(_DEFAULTS.m_max),
+    convergence_threshold: float = _DEFAULTS.convergence_threshold,
+    save_all_passes: bool = _DEFAULTS.save_all_passes,
+    anderson_depth: int = _DEFAULTS.anderson_depth,
     process_weights_3wm: FloatArray | None = None,
     process_weights_4wm: FloatArray | None = None,
     Ze: float | ComplexArray = 50.0,
@@ -1340,9 +1341,10 @@ def bloch_fb_segmented_cmes_solve(
     m_max : int or (n_freq, n_seg, n_modes) int array
         Harmonic limit, global or per frequency, segment and mode (a process
         uses the largest limit among its modes).
+    passes, kappa_cutoff, convergence_threshold, save_all_passes, anderson_depth
+        As in :class:`BlochSolverConfig`, whose defaults (and ``m_max``) they take.
     diagnostics : dict, optional
         If given, filled with ``converged`` and ``residuals`` (n_freq,).
-
 
     Returns
     -------
@@ -1500,71 +1502,3 @@ def bloch_fb_segmented_cmes_solve(
         diagnostics["converged"] = converged
         diagnostics["residuals"] = residuals
     return I_out
-
-
-def bloch_fb_cmes_solve(
-    x_array: FloatArray,
-    y0_array_fwd: ComplexArray,
-    y0_array_bwd: ComplexArray,
-    gammas_array: ComplexArray,
-    relations_3wm: np.ndarray,
-    relations_4wm: np.ndarray,
-    base_3wm: ComplexArray,
-    base_4wm: ComplexArray,
-    prefac: ComplexArray,
-    phi_plus: ComplexArray,
-    phi_minus: ComplexArray,
-    L_nl: FloatArray,
-    positions: FloatArray,
-    n_cells: int,
-    Zb_plus: ComplexArray,
-    Zb_minus: ComplexArray,
-    *,
-    edge_K: ComplexArray | None = None,
-    edge_flag: np.ndarray | None = None,
-    m_max: int | np.ndarray = 5,
-    process_weights_3wm: FloatArray | None = None,
-    process_weights_4wm: FloatArray | None = None,
-    **kwargs,
-) -> ComplexArray:
-    """
-    Solve the forward/backward Bloch CMEs of a uniform device.
-
-    The one-segment case of :func:`bloch_fb_segmented_cmes_solve`: every table
-    has the shape of the segmented solver without the segment axis
-    (``gammas_array``, ``prefac``, ``Zb_plus``, ``Zb_minus``: (n_freq, n_modes);
-    ``phi_plus``, ``phi_minus``: (n_freq, n_modes, n_nl); ``base_3wm``,
-    ``base_4wm``: (n_rel,); ``L_nl``, ``positions``: (n_nl,); ``n_cells``: int;
-    ``edge_K``: (n_freq, n_modes, 2, 2); ``edge_flag``: (n_freq, n_modes);
-    ``m_max``: int or (n_freq, n_modes); process weights: (n_freq, n_rel)).
-    Other keyword arguments are passed through unchanged. The propagation phase
-    of the result is ``exp(j kappa x)``.
-    """
-    x_array = np.asarray(x_array, dtype=np.float64)
-    seg = lambda a: None if a is None else np.asarray(a)[:, None]  # noqa: E731
-    m_max = np.asarray(m_max, dtype=np.int64)
-    return bloch_fb_segmented_cmes_solve(
-        x_array,
-        np.array([0.0, x_array[-1]]),
-        y0_array_fwd,
-        y0_array_bwd,
-        seg(gammas_array),
-        relations_3wm,
-        relations_4wm,
-        np.asarray(base_3wm)[None],
-        np.asarray(base_4wm)[None],
-        seg(prefac),
-        seg(phi_plus),
-        seg(phi_minus),
-        np.asarray(L_nl, dtype=np.float64)[None],
-        np.asarray(positions, dtype=np.float64)[None],
-        np.array([int(n_cells)], dtype=np.int64),
-        seg(Zb_plus),
-        seg(Zb_minus),
-        m_max=m_max if m_max.ndim == 0 else m_max[:, None],
-        process_weights_3wm=seg(process_weights_3wm),
-        process_weights_4wm=seg(process_weights_4wm),
-        edge_K=seg(edge_K),
-        edge_mode=edge_flag,
-        **kwargs,
-    )

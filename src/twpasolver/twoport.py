@@ -242,7 +242,7 @@ class TwoPortCell:
         """
         save_to_file(filename, self.as_dict(), writer=writer)
 
-    def interpolate(self, freqs: np.ndarray, polar: bool = True) -> TwoPortCell:
+    def interpolate(self, freqs: np.ndarray, polar: bool = False) -> TwoPortCell:
         """
         Return abcd matrix of internal cell interpolating the given frequencies.
 

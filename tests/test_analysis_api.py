@@ -1,5 +1,6 @@
 """API and robustness tests for ``TWPAnalysis``, file I/O and the circuit models."""
 
+import logging
 import os
 import warnings
 
@@ -11,6 +12,7 @@ from twpasolver.analysis import TWPAnalysis
 from twpasolver.cmes.solver_config import BlochSolverConfig
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.frequency import Frequencies
+from twpasolver.logger import log
 from twpasolver.matrices_arrays import ABCDArray
 from twpasolver.models import TWPA, LCLfBaseCell
 from twpasolver.models.oneport import Capacitance, OnePortArray, Resistance
@@ -77,7 +79,7 @@ def test_twpanalysis_end_to_end(analysis, tmp_path):
     bloch = _bloch_gain(an)
     assert np.all(np.isfinite(bloch["gain_db"]))
     assert "gains_all_passes" in bloch
-    pm = an.phase_matching(thin=200)
+    pm = an.phase_matching(pump_arange=PUMP + np.arange(3), signal_arange=SIGNALS)
     assert pm["delta"].shape == (len(pm["signal_freqs"]), len(pm["pump_freqs"]))
     bw = an.bandwidth()
     assert bw["max_gain"] == np.max(bloch["gain_db"])
@@ -146,6 +148,98 @@ def test_k_star_guard_with_coarse_grid():
     assert np.all(np.isfinite(an.data["k_star"]))
 
 
+# Stopband from the supercell half trace (2.11)
+
+
+def test_stopband_does_not_depend_on_grid_end():
+    bands = []
+    for f_max in (10, 20, 40):
+        an = TWPAnalysis(twpa=_small_twpa(), f_arange=(0.05, f_max, 1e-2))
+        an.update_base_data()
+        bands.append((*an.data["stopband_freqs"], an.data["optimal_pump_freq"]))
+    assert bands[0][0] < bands[0][1] < bands[0][2]
+    assert bands[1] == bands[0] and bands[2] == bands[0]
+
+
+def _flat_line_analysis():
+    """LC ladder with a ~300 GHz cutoff: dispersionless and without stopband."""
+    twpa = TWPA(
+        cells=[LCLfBaseCell(L=50e-12, C=20e-15, Lf=0.0)],
+        N=2000,
+        Istar=6.3e-3,
+        Idc=1e-3,
+        Ip0=1e-3,
+    )
+    an = TWPAnalysis(twpa=twpa, f_arange=(0.05, 30, 1e-2))
+    an.update_base_data()
+    return an
+
+
+def test_no_stopband_needs_explicit_pump():
+    an = _flat_line_analysis()
+    assert an.data["stopband_freqs"] is None
+    with pytest.raises(ValueError, match="pass pump"):
+        an.gain(SIGNALS)
+    with pytest.raises(ValueError, match="pump_arange"):
+        an.phase_matching()
+
+
+# 4WM Kerr mismatch (2.2)
+
+
+@pytest.mark.parametrize(
+    "mixing, config, pump, kerr",
+    [("4WM", "basic_4wm", 7.0, -2), ("3WM", "basic_3wm", 14.0, -1)],
+)
+def test_phase_matching_kerr_mismatch_on_flat_line(mixing, config, pump, kerr):
+    """Kerr part of dk on a flat line: -2 chi k_p (4WM), -chi k_p (3WM), as in the CMEs."""
+    an = _flat_line_analysis()
+    Ip = 1e-3
+    kw = dict(
+        mixing=mixing,
+        mode_array_config=config,
+        pump_arange=[pump],
+        signal_arange=[5.0, 6.0],
+        relative=False,
+        save=False,
+    )
+    dk = an.phase_matching(pump_Ip0=Ip, **kw)
+    dk_lin = an.phase_matching(pump_Ip0=0.0, **kw)["delta"]
+    chi = an.twpa.xi * Ip**2 / 8
+    k_p = dk["triplets"]["k"][0][0]
+    np.testing.assert_allclose((dk["delta"] - dk_lin) / (chi * k_p), kerr, rtol=1e-3)
+
+
+# gain(Ip0=...) is local (2.13), position grid (2.18)
+
+
+def test_gain_ip0_does_not_change_twpa(analysis):
+    ref = TWPAnalysis(
+        twpa=_small_twpa().model_copy(update={"Ip0": 5e-4}), f_arange=(0.05, 20, 1e-2)
+    )
+    ref.update_base_data()
+    for model in ("simple", "bloch"):
+        kw = dict(pump=PUMP, Is0=1e-8, model=model, thin=20, save=False)
+        if model == "bloch":
+            kw["bloch_config"] = BlochSolverConfig(passes=10)
+        res = analysis.gain(SIGNALS, Ip0=5e-4, **kw)
+        assert analysis.twpa.Ip0 == 1e-3
+        np.testing.assert_array_equal(
+            res["gain_db"], ref.gain(SIGNALS, **kw)["gain_db"]
+        )
+
+
+def test_gain_position_grid_has_two_points_at_least(analysis):
+    res = analysis.gain(
+        SIGNALS[:1],
+        pump=PUMP,
+        model="simple",
+        thin=10 * analysis.twpa.N_tot,
+        save=False,
+    )
+    assert len(res["x"]) == 2
+
+
 # phase_matching ranges (2.31)
 
 
@@ -200,16 +294,33 @@ def test_bandwidth_errors():
 
 def test_overwrite_message_checks_save_name(analysis, caplog):
     analysis.data.pop("custom", None)
-    with caplog.at_level("INFO", logger="twpasolver"):
+    log.addHandler(caplog.handler)
+    try:
         analysis.phase_matching(
             pump_arange=[13.0], signal_arange=[3.0], save_name="custom"
         )
-    assert "already present" not in caplog.text
-    with caplog.at_level("INFO", logger="twpasolver"):
+        assert "already present" not in caplog.text
         analysis.phase_matching(
             pump_arange=[13.0], signal_arange=[3.0], save_name="custom"
         )
+    finally:
+        log.removeHandler(caplog.handler)
     assert "'custom' output already present" in caplog.text
+
+
+# Logging (5.4)
+
+
+def test_log_does_not_reach_root_handler():
+    records: list = []
+    handler = logging.Handler()
+    handler.emit = records.append  # type: ignore[method-assign]
+    logging.getLogger().addHandler(handler)
+    try:
+        log.warning("printed once, by the twpasolver handler")
+    finally:
+        logging.getLogger().removeHandler(handler)
+    assert records == [] and log.handlers
 
 
 # Validation (2.19, 2.23, 2.35)
