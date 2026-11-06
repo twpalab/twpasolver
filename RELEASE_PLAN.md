@@ -469,6 +469,7 @@ Decisions (Pietro, 2026-11-07):
   `cmes/base.py` stays. WP8.4 is withdrawn; WP8.5 (`phase_matching` from shared tables) is unaffected.
 - The stopband guard (`simulate_stopband_modes=False`, D4) and `StubBaseCell(line=False)` stay.
 - Dependencies: only `sympy` is removed (5.3); `networkx`, `skrf` and `matplotlib` stay core; no extras.
+- Flatten the facade's base classes (4.3c).
 
 Items (each step keeps golden gains bit-identical on the holotype, the segmented holotype and the 3-cell device):
 - [ ] **4.1 Move solver preparation to `cmes/bloch_prep.py`:** `_edge_basis_entries`, `_harmonic_limits`,
@@ -477,9 +478,13 @@ Items (each step keeps golden gains bit-identical on the holotype, the segmented
 - [ ] **4.2 Uniform is the one-segment case everywhere:** drop the dual shapes in `_prepare_cme_inputs`, the
   two branches of `_apply_phase_carrier`, `_drop_segment_axis` and `_is_segmented` branching; the segment axis
   is internal and never in results.
-- [ ] **4.3b `linear.py` + lazy `an.linear`:** replaces `update_base_data`, the `data` dict, the
-  `analysis_function` decorator, `Analyzer` (one subclass) and the `Frequencies` base class
-  (`freqs` = array or arange tuple, plus `unit`). `parameter_sweep` becomes a loop that stacks results.
+- [ ] **4.3b `linear.py` + lazy `an.linear`:** replaces `update_base_data`, the `data` dict and the
+  `analysis_function` decorator. `parameter_sweep` becomes a loop that stacks results.
+- [ ] **4.3c Flatten the facade's base classes:** `TWPAnalysis` stops inheriting from `Analyzer` (an abstract
+  base with one subclass) and `Frequencies` (two ways to give the grid, `f_list` or `f_arange`). The facade
+  takes `freqs` (array or arange tuple) and `unit`; `Analyzer` goes. `Frequencies` is used only as this base
+  class but is exported from `twpasolver/__init__`: drop it, or keep it as a standalone grid helper the
+  facade calls (decide when doing 4.3c).
 - [ ] **4.4 `problem.py`: one builder for both models**, computing relations and coefficients once per call;
   absorbs 3.3 (shared port tables and post-processing). Ignored parameters go: `idler_mode` is derived from the
   relations; `Z0`/`Ze` duplicates removed.
@@ -498,7 +503,7 @@ Items (each step keeps golden gains bit-identical on the holotype, the segmented
   `np.linalg.matrix_power` on stacks; keep the `ABCDArray`/`SMatrixArray` accessors (`.A`, `.S21`) as thin views.
 
 Estimate: `analysis.py` 1,836 lines → ~1,200 in the package (facade ~200); `src/` ~8,200 → ~6,500 together
-with 5.3. Order: 4.1, 4.2, 4.3b, 4.4, 4.5b with 5.3, 4.6/4.7, 4.8; 4.9 any time.
+with 5.3. Order: 4.1, 4.2, 4.3b with 4.3c, 4.4, 4.5b with 5.3, 4.6/4.7, 4.8; 4.9 any time.
 
 History of the earlier WP4 items:
 - [x] **4.3 Docstrings:**
@@ -874,7 +879,7 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
 WP0 is closed (PyPI, `0.1.0`, Python ≥3.10, any API break allowed). WP1, WP2 and WP3 except 3.3 are done (2.4 and
 2.37 deferred); comments and docstrings are trimmed. Nothing is pushed. Next, roughly in order:
 1. **WP4 (API, before the docs are written against it):** follow the design and order in WP4 (4.1 move solver
-   prep to `cmes/`, 4.2 one-segment shapes, 4.3b lazy linear data, 4.4 one problem builder, 4.5b result
+   prep to `cmes/`, 4.2 one-segment shapes, 4.3b/4.3c lazy linear data and flat facade, 4.4 one problem builder, 4.5b result
    dataclasses with 5.3 `ModeSet`, 4.6/4.7, 4.8 package split); golden gains bit-identical at every step.
 2. **WP5:** 5.1 user models, 5.3 `modes_rwa` (with 4.5b), `__mul__` of 5.5 (5.2 can wait for WP8).
 3. **WP6:** rest of 6.1 (version and Python are set), CI (add 3.13), pre-commit pins, mypy.
