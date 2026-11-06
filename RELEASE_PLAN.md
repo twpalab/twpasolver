@@ -159,6 +159,17 @@ Each fix gets a test.
     scaling only m makes it worse (0.55 dB at 4 GHz). Auto vs converged reference (34 cells, m=17, kc=1,
     13× slower): 0.028 dB. q can be read from the cell list; the c_m spectrum also shows it (non-zero only at
     multiples of q, threshold ~1e-6).
+  - **Deferred 2026-11-06 (keep `m_max='auto'` for now).** Branch `harmonic-filter` (bd46930, WIP): no
+    `m_max`/cap/q; keep a term when its residual accumulates < `mismatch_cycles` cycles over the device and its
+    process' Fourier component is >= `harmonic_tol` of its bound, both tested on canonically ordered participants
+    (partners kept bit for bit). Accurate (holotype 100 cycles: 0.04 dB from the uncapped reference; 102-cell
+    unfold = 34-cell without q) but ~4x slower than auto, and segmented copies stall (residual ~0.1) at 100
+    cycles (fine at 30 and 300). The cost is **passes, not RK steps**: per-pass time is unchanged and
+    `max_steps_per_cell=1` changes nothing, because the kernel only sees the residual `dk + G_m`; the extra
+    high-m terms are forward-backward (Bragg-type) couplings that slow the fixed-point iteration. Next attempt:
+    treat strong FB terms implicitly (as the edge basis does) or precondition Anderson with them. A residual
+    threshold relative to k_proc without the pi/D cap was 25x slower (residuals up to ~0.6 rad/cell do cost RK
+    steps).
   - **Rejected:** DFT weight rule w = |c_m|·min(L, 1/|Δk+G_m|) with one tolerance per process: 1.3–2 dB off at
     every tol (1e-1…3e-4), mostly unconverged at the edge. Exactly matched Kerr rows set W_ref (weight |c|·L) and
     drop pump-driven 4WM rows; 3WM chains are cut partially; a shared 3WM/4WM reference drops all 3WM (units).
