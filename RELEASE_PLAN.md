@@ -82,7 +82,7 @@ and merging code over adding options.
   in a later update, adapted to the new API: it used the uniform `bloch_fb_cmes_solve`, `bloch_mode_tables`,
   `process_weights` and the private `_prepare_cme_inputs`/`_build_port_tables`.
 - [x] **D4. `simulate_stopband_modes=False`** (the guard path superseded by the edge basis; it only buys about
-  2.5× speed). Keep it as a fast option, or remove it. **Decided 2026-11-06: keep it** (large speed-up).
+  2.5× speed). Keep it as a fast option, or remove it. **Decided 2026-11-06: keep it** (large speed-up). Reconfirmed 2026-11-07 for WP4.
 - [x] **D5. Holotype JSON.** Is the uncommitted edit of `docs/source/notebooks/imskit_v3_holotype.json` intended
   for the docs? Either way the tests get frozen fixtures (WP1.2).
   **Decided 2026-11-06:** yes, the edited JSON (unloaded cells L 55.2 pH, Lf 0.039 nH) is the docs model,
@@ -432,26 +432,75 @@ cold compile time measured and noted here; the line count noted here.
   devices; `_segment_supercell_abcds` and `_segment_bloch_params` merged into `update_base_data` and
   `_bloch_params_for_cell(cell, T=None)` (returns k, alpha, Zb, reflection_coeff only); `analysis.py` +55 -137
   (net -82; with the winding in `bloch.py` +83, src net +1). No data key removed (all are read somewhere).
-- [ ] **4.1 Split into a package `twpasolver/analysis/`**, with `__init__` re-exporting `TWPAnalysis`,
-  `GainModel` and `Analyzer`:
 
-  | module | content |
-  |---|---|
-  | `base.py` | `Analyzer`, `analysis_function`, `parameter_sweep` |
-  | `linear.py` | Bloch parameters, segment ABCD cache, stopbands, `k_star`, pump estimate |
-  | `phase_matching.py` | `phase_matching` |
-  | `cme_inputs.py` | initial states, carrier, port tables, relation coefficients (computed once per call, not three times as now) |
-  | `stopbands.py` | harmonic limits, edge basis, `_fb_stopbands` |
-  | `gain.py` | `GainModel`, drivers, result builder |
-  | `core.py` | thin `TWPAnalysis` |
+**Design (agreed with Pietro 2026-11-07; any API break allowed, D8).** Today `TWPAnalysis` (~1,400 of 1,836
+lines) mixes linear device data, a mutable mode-array registry, CME problem assembly, solver preparation (edge
+basis, stopband guard, harmonic limits, relation coefficients: ~600 lines that belong in `cmes/`) and result
+storage (`data` dict, auto-saving decorator), with two dualities everywhere: uniform vs segmented shapes and
+`simple` vs `bloch` pipelines with different result keys. Target: pure functions over frozen data, a uniform
+device is always the one-segment case, one problem builder and one result type for both models, a thin facade.
 
-  - Make `_prepare_cme_inputs` and `_build_port_tables` public: `quantum/background.py:148,212` calls them.
-- [ ] **4.2 Consistent result dict across models** (per D8):
-  - every model returns the same keys (`I_tuples_fwd/bwd` with zeros for forward-only models, `gain_db`,
-    `gain_db_11/12/22`, `converged`);
-  - one naming scheme (per-pass `gain_db_fwd/bwd` against top-level `gain_db/gain_db_12`; `mode_info` keys
-    `signal`/`pump` in `phase_matching` against `signal_mode`/`pump_mode` in `gain`);
-  - NaN-safe dB everywhere.
+```
+twpasolver/analysis/
+  linear.py         LinearData (frozen): per-segment k, alpha, Zb±, segment bounds, S21/S11, stopbands, k_star
+                    linear_data(twpa, freqs_hz) -> LinearData       # pure, cached on (twpa dump, grid)
+  problem.py        CMEProblem: mode frequencies (n_modes, n_f), per-segment gammas/Zb, relations,
+                    coefficients (n_rel, n_seg)                     # one builder for both models
+  ports.py          Ports(input, output=None, Z_ext=50) -> boundary tables
+  gain.py           solve(problem, inputs, model, ports, config) -> GainResult
+  phase_matching.py from LinearData + modes (segment-weighted, as in 2.9)
+  results.py        GainResult / PhaseMatchingResult dataclasses: same fields for every model, save/load, plot
+  core.py           TWPAnalysis facade (~200 lines)
+cmes/bloch_prep.py  edge basis, stopband guard, harmonic limits, relation coefficients (moved out of analysis)
+```
+
+```python
+an = TWPAnalysis(twpa, freqs=(0.05, 20, 1e-3), unit="GHz", ports=Ports(conn, Z_ext=50))
+an.linear.stopbands, an.linear.k                      # lazy, recomputed only when twpa/grid change
+modes = ModeSet.three_wave(pump_harmonics=3, conversions=2)   # or "basic_3wm"
+r = an.gain(signals, pump=8.0, modes=modes, model="bloch", Is0=1e-7, config=BlochSolverConfig())
+r.gain_db, r.s11_db, r.I_fwd, r.I_bwd, r.converged, r.diagnostics
+r.save("run.h5")
+pm = an.phase_matching(signals, pumps, modes=modes, process="PA")
+```
+
+Decisions (Pietro, 2026-11-07):
+- `simple` stays the textbook CMEs (k-based coupling); it is **not** rebuilt on the Bloch tables, so
+  `cmes/base.py` stays. WP8.4 is withdrawn; WP8.5 (`phase_matching` from shared tables) is unaffected.
+- The stopband guard (`simulate_stopband_modes=False`, D4) and `StubBaseCell(line=False)` stay.
+- Dependencies: only `sympy` is removed (5.3); `networkx`, `skrf` and `matplotlib` stay core; no extras.
+
+Items (each step keeps golden gains bit-identical on the holotype, the segmented holotype and the 3-cell device):
+- [ ] **4.1 Move solver preparation to `cmes/bloch_prep.py`:** `_edge_basis_entries`, `_harmonic_limits`,
+  `_stopband_guard_weights`, `prepare_relations_coefficients`, `_fb_stopbands`, `_apply_edge_basis_segmented`,
+  `_prepare_bloch_segmented`, `_log_edge_basis_skipped`. Mechanical, ~600 lines out of `analysis.py`.
+- [ ] **4.2 Uniform is the one-segment case everywhere:** drop the dual shapes in `_prepare_cme_inputs`, the
+  two branches of `_apply_phase_carrier`, `_drop_segment_axis` and `_is_segmented` branching; the segment axis
+  is internal and never in results.
+- [ ] **4.3b `linear.py` + lazy `an.linear`:** replaces `update_base_data`, the `data` dict, the
+  `analysis_function` decorator, `Analyzer` (one subclass) and the `Frequencies` base class
+  (`freqs` = array or arange tuple, plus `unit`). `parameter_sweep` becomes a loop that stacks results.
+- [ ] **4.4 `problem.py`: one builder for both models**, computing relations and coefficients once per call;
+  absorbs 3.3 (shared port tables and post-processing). Ignored parameters go: `idler_mode` is derived from the
+  relations; `Z0`/`Ze` duplicates removed.
+- [ ] **4.5b Result dataclasses** (`GainResult`, `PhaseMatchingResult`): every model has the same fields
+  (`I_fwd`, `I_bwd` zeros for `simple`, `gain_db`, `gain_db_11/12/22` NaN for `simple`, `converged`,
+  `diagnostics`), one naming scheme, NaN-safe dB, optional per-pass history replaced by a residual-per-pass
+  array; `save`/`load` through `file_utils`, `plot` through `plotting`.
+- [ ] **4.6 Units:** user unit at the facade, Hz everywhere inside; express the Hz spans (`1e9/4e9/8e9`) in the
+  user unit or document them.
+- [ ] **4.7 Residual metric:** document on the result that the forward–backward residual is relative and
+  dominated by nearly empty backward envelopes (floor 1e-3 to 1e-1 is common; observables stable); better,
+  weight it by mode power. One convergence test, the same as the reported metric.
+- [ ] **4.8 Split into the package** above, `__init__` re-exporting `TWPAnalysis`, `GainModel`, `Ports`,
+  `ModeSet` and the result types.
+- [ ] **4.9 Plain NumPy 2×2 algebra:** `matmul_2x2`/`matpow_2x2` duplicate `a @ b` and
+  `np.linalg.matrix_power` on stacks; keep the `ABCDArray`/`SMatrixArray` accessors (`.A`, `.S21`) as thin views.
+
+Estimate: `analysis.py` 1,836 lines → ~1,200 in the package (facade ~200); `src/` ~8,200 → ~6,500 together
+with 5.3. Order: 4.1, 4.2, 4.3b, 4.4, 4.5b with 5.3, 4.6/4.7, 4.8; 4.9 any time.
+
+History of the earlier WP4 items:
 - [x] **4.3 Docstrings:**
   - `Is0` is documented as 1e-6 but defaults to 1e-7 (private drivers 1e-6);
   - `fb_config` is described as "GENERAL model only" (also in the `FBSolverConfig` docstring);
@@ -459,11 +508,6 @@ cold compile time measured and noted here; the line count noted here.
   - the `_edge_basis_entries` Returns section needs a tidy (the `outside` edit);
   - `_bloch_mode_weights` claims segmented shapes it never receives;
   - the `__init__.py` package docstring lists MINIMAL_3WM/GENERAL and omits BLOCH.
-- [ ] **4.4 Remove ignored parameters or make them work:**
-  - `idler_mode` only goes into metadata;
-  - `update_rate` is ignored by `bloch`, and `m_max`/`edge_threshold`/`anderson_depth` by `general`;
-  - `Z0` and `Ze` are both `port_Z_ext`;
-  - `max_step` and `edge_substeps` are never exposed.
 - [x] **4.5 Dead code:**
   - `self._n_distinct_segments` (`~743`);
   - the unreachable `threshold is None` branches (`~1300`, `~1402`);
@@ -472,12 +516,6 @@ cold compile time measured and noted here; the line count noted here.
   - the unused `twpanalysis_instance` fixture;
   - `mathutils.compute_phase_matching` (unused, and it has the wrong 4WM Kerr factor);
   - `FrequencyLinspace` and `nb_complex3d` (unused types).
-- [ ] **4.6 Units:** user-unit frequencies, with Hz only internally. Hz constants (`1e9/4e9/8e9` spans) sit next
-  to user-unit logs; express the spans in user units, or document them.
-- [ ] **4.7 Residual metric:** document in the result that the forward–backward residual is relative and
-  dominated by nearly empty backward envelopes (floor 1e-3 to 1e-1 is common; observables stable). Better:
-  weight it by mode power. With `anderson_depth=0` the convergence test (`_convergence_step`) differs from the
-  reported metric; make them one.
 
 ## WP5: models, modes and logging
 
@@ -496,6 +534,14 @@ cold compile time measured and noted here; the line count noted here.
   - Replace the two parsers (`RWAAnalyzer._parse_expression` `~269`, `ModeArray._parse_expression_for_propagation`
     `~425`) and the two resolvers (sympy substitution, dict linear combination) with integer coefficient vectors.
     This drops the sympy dependency (current build: 18 modes, 1363 terms, 0.12 s).
+  - **Verified exact 2026-11-07:** the parser admits only sums/differences of names, so every mode is an integer
+    vector over the independent tones (any number: multiple pumps included) and sympy `==` on these linear forms
+    is integer-vector equality. Prototype (`find_terms`, ~50 lines, scratch `rwa_int.py`) gives term lists
+    identical to `RWAAnalyzer.find_rwa_terms` (order and coefficients) on 338 relation sets (all factory configs,
+    300 random sets with 1-3 independent modes, a dual-pump 4WM set): ~50,000 terms. Keep that comparison as the
+    regression test; reject a mode defined by two relations; cycles still raise.
+  - Becomes `ModeSet` (WP4): frequencies are the integer matrix applied to the independent tones, no mutation.
+    `plot_mode_relations` and `print_modes` stay as they are; `networkx` stays a core dependency.
   - Remove `n_sidebands` (`~1066`) and the unused `edge_colors`/`edge_styles`. Done 2026-11-06 (audit-fixes),
     together with the `general_no_reflections` alias of `GainModel`.
   - `get_dependent_modes` has no docstring and no caller.
@@ -613,6 +659,7 @@ scaling on left-handed bands), and built-in cells are opaque ABCD functions.
   nonlinearity by quadrature inside TL sections. Kernels unchanged (they take coefficient tables). Derivation of
   the shunt term to be checked on a small lumped left-handed ladder.
 - [ ] **8.4 `simple` from the same tables, forward modes only.** Drop the γ-based coupling in `cmes/base.py`.
+  **Withdrawn 2026-11-07:** `simple` stays the textbook CMEs.
   First measure the gap to the current form on the holotype (should be discreteness-level).
 - [ ] **8.5 `phase_matching` from the same tables** (pump-only SPM/XPM), removing `TWPA.chi`.
 - [ ] **8.6 Reference devices as tests** (right-handed ladder vs analytic, left-handed ladder, CRLH, KI stub, SNAIL 3WM;
@@ -826,9 +873,10 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
 
 WP0 is closed (PyPI, `0.1.0`, Python ≥3.10, any API break allowed). WP1, WP2 and WP3 except 3.3 are done (2.4 and
 2.37 deferred); comments and docstrings are trimmed. Nothing is pushed. Next, roughly in order:
-1. **WP4 (API, before the docs are written against it):** 4.2 one result dict, 4.4 ignored parameters, 4.1 split
-   `analysis.py` (about 1,860 lines), 4.6 units, 4.7 residual metric; 3.3 shared helpers fits here.
-2. **WP5:** 5.1 user models, 5.3 `modes_rwa`, 5.5 descriptor (5.2 can wait for WP8).
+1. **WP4 (API, before the docs are written against it):** follow the design and order in WP4 (4.1 move solver
+   prep to `cmes/`, 4.2 one-segment shapes, 4.3b lazy linear data, 4.4 one problem builder, 4.5b result
+   dataclasses with 5.3 `ModeSet`, 4.6/4.7, 4.8 package split); golden gains bit-identical at every step.
+2. **WP5:** 5.1 user models, 5.3 `modes_rwa` (with 4.5b), `__mul__` of 5.5 (5.2 can wait for WP8).
 3. **WP6:** rest of 6.1 (version and Python are set), CI (add 3.13), pre-commit pins, mypy.
 4. **WP7:** fix the Sphinx RST errors left in `gain`, `bloch_mode_tables`, `edge_basis_tables`, the `bloch_fb`
    module docstring and the `|…|` field descriptions; toctree, notebooks, README, changelog; tag and publish.
