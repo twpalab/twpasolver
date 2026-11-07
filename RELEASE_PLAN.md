@@ -717,22 +717,35 @@ History of the earlier WP4 items:
 
   - Done 2026-11-07 (audit-fixes): mypy reports no issues in 35 files (numba types out of annotations, `EPS` a
     float, `cast` in `validate_cell`, array-typed reductions and annotations).
-- [ ] **7.1 Toctree** (`docs/source/tutorials.rst`/`index.rst`) has only notebooks 01-04. 05/06 and `quantum` were moved
+- [x] **7.1 Toctree** (`docs/source/tutorials.rst`/`index.rst`) has only notebooks 01-04. 05/06 and `quantum` were moved
   out on 2026-11-06 (thesis material). New docs notebooks for segmented devices and the edge basis can be written
   later from them, without thesis dependencies.
-- [ ] **7.2 Notebooks** must use the post-refactor API, and must not depend on thesis files (`palette.py`,
+  - Done 2026-11-07: tutorials 01-06 in `tutorials.rst`; `physics.rst` added to the index.
+- [x] **7.2 Notebooks** must use the post-refactor API, and must not depend on thesis files (`palette.py`,
   `prl_aps.mplstyle`, `edge_basis_sweep.py` → keep only what the docs need).
-- [ ] **7.3 API reference:** `run_apidoc` in `conf.py` writes into the repo, so either ignore its output (1.5) or
+  - Done 2026-11-07: 03 and 04 ported to the new API (04's Floquet section moved to 05); new 05_other_twpas
+    (resonant phase matching with notch resonators in a 4WM Josephson line after Denney/Malnou 2026, with a
+    user-defined cell and the Bloch hook; Floquet TWPA from segments on the KI holotype: 13 dB fewer photons in
+    conversion modes at equal gain) and 06_segmented_devices (identical segments vs uniform, runtime vs
+    n_seg, random L/Lf variations, Lf taper). All execute without errors: 03 ~2 s, 04 ~23 s, 05 ~13 s,
+    06 ~1 min 50 s. 01/02 used no analysis API.
+- [x] **7.3 API reference:** `run_apidoc` in `conf.py` writes into the repo, so either ignore its output (1.5) or
   generate it at build time only. It currently lacks bloch*, rk45, warmup and quantum.
   - 2026-11-07: the `analysis/` package gives ~40 "duplicate object description" warnings (classes on
     both the package page, through the re-exports, and the module pages; dataclass fields both in
     `Attributes:` and as members). Document the package page only, or turn off member docs for dataclasses.
-- [ ] **7.4 Execution policy:** `nbsphinx_execute` is unset (auto), so stripped notebooks run at every build,
+  - Done 2026-11-07: apidoc output stays git-ignored and regenerated at build; `ignore-module-all` and
+    `napoleon_use_ivar` remove the duplicate-object warnings; the remaining RST errors (bloch_mode_tables,
+    edge_basis_tables, logm, bloch_fb title and literal block, `|...|` in field descriptions) fixed: the build
+    has no docstring warnings left. Notebook rendering needs pandoc (not installed on this machine; CI installs it).
+- [x] **7.4 Execution policy:** `nbsphinx_execute` is unset (auto), so stripped notebooks run at every build,
   which is slow given numba compile times. Either commit outputs for heavy notebooks and set `never` for them, or
   cache them. Pandoc is needed for the build and is not installed locally.
-- [ ] **7.5 README:** what twpasolver is, the models and when to use which, install, warmup, a minimal example,
+  - Done 2026-11-07: `nbsphinx_execute = "always"`, timeout 900 s.
+- [x] **7.5 README:** what twpasolver is, the models and when to use which, install, warmup, a minimal example,
   citation, license.
-- [ ] **7.6 Physics notes for users:** document that the forward-only `general_no_reflections` (future `simple`)
+  - Done 2026-11-07: README with features, models, install, warmup, a tested example, citing, license.
+- [x] **7.6 Physics notes for users:** document that the forward-only `general_no_reflections` (future `simple`)
   ignores `port`, `port_out` and `port_Z_ext`: its gain is output over input inside the line, with no connector
   losses or end reflections. Either say so or warn when connectors are set. the edge-basis derivation (`edge_basis_physics.tex`, cited by
   `cmes/bloch.py`) now lives in `notebooks/amplification/twpasolver_thesis/claude_outputs/`; adapt it for the docs.
@@ -740,7 +753,10 @@ History of the earlier WP4 items:
   - `m_max` per supercell (2.4);
   - the convergence/residual meaning (4.7);
   - the nonlinear-element hook (5.2).
-- [ ] **7.7 Changelog of breaking changes** (return keys, removed models and options).
+  - Done 2026-11-07: `docs/source/physics.rst` (models and when to use them, ports, edge basis and
+    `edge_threshold`, mixing terms and `m_max` per supercell, convergence, mode sets, custom cells); `simple`
+    now warns when connectors are set. The full edge-basis derivation (thesis tex) is not adapted.
+- [x] **7.7 Changelog of breaking changes** (return keys, removed models and options).
   - Breaking so far (audit-fixes): `phase_matching(thin=)` removed; `bloch_fb_cmes_solve` removed;
     `bloch_fb_segmented_cmes_solve` defaults are now those of `BlochSolverConfig` (m_max 2, anderson_depth 10);
     the `twpasolver` logger no longer propagates to the root logger; `interpolate` defaults to `polar=False`;
@@ -750,6 +766,7 @@ History of the earlier WP4 items:
   - `data["k"]` by winding (2.3): changes above resonator notches (was off by π per supercell), in
     left-handed bands (now k < 0) and on grids starting above a stopband (was off by 2π per supercell);
     `_bloch_params_for_cell` no longer returns `gamma_bloch`, `vg`, `N_tot` and drops `Z0_override`/`abcd_single`.
+  - Done 2026-11-07: `CHANGELOG.md` for 0.1.0 (new, breaking changes, fixes).
 - [ ] **7.8 Branches.**
   - Reconcile `origin/main` (4 commits, the simple_4wm PR: `create_basic(three_wave=)`, `basic_4wm` array,
     placeholder relations; already present in substance on `edge-basis`). `git merge-tree` shows conflicts in
@@ -1000,9 +1017,8 @@ freqs, unit, ports)`, `ModeSet`, `GainResult`/`PhaseMatchingResult`). Nothing is
 1. **WP5 is done** (2026-11-07). The open finding of 4.2 (segmented `simple` depends slightly on `thin`) is
    worth one measurement.
 2. **WP6 is done** (2026-11-07): metadata, CI, publish workflow, pre-commit, mypy clean.
-3. **WP7:** notebooks and `implementing_models.rst` on the new API (7.2); fix the Sphinx RST errors left in
-   `bloch_mode_tables`, `edge_basis_tables`, the `bloch_fb` module docstring and the `|…|` field descriptions, and
-   the duplicate-object warnings of the re-exported analysis classes and dataclass fields (7.3); toctree, README,
-   changelog; tag and publish.
+3. **WP7 is done except 7.8/7.9** (Pietro): merge the branches, configure the PyPI trusted publisher for
+   `publish.yml`, check the author/maintainer metadata in `pyproject.toml`, build the docs once with pandoc,
+   then tag `v0.1.0` (the tag publishes to PyPI and deploys the docs).
 4. **Regression reference:** the golden script used for WP4 lives in the job scratch only; put a reduced version
    (gains only) in `tests/` before further numerical work.

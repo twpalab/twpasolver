@@ -68,7 +68,7 @@ class BlochSolverConfig(BaseModel):
         default=0.2,
         gt=0,
         description="Phase-mismatch cutoff used to filter 3WM/4WM terms: a term is"
-        " kept when its residual mismatch |dk + G_m| after a reciprocal vector is"
+        " kept when its residual mismatch ``|dk + G_m|`` after a reciprocal vector is"
         " below kappa_cutoff times the largest wavenumber of its process, capped"
         " at the zone edge pi / d (the largest wavenumber the supercell-averaged"
         " envelopes resolve), so no kept term advances more than"
@@ -86,10 +86,10 @@ class BlochSolverConfig(BaseModel):
     )
     m_max: int | Literal["auto"] = Field(
         default=2,
-        description="Largest |m| of the reciprocal lattice"
+        description="Largest ``|m|`` of the reciprocal lattice"
         " vectors G_m = 2 pi m / d whose intracell Fourier components couple"
         " quasi-phase-matched terms. Only terms whose residual mismatch"
-        " |dk + G_m| passes kappa_cutoff are kept; 0 keeps cell averages only."
+        " ``|dk + G_m|`` passes kappa_cutoff are kept; 0 keeps cell averages only."
         " 'auto': 1 for every mode, raised to the Bragg"
         " order m (k d = m pi) of a mode that lies inside a stopband or whose"
         " splitting is below twice edge_threshold, at the frequencies (and in the"
@@ -111,7 +111,7 @@ class BlochSolverConfig(BaseModel):
         gt=0,
         lt=1,
         description="A mode is close to a stopband edge when its Bloch splitting"
-        " |sinh(gamma d)| is below this value. What happens to the modes close"
+        " ``|sinh(gamma d)|`` is below this value. What happens to the modes close"
         " to an edge or inside a stopband is set by simulate_stopband_modes."
         " Modes with an input are never changed. None: no stopband treatment"
         " (native Bloch basis everywhere, which fails at the edges).",

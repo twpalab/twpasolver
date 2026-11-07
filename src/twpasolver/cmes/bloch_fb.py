@@ -8,7 +8,7 @@ supercells of its own; a uniform device is the one-segment case of
 :func:`bloch_fb_segmented_cmes_solve`.
 
 Physics summary (package convention exp(+j omega t), forward ~ exp(-gamma x))
-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 * Inside a segment every mode is expanded exactly as
   ``psi_n = A+_n psi+_n + A-_n psi-_n`` on that segment's Bloch modes, with
   ``psi+_n(0) = (Zb+_n, 1)`` and ``psi-_n(0) = (-Zb-_n, 1)``. Both amplitudes
@@ -49,7 +49,7 @@ Junction conditions
 -------------------
 Every junction lies on a supercell boundary of both neighbours. Continuity of
 (V, I) and the projection with the reciprocity invariant give, for the junction
-between a left segment L and a right segment R,
+between a left segment L and a right segment R::
 
     A+_R = t  A+_L + rho_R A-_R,      t   = W_L / (Zb+_R + Zb-_L),
     A-_L = t' A-_R + rho_L A+_L,      t'  = W_R / (Zb+_R + Zb-_L),

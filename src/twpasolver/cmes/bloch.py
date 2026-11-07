@@ -252,20 +252,20 @@ def bloch_mode_tables(
 
     Returns
     -------
-    dict with
-        ``Zb_plus``, ``Zb_minus``, ``W`` : (F,) complex
-        ``phi_plus``, ``phi_minus`` : (F, n_nl) complex, periodic profiles of the
-            forward/backward mode current through each nonlinear inductor
-        ``L_nl`` : (n_nl,) nonlinear inductances
-        ``n_cells`` : unit cells per supercell
-        ``positions`` : (n_nl,) position of each nonlinear inductor inside the
-            supercell, in unit cells (the reference used for ``phi``)
-        ``gamma_exact`` : (F,) complex, per-unit-cell gamma from the eigenvalue
-        ``eig_residual`` : (F,) float, |I_M * lambda - 1| after propagating the
-            forward mode through one supercell (should be ~machine precision)
-        ``split`` : (F,) float, ``|sinh(gamma d)| = |lambda+ - lambda-| / 2``,
-            the normalisation-free splitting of the two Bloch modes (0 at every
-            band edge, the exceptional point of the supercell matrix)
+    dict
+        * ``Zb_plus``, ``Zb_minus``, ``W``: (F,) complex.
+        * ``phi_plus``, ``phi_minus``: (F, n_nl) complex, periodic profiles of the
+          forward/backward mode current through each nonlinear inductor.
+        * ``L_nl``: (n_nl,) nonlinear inductances.
+        * ``n_cells``: unit cells per supercell.
+        * ``positions``: (n_nl,) position of each nonlinear inductor inside the
+          supercell, in unit cells (the reference used for ``phi``).
+        * ``gamma_exact``: (F,) complex, per-unit-cell gamma from the eigenvalue.
+        * ``eig_residual``: (F,) float, ``|I_M * lambda - 1|`` after propagating the
+          forward mode through one supercell (should be ~machine precision).
+        * ``split``: (F,) float, ``|sinh(gamma d)| = |lambda+ - lambda-| / 2``,
+          the normalisation-free splitting of the two Bloch modes (0 at every
+          band edge, the exceptional point of the supercell matrix).
     """
     freqs_hz = np.asarray(freqs_hz, dtype=np.float64)
     gamma_ref = np.asarray(gamma_ref, dtype=np.complex128)
@@ -369,7 +369,7 @@ def logm_unimodular_2x2(Q: np.ndarray) -> np.ndarray:
 
     ``log Q = (phi / sinh phi) (Q - cosh(phi) I)`` with ``cosh phi = tr(Q)/2``,
     regular at the exceptional point ``Q - I`` nilpotent (``log Q = Q - I``).
-    Valid for Q close to the identity (|phi| well below pi).
+    Valid for Q close to the identity (``|phi|`` well below pi).
     """
     Q = np.asarray(Q, dtype=np.complex128)
     c = 0.5 * (Q[..., 0, 0] + Q[..., 1, 1])
@@ -618,18 +618,18 @@ def edge_basis_tables(
 
     Returns
     -------
-    dict with
-        ``Zb_plus``, ``Zb_minus`` : (F,) lossless Bloch impedances at ``f_ref``
-            (the fixed boundary vectors ``(Zb+, 1)``, ``(-Zb-, 1)``)
-        ``W`` : (F,) real, ``Zb+ + Zb-`` (positive)
-        ``phi_plus``, ``phi_minus`` : (F, n_nl) periodic profiles of the fixed
-            vectors propagated through the **lossy** cells at ``f``, with the
-            edge phase ``exp(+-j kappa_e pos)``
-        ``K``, ``K_lossless`` : (F, 2, 2) per-unit-cell linear generator of
-            ``(c+, c-)`` from the lossy / lossless supercell at ``f``
-        ``kappa_e`` : (F,) edge wavenumber per unit cell
-        ``ham_defect`` : (F,) ``||K^dag S + S K|| / ||K||`` of the lossless K,
-            ``S = diag(1, -1)``; zero to rounding (flux conservation)
+    dict
+        * ``Zb_plus``, ``Zb_minus``: (F,) lossless Bloch impedances at ``f_ref``
+          (the fixed boundary vectors ``(Zb+, 1)``, ``(-Zb-, 1)``).
+        * ``W``: (F,) real, ``Zb+ + Zb-`` (positive).
+        * ``phi_plus``, ``phi_minus``: (F, n_nl) periodic profiles of the fixed
+          vectors propagated through the **lossy** cells at ``f``, with the
+          edge phase ``exp(+-j kappa_e pos)``.
+        * ``K``, ``K_lossless``: (F, 2, 2) per-unit-cell linear generator of
+          ``(c+, c-)`` from the lossy / lossless supercell at ``f``.
+        * ``kappa_e``: (F,) edge wavenumber per unit cell.
+        * ``ham_defect``: (F,) ``||K^dag S + S K|| / ||K||`` of the lossless K,
+          ``S = diag(1, -1)``; zero to rounding (flux conservation).
     """
     f_hz = np.atleast_1d(np.asarray(f_hz, dtype=np.float64))
     f_ref_hz = np.atleast_1d(np.asarray(f_ref_hz, dtype=np.float64))

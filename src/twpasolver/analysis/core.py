@@ -246,6 +246,10 @@ class TWPAnalysis(BaseModel):
                 "backward inputs (initial_amplitudes_bwd). Use model='bloch' for "
                 "counter-propagating waves."
             )
+        if model == GainModel.SIMPLE and (
+            self.ports.input is not None or self.ports.output is not None
+        ):
+            log.warning("Model 'simple' ignores the connectors in ports; use 'bloch'.")
         signal_freqs = np.asarray(signal_freqs, dtype=float)
         pr = self.problem(
             modes, {**(tones or {}), pump_mode: pump, signal_mode: signal_freqs}
