@@ -441,6 +441,30 @@ def bloch_fb_segment_rhs_edge(
 
 
 @nb.njit(cache=True)
+def _self_linear_rows(rows, n_modes):
+    """True for rows linear in their target (one unconjugated occurrence among the inputs)."""
+    n_in = rows.shape[1] - 3
+    out = np.zeros(rows.shape[0], dtype=np.bool_)
+    for r in range(rows.shape[0]):
+        count = 0
+        lin = True
+        for q in range(n_in):
+            block = rows[r, 1 + q] // n_modes
+            if rows[r, 1 + q] - block * n_modes == rows[r, 0]:
+                count += 1
+                lin = lin and (block == 0 or block == 2)
+        out[r] = lin and count == 1
+    return out
+
+
+@nb.njit(cache=True)
+def _take_rows(rows, coeffs_f, coeffs_b, gs, mask):
+    """Rows (and their forward/backward coefficients and reciprocal vectors) where ``mask``."""
+    idx = np.flatnonzero(mask)
+    return rows[idx], coeffs_f[idx], coeffs_b[idx], gs[idx]
+
+
+@nb.njit(cache=True)
 def _edge_sources_segmented(
     xs,
     sub_off,
@@ -474,6 +498,13 @@ def _edge_sources_segmented(
     ``S+`` is the forward-solve derivative of ``c+`` and ``S- = -exp(j Phi_f(L))
     dB/ds`` the physical derivative of ``c-``; only rows targeting an edge mode
     are evaluated, with the segment's own rows, coefficients and phases.
+
+    Rows linear in the edge mode itself (cross-phase modulation and
+    pump-induced coupling of its two directions) are left out of ``S`` and
+    returned as the Jacobian ``J`` (n_flag, n_xs, 2, 2) of ``(S+, S-)`` with
+    respect to ``(c+, c-)``, for the BVP to treat implicitly: explicit, they
+    lag one pass and the iteration diverges once the grid resolves an
+    evanescent edge mode.
     """
     n_modes = A_fwd.shape[0]
     n_seg = offsets.shape[0] - 1
@@ -481,6 +512,7 @@ def _edge_sources_segmented(
     n_flag = flag_idx.shape[0]
     S_plus = np.zeros((n_flag, xs.shape[0]), dtype=np.complex128)
     S_minus = np.zeros((n_flag, xs.shape[0]), dtype=np.complex128)
+    J = np.zeros((n_flag, xs.shape[0], 2, 2), dtype=np.complex128)
     zeros_alpha = np.zeros(n_modes, dtype=np.float64)
     for s in range(n_seg):
         q = n_seg - 1 - s
@@ -512,6 +544,12 @@ def _edge_sources_segmented(
             g4[off4[s] : off4[s + 1]],
             is_flag,
         )
+        lin3 = _self_linear_rows(r3f, n_modes)
+        lin4 = _self_linear_rows(r4f, n_modes)
+        sr3, sc3f, sc3b, sg3 = _take_rows(r3f, c3ff, c3bf, g3f, ~lin3)
+        sr4, sc4f, sc4b, sg4 = _take_rows(r4f, c4ff, c4bf, g4f, ~lin4)
+        lr3, lc3f, lc3b, lg3 = _take_rows(r3f, c3ff, c3bf, g3f, lin3)
+        lr4, lc4f, lc4b, lg4 = _take_rows(r4f, c4ff, c4bf, g4f, lin4)
         seg_x = np.ascontiguousarray(x_int[a:b])
         seg_s = np.ascontiguousarray(s_int[ca:cb])
         Af = np.ascontiguousarray(A_fwd[:, a:b])
@@ -519,54 +557,52 @@ def _edge_sources_segmented(
         k_s = np.ascontiguousarray(kappas_seg[s])
         pf = np.ascontiguousarray(Phi_f_b[:, s])
         pb = np.ascontiguousarray(Phi_b_b[:, q])
+        # Fields with a unit c+ (col 0) or c- (col 1) on each edge mode, for
+        # the Jacobian columns of its self-linear rows.
+        Af_u = np.empty((n_flag, 2) + Af.shape, dtype=np.complex128)
+        Ab_u = np.empty((n_flag, 2) + Ab.shape, dtype=np.complex128)
+        for qq in range(n_flag):
+            f = flag_idx[qq]
+            for col in range(2):
+                Af_u[qq, col] = Af
+                Ab_u[qq, col] = Ab
+                Af_u[qq, col, f, :] = 1.0 - col
+                Ab_u[qq, col, f, :] = col / phase_end[f]
         for j in range(sub_off[s], sub_off[s + 1]):
             x = xs[j]
-            cur = _interp_rows(Af, seg_x, x)
-            out = bloch_fb_segment_rhs(
-                x,
-                cur,
-                zeros_alpha,
-                k_s,
-                r3f,
-                r4f,
-                c3ff,
-                c4ff,
-                g3f,
-                g4f,
-                seg_x[0],
-                pf,
-                seg_s,
-                Ab,
-                seg_s[0],
-                pb,
-                end,
-            )
             y = end - x
+            cur = _interp_rows(Af, seg_x, x)
             cur_b = _interp_rows(Ab, seg_s, y)
+            # fmt: off
+            out = bloch_fb_segment_rhs(
+                x, cur, zeros_alpha, k_s, sr3, sr4, sc3f, sc4f, sg3, sg4,
+                seg_x[0], pf, seg_s, Ab, seg_s[0], pb, end,
+            )
             out_b = bloch_fb_segment_rhs(
-                y,
-                cur_b,
-                zeros_alpha,
-                k_s,
-                r3f,
-                r4f,
-                c3bf,
-                c4bf,
-                g3f,
-                g4f,
-                seg_s[0],
-                pb,
-                seg_x,
-                Af,
-                seg_x[0],
-                pf,
-                end,
+                y, cur_b, zeros_alpha, k_s, sr3, sr4, sc3b, sc4b, sg3, sg4,
+                seg_s[0], pb, seg_x, Af, seg_x[0], pf, end,
             )
             for qq in range(n_flag):
                 f = flag_idx[qq]
                 S_plus[qq, j] = out[f]
                 S_minus[qq, j] = -phase_end[f] * out_b[f]
-    return S_plus, S_minus
+                for col in range(2):
+                    cu = cur.copy()
+                    cu_b = cur_b.copy()
+                    cu[f] = 1.0 - col
+                    cu_b[f] = col / phase_end[f]
+                    o = bloch_fb_segment_rhs(
+                        x, cu, zeros_alpha, k_s, lr3, lr4, lc3f, lc4f, lg3, lg4,
+                        seg_x[0], pf, seg_s, Ab_u[qq, col], seg_s[0], pb, end,
+                    )
+                    o_b = bloch_fb_segment_rhs(
+                        y, cu_b, zeros_alpha, k_s, lr3, lr4, lc3b, lc4b, lg3, lg4,
+                        seg_s[0], pb, seg_x, Af_u[qq, col], seg_x[0], pf, end,
+                    )
+                    J[qq, j, 0, col] = o[f]
+                    J[qq, j, 1, col] = -phase_end[f] * o_b[f]
+            # fmt: on
+    return S_plus, S_minus, J
 
 
 @nb.njit(cache=True)
@@ -576,6 +612,7 @@ def _edge_bvp_solve_segmented(
     sub_off,
     S_plus,
     S_minus,
+    J,
     cp_in,
     rho_in,
     cm_out,
@@ -587,10 +624,12 @@ def _edge_bvp_solve_segmented(
     Phi_j,
 ):
     """
-    Exact two-point solution of ``dc/dx = K_s c + S`` across segments and junctions.
+    Two-point solution of ``dc/dx = (K_s + J(x)) c + S`` across segments and junctions.
 
-    Inside segment ``s`` the step is ``exp(K_s h_s)`` with trapezoidal sources
-    (uniform sub-grid ``xs[sub_off[s]:sub_off[s+1]]``, both ends included). The
+    Inside segment ``s`` the step from ``xs[j]`` is ``exp((K_s + J_mid) h_s)``,
+    ``J_mid`` the mean of ``J`` (n, 2, 2) at its two ends, with trapezoidal
+    sources (uniform sub-grid ``xs[sub_off[s]:sub_off[s+1]]``, both ends
+    included); exact for ``J = 0``. The
     discrete Riccati sweep ``c-_j = R_j c+_j + Q_j`` is built from the output
     end, ``c-(L) = cm_out + rho_out c+(L)``, and carried across junction ``s``
     (between segments ``s-1`` and ``s``) by its scattering relations
@@ -601,16 +640,16 @@ def _edge_bvp_solve_segmented(
     """
     n_seg = K_seg.shape[0]
     n = xs.shape[0]
-    P = np.empty((n_seg, 2, 2), dtype=np.complex128)
+    P = np.empty((n, 2, 2), dtype=np.complex128)
     sp = np.zeros(n, dtype=np.complex128)
     sm = np.zeros(n, dtype=np.complex128)
     for s in range(n_seg):
         lo = sub_off[s]
         hi = sub_off[s + 1]
         h = xs[lo + 1] - xs[lo]
-        P[s] = _expm_2x2(K_seg[s] * h)
-        a, b, c, d = P[s, 0, 0], P[s, 0, 1], P[s, 1, 0], P[s, 1, 1]
         for j in range(lo, hi - 1):
+            P[j] = _expm_2x2((K_seg[s] + 0.5 * (J[j] + J[j + 1])) * h)
+            a, b, c, d = P[j, 0, 0], P[j, 0, 1], P[j, 1, 0], P[j, 1, 1]
             sp[j] = 0.5 * h * (a * S_plus[j] + b * S_minus[j] + S_plus[j + 1])
             sm[j] = 0.5 * h * (c * S_plus[j] + d * S_minus[j] + S_minus[j + 1])
     R = np.empty(n, dtype=np.complex128)
@@ -620,8 +659,8 @@ def _edge_bvp_solve_segmented(
     for s in range(n_seg - 1, -1, -1):
         lo = sub_off[s]
         hi = sub_off[s + 1]
-        a, b, c, d = P[s, 0, 0], P[s, 0, 1], P[s, 1, 0], P[s, 1, 1]
         for j in range(hi - 2, lo - 1, -1):
+            a, b, c, d = P[j, 0, 0], P[j, 0, 1], P[j, 1, 0], P[j, 1, 1]
             den = d - R[j + 1] * b
             R[j] = (R[j + 1] * a - c) / den
             Q[j] = (R[j + 1] * sp[j] + Q[j + 1] - sm[j]) / den
@@ -639,14 +678,13 @@ def _edge_bvp_solve_segmented(
     for s in range(n_seg):
         lo = sub_off[s]
         hi = sub_off[s + 1]
-        a, b = P[s, 0, 0], P[s, 0, 1]
         if s > 0:
             r_r = rhoR_j[s] / np.exp(2j * Phi_j[s])
             den = 1.0 - r_r * R[lo]
             c_plus[lo] = (t_j[s] * c_plus[lo - 1] + r_r * Q[lo]) / den
             c_minus[lo] = R[lo] * c_plus[lo] + Q[lo]
         for j in range(lo, hi - 1):
-            c_plus[j + 1] = a * c_plus[j] + b * c_minus[j] + sp[j]
+            c_plus[j + 1] = P[j, 0, 0] * c_plus[j] + P[j, 0, 1] * c_minus[j] + sp[j]
             c_minus[j + 1] = R[j + 1] * c_plus[j + 1] + Q[j + 1]
     return c_plus, c_minus
 
@@ -1101,7 +1139,7 @@ def _bloch_fb_solve_segmented(
             for qq in range(n_flag):
                 A_bwd_i[flag_idx[qq]] = own_bwd[flag_idx[qq]]
             if n_flag > 0:
-                S_p, S_m = _edge_sources_segmented(
+                S_p, S_m, J_e = _edge_sources_segmented(
                     xs_edge,
                     sub_off,
                     flag_idx,
@@ -1136,6 +1174,7 @@ def _bloch_fb_solve_segmented(
                         sub_off,
                         np.ascontiguousarray(S_p[qq]),
                         np.ascontiguousarray(S_m[qq]),
+                        np.ascontiguousarray(J_e[qq]),
                         t_in[f] * y0_array_fwd[i, f],
                         rho_in[f],
                         -t_out[f] * y0_array_bwd[i, f] * pe,

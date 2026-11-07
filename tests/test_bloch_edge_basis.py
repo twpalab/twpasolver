@@ -13,7 +13,7 @@ from twpasolver.cmes.bloch import (
     supercell_matrix,
 )
 from twpasolver.cmes.bloch_common import _expm_2x2
-from twpasolver.cmes.bloch_fb import _edge_bvp_solve_segmented
+from twpasolver.cmes.bloch_fb import _edge_bvp_solve_segmented, _self_linear_rows
 
 
 def test_logm_expm_2x2():
@@ -39,6 +39,7 @@ def _edge_bvp_one_segment(K, x, S_plus, S_minus, cp_in, rho_in, cm_out, rho_out)
         np.array([0, len(x)], dtype=np.int64),
         S_plus,
         S_minus,
+        np.zeros((len(x), 2, 2), complex),
         cp_in,
         rho_in,
         cm_out,
@@ -213,7 +214,10 @@ def test_segmented_bvp_matches_transfer_matrix():
     n_seg = len(lens)
     bc = (1.0 + 0j, 0.2 - 0.1j, 0.05j, -0.3 + 0.1j)  # cp_in, rho_in, cm_out, rho_out
     z = np.zeros(len(xs), complex)
-    cp, cm = _edge_bvp_solve_segmented(K, xs, sub_off, z, z, *bc, t, tp, rL, rR, Phi)
+    J0 = np.zeros((len(xs), 2, 2), complex)
+    cp, cm = _edge_bvp_solve_segmented(
+        K, xs, sub_off, z, z, J0, *bc, t, tp, rL, rR, Phi
+    )
 
     def junction_T(s):  # (c+_L, c-_L) -> (c+_R, c-_R)
         e2 = np.exp(2j * Phi[s])
@@ -237,7 +241,9 @@ def test_segmented_bvp_matches_transfer_matrix():
 
     # with sources: junction relations and end conditions hold exactly
     Sp, Sm = 1e-3 * np.exp(0.01j * xs), 2e-3 * np.exp(-0.02j * xs)
-    cp, cm = _edge_bvp_solve_segmented(K, xs, sub_off, Sp, Sm, *bc, t, tp, rL, rR, Phi)
+    cp, cm = _edge_bvp_solve_segmented(
+        K, xs, sub_off, Sp, Sm, J0, *bc, t, tp, rL, rR, Phi
+    )
     for s in range(1, n_seg):
         left, right = sub_off[s] - 1, sub_off[s]
         e2 = np.exp(2j * Phi[s])
@@ -245,6 +251,67 @@ def test_segmented_bvp_matches_transfer_matrix():
         assert abs(cm[left] - (tp[s] * cm[right] + rL[s] * e2 * cp[left])) < 1e-14
     assert abs(cp[0] - (bc[0] + bc[1] * cm[0])) < 1e-14
     assert abs(cm[-1] - (bc[2] + bc[3] * cp[-1])) < 1e-14
+
+
+def test_self_linear_rows():
+    """Rows linear in their target: one unconjugated occurrence, own or counter."""
+    n = 4  # field blocks: own, conj own, counter, conj counter
+    rows = np.array(
+        [
+            [3, 0, 3, 4, 0, 0],  # XPM of mode 0 on mode 3: linear
+            [3, 0, 11, 4, 0, 0],  # same through the counter field: linear
+            [3, 3, 3, 7, 0, 0],  # SPM: cubic
+            [3, 0, 0, 0, 0, 0],  # third harmonic: source
+            [3, 0, 7, 0, 0, 0],  # conjugate of the target: antilinear
+            [3, 0, 15, 4, 0, 0],  # conjugate counter: antilinear
+        ],
+        dtype=np.int64,
+    )
+    assert _self_linear_rows(rows, n).tolist() == [
+        True,
+        True,
+        False,
+        False,
+        False,
+        False,
+    ]
+
+
+def test_edge_bvp_constant_jacobian_shifts_K():
+    """An implicit term J constant along the line acts as K + J."""
+    K = np.array([[0.01j, 0.03], [0.03, -0.01j]])
+    Jc = np.array([[0.002j, 0.004 - 0.001j], [0.001j, -0.003j]])
+    xs = np.linspace(0.0, 300.0, 121)
+    off = np.array([0, len(xs)], dtype=np.int64)
+    Sp, Sm = 1e-3 * np.exp(0.01j * xs), 2e-3 * np.exp(-0.02j * xs)
+    bc = (1.0 + 0j, 0.2 - 0.1j, 0.05j, -0.3 + 0.1j)
+    one, zero = np.ones(1, complex), np.zeros(1, complex)
+    jac = np.broadcast_to(Jc, (len(xs), 2, 2)).copy()
+    implicit = _edge_bvp_solve_segmented(
+        K[None], xs, off, Sp, Sm, jac, *bc, one, one, zero, zero, np.zeros(2)
+    )
+    shifted = _edge_bvp_solve_segmented(
+        (K + Jc)[None], xs, off, Sp, Sm, 0 * jac, *bc, one, one, zero, zero, np.zeros(2)
+    )
+    assert np.allclose(implicit, shifted, rtol=0, atol=1e-14)
+
+
+def test_segmented_edge_basis_converges_below_default_threshold():
+    """Item 2.37: p4 in the stopband of one segment no longer stalls the iteration."""
+    from twpasolver.cmes.solver_config import BlochSolverConfig
+
+    r = _segmented_holotype((1.0, 1.02, 0.98, 1.0)).gain(
+        signal_freqs=np.array([6.0, 10.5]),
+        Is0=1e-9,
+        pump=16.0,
+        model="bloch",
+        modes=EXT2,
+        bloch_config=BlochSolverConfig(
+            passes=80, anderson_depth=15, convergence_threshold=1e-3
+        ),
+    )
+    assert r.diagnostics["edge_flag"][:, 2, r.mode("p4")].all()
+    assert r.converged.all()
 
 
 def test_segmented_bvp_trivial_junctions_equal_uniform():
@@ -265,6 +332,7 @@ def test_segmented_bvp_trivial_junctions_equal_uniform():
         xs,
         sub_off,
         *src(xs),
+        np.zeros((len(xs), 2, 2), complex),
         *bc,
         ones,
         ones,
