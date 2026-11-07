@@ -126,7 +126,11 @@ from twpasolver.cmes.bloch_common import (
     _stencil_value,
 )
 from twpasolver.cmes.rk45 import rk45_solve
-from twpasolver.cmes.solver_config import BlochSolverConfig, RKSolverConfig
+from twpasolver.cmes.solver_config import (
+    BLOCH_M_MAX_AUTO_BASE,
+    BlochSolverConfig,
+    RKSolverConfig,
+)
 from twpasolver.logger import log
 
 _DEFAULTS = BlochSolverConfig()
@@ -1297,7 +1301,7 @@ def bloch_fb_segmented_cmes_solve(
     Zb_minus: ComplexArray,
     passes: int = _DEFAULTS.passes,
     kappa_cutoff: float = _DEFAULTS.kappa_cutoff,
-    m_max: int | np.ndarray = int(_DEFAULTS.m_max),
+    m_max: int | np.ndarray = BLOCH_M_MAX_AUTO_BASE,
     convergence_threshold: float = _DEFAULTS.convergence_threshold,
     save_all_passes: bool = _DEFAULTS.save_all_passes,
     anderson_depth: int = _DEFAULTS.anderson_depth,
@@ -1355,9 +1359,10 @@ def bloch_fb_segmented_cmes_solve(
         Settings of the RK45 integrator (default ``RKSolverConfig()``).
     m_max : int or (n_freq, n_seg, n_modes) int array
         Harmonic limit, global or per frequency, segment and mode (a process
-        uses the largest limit among its modes).
+        uses the largest limit among its modes). Default: the base limit of
+        ``m_max='auto'``, which the analysis layer resolves per mode.
     passes, kappa_cutoff, convergence_threshold, save_all_passes, anderson_depth
-        As in :class:`BlochSolverConfig`, whose defaults (and ``m_max``) they take.
+        As in :class:`BlochSolverConfig`, whose defaults they take.
     diagnostics : dict, optional
         If given, filled with ``converged`` and ``residuals`` (n_freq,).
 

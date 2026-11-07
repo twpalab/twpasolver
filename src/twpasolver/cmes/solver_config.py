@@ -25,7 +25,7 @@ class RKSolverConfig(BaseModel):
         default=10, gt=0, description="Initial step, in unit cells."
     )
     max_steps_per_cell: float = Field(
-        default=10,
+        default=2,
         ge=0,
         description="Cap on the accepted steps per unit cell of the integration"
         " interval (device or segment length): ceil(length * max_steps_per_cell)"
@@ -62,10 +62,10 @@ class BlochSolverConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     passes: int = Field(
-        default=10, ge=1, description="Maximum number of forward-backward passes."
+        default=30, ge=1, description="Maximum number of forward-backward passes."
     )
     kappa_cutoff: float = Field(
-        default=0.2,
+        default=0.1,
         gt=0,
         description="Phase-mismatch cutoff used to filter 3WM/4WM terms: a term is"
         " kept when its residual mismatch ``|dk + G_m|`` after a reciprocal vector is"
@@ -85,7 +85,7 @@ class BlochSolverConfig(BaseModel):
         description="Whether to store intermediate results for every pass.",
     )
     m_max: int | Literal["auto"] = Field(
-        default=2,
+        default="auto",
         description="Largest ``|m|`` of the reciprocal lattice"
         " vectors G_m = 2 pi m / d whose intracell Fourier components couple"
         " quasi-phase-matched terms. Only terms whose residual mismatch"
@@ -98,7 +98,7 @@ class BlochSolverConfig(BaseModel):
         " component of a mode at the m-th edge is reached only through G_m.",
     )
     anderson_depth: int = Field(
-        default=10,
+        default=20,
         ge=1,
         description="Number of previous"
         " passes used by Anderson acceleration of the forward-backward"

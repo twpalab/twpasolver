@@ -225,7 +225,7 @@ class TWPAnalysis(BaseModel):
         tones: Optional[Mapping[str, float]] = None,
         initial_amplitudes_fwd: Optional[Union[List[float], np.ndarray]] = None,
         initial_amplitudes_bwd: Optional[Union[List[float], np.ndarray]] = None,
-        thin: int = 100,
+        thin: int = 50,
         bloch_config: Optional[BlochSolverConfig] = None,
         rk_config: Optional[RKSolverConfig] = None,
     ) -> GainResult:
