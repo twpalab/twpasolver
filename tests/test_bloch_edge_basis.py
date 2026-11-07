@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 from scipy.linalg import expm
-from test_bloch import HOLOTYPE, _holotype_analysis
+from test_bloch import EXT2, HOLOTYPE, _holotype_analysis
 
 from twpasolver.cmes.bloch import (
     edge_basis_tables,
@@ -102,7 +102,7 @@ def _gain(analysis, sig, threshold, passes=80, depth=15):
         Is0=1e-9,
         pump=16.0,
         model="bloch",
-        mode_array_config="ext2",
+        modes=EXT2,
         bloch_config=BlochSolverConfig(
             passes=passes, anderson_depth=depth, edge_threshold=threshold
         ),
@@ -115,20 +115,20 @@ def test_edge_basis_needed_at_the_edge():
     sig = [9.188, 9.196]
     native = _gain(analysis, sig, None)
     fixed = _gain(analysis, sig, 0.10)
-    bad = ~native["bloch"]["converged"] | ~np.isfinite(native["gain_db"])
+    bad = ~native.diagnostics["converged"] | ~np.isfinite(native.gain_db)
     assert bad.any()
-    assert fixed["bloch"]["converged"].all()
-    assert np.all(np.isfinite(fixed["gain_db"]))
+    assert fixed.diagnostics["converged"].all()
+    assert np.all(np.isfinite(fixed.gain_db))
 
 
 def test_edge_basis_matches_native_basis_in_passband():
     """p2s in the passband: fixed and native bases give the same gain."""
     analysis = _holotype_analysis()
-    native = _gain(analysis, [9.234], None)["gain_db"]
+    native = _gain(analysis, [9.234], None).gain_db
     fixed = _gain(analysis, [9.234], 0.09)
-    p2s = fixed["mode_info"]["mode_map"]["p2s"]
-    assert fixed["bloch"]["edge_flag"][0, p2s]
-    assert np.allclose(fixed["gain_db"], native, atol=0.02)
+    p2s = fixed.mode("p2s")
+    assert fixed.diagnostics["edge_flag"][0, p2s]
+    assert np.allclose(fixed.gain_db, native, atol=0.02)
 
 
 def test_edge_basis_independent_of_threshold():
@@ -137,10 +137,10 @@ def test_edge_basis_independent_of_threshold():
     sig = [9.196]
     g10 = _gain(analysis, sig, 0.10)
     g12 = _gain(analysis, sig, 0.12)
-    p2s = g10["mode_info"]["mode_map"]["p2s"]
-    assert g10["bloch"]["edge_flag"][0, p2s]
-    assert np.all(np.isfinite(g10["gain_db"]))
-    assert np.allclose(g10["gain_db"], g12["gain_db"], atol=0.02)
+    p2s = g10.mode("p2s")
+    assert g10.diagnostics["edge_flag"][0, p2s]
+    assert np.all(np.isfinite(g10.gain_db))
+    assert np.allclose(g10.gain_db, g12.gain_db, atol=0.02)
 
 
 def test_edge_basis_seamless_at_passband_switch():
@@ -148,10 +148,10 @@ def test_edge_basis_seamless_at_passband_switch():
     analysis = _holotype_analysis()
     sig = [9.2481]  # p2s splitting 0.099
     fixed = _gain(analysis, sig, 0.10)
-    p2s = fixed["mode_info"]["mode_map"]["p2s"]
-    assert fixed["bloch"]["edge_flag"][0, p2s]
+    p2s = fixed.mode("p2s")
+    assert fixed.diagnostics["edge_flag"][0, p2s]
     native = _gain(analysis, sig, None)
-    assert np.allclose(fixed["gain_db"], native["gain_db"], atol=0.01)
+    assert np.allclose(fixed.gain_db, native.gain_db, atol=0.01)
 
 
 def test_zone_centre_is_not_an_edge():
@@ -162,12 +162,12 @@ def test_zone_centre_is_not_an_edge():
         Is0=1e-9,
         pump=16.0,
         model="bloch",
-        mode_array_config="ext2",
+        modes=EXT2,
     )
-    i = res["mode_info"]["mode_map"]["i"]
-    assert res["bloch"]["split"][0, i] < 0.10
-    assert not res["bloch"].get("edge_flag", np.zeros((1, i + 1), bool))[0, i]
-    assert np.all(np.isfinite(res["gain_db"]))
+    i = res.mode("i")
+    assert res.diagnostics["split"][0, i] < 0.10
+    assert not res.diagnostics.get("edge_flag", np.zeros((1, i + 1), bool))[0, i]
+    assert np.all(np.isfinite(res.gain_db))
 
 
 # --------------------------------------------------------------------------- #
@@ -294,7 +294,6 @@ def _segmented_holotype(scale=(1.0, 1.0, 1.0, 1.0)):
     """The holotype cut into equal segments; ``scale`` multiplies L and Lf per segment."""
     from twpasolver import TWPAnalysis
     from twpasolver.models import TWPA
-    from twpasolver.modes_rwa import ModeArrayFactory
 
     base = TWPA.from_file(str(HOLOTYPE))
     for cell in base.cells:
@@ -306,17 +305,7 @@ def _segmented_holotype(scale=(1.0, 1.0, 1.0, 1.0)):
             cell.L, cell.Lf = cell.L * g, cell.Lf * g
         segs.append(seg)
     dev = TWPA(cells=segs, Z0_ref=base.Z0_ref, Ip0=base.Ip0)
-    analysis = TWPAnalysis(twpa=dev, freqs=(0.2, 80, 2e-3))
-    analysis.add_mode_array(
-        "ext2",
-        ModeArrayFactory.create_extended_3wm(
-            analysis.linear,
-            n_pump_harmonics=3,
-            n_frequency_conversion=2,
-            n_signal_harmonics=0,
-        ),
-    )
-    return analysis
+    return TWPAnalysis(twpa=dev, freqs=(0.2, 80, 2e-3))
 
 
 def test_segmented_copy_matches_uniform():
@@ -324,10 +313,10 @@ def test_segmented_copy_matches_uniform():
     sig = [9.188, 9.196, 9.234]
     uniform = _gain(_holotype_analysis(), sig, 0.10)
     seg = _gain(_segmented_holotype(), sig, 0.10)
-    p2s = seg["mode_info"]["mode_map"]["p2s"]
-    assert seg["bloch"]["edge_flag"][:, :, p2s].all()
-    assert seg["bloch"]["converged"].all()
-    assert np.allclose(seg["gain_db"], uniform["gain_db"], atol=2e-3)
+    p2s = seg.mode("p2s")
+    assert seg.diagnostics["edge_flag"][:, :, p2s].all()
+    assert seg.diagnostics["converged"].all()
+    assert np.allclose(seg.gain_db, uniform.gain_db, atol=2e-3)
 
 
 def test_segmented_mixed_flags():
@@ -337,34 +326,25 @@ def test_segmented_mixed_flags():
     g10 = _gain(analysis, sig, 0.10)
     g12 = _gain(analysis, sig, 0.12)
     native = _gain(analysis, sig, None)
-    p2s = g10["mode_info"]["mode_map"]["p2s"]
-    flags = g10["bloch"]["edge_flag"][:, :, p2s]
+    p2s = g10.mode("p2s")
+    flags = g10.diagnostics["edge_flag"][:, :, p2s]
     assert flags.any(axis=1).all() and not flags.all(axis=1).any()
-    assert g10["bloch"]["converged"].all() and g12["bloch"]["converged"].all()
-    assert not native["bloch"]["converged"].all()
-    assert np.allclose(g10["gain_db"], g12["gain_db"], atol=0.03)
+    assert g10.diagnostics["converged"].all() and g12.diagnostics["converged"].all()
+    assert not native.diagnostics["converged"].all()
+    assert np.allclose(g10.gain_db, g12.gain_db, atol=0.03)
 
 
 def test_per_mode_harmonic_limits_in_filter():
     """Row limit = largest limit among its modes; uniform limits = scalar m_max."""
-    from test_bloch import CELL_L, CELL_U
-
-    from twpasolver import TWPAnalysis
     from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
     from twpasolver.cmes.prep import prepare_relations_coefficients
-    from twpasolver.models import TWPA
-    from twpasolver.modes_rwa import ModeArrayFactory
+    from twpasolver.modes_rwa import ModeSet
 
-    analysis = TWPAnalysis(
-        twpa=TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10), freqs=(0.05, 20, 1e-2)
-    )
-    ma = ModeArrayFactory.create_extended_3wm(
-        analysis.linear, n_pump_harmonics=1, n_frequency_conversion=1
-    )
+    ma = ModeSet.extended_3wm(n_pump_harmonics=1, n_frequency_conversion=1)
     rel3, rel4, _, _ = prepare_relations_coefficients(
-        ma.get_rwa_terms(2), ma.get_rwa_terms(3), 1.0, 1.0
+        ma.rwa_terms(2), ma.rwa_terms(3), 1.0, 1.0
     )
-    n_modes = len(ma.modes)
+    n_modes = len(ma.labels)
     rng = np.random.default_rng(5)
     for _ in range(10):
         kappas = -rng.uniform(0.01, 0.3, n_modes)
@@ -402,7 +382,7 @@ def _gain_m(analysis, sig, m_max):
         Is0=1e-9,
         pump=16.0,
         model="bloch",
-        mode_array_config="ext2",
+        modes=EXT2,
         bloch_config=BlochSolverConfig(
             passes=80,
             anderson_depth=15,
@@ -418,9 +398,9 @@ def test_auto_m_max_raises_edge_modes_only(segmented):
     analysis = _segmented_holotype() if segmented else _holotype_analysis()
     sig = [6.0, 9.188]
     auto = _gain_m(analysis, sig, "auto")
-    lim = auto["bloch"]["m_lim"]
-    p2s = auto["mode_info"]["mode_map"]["p2s"]
-    s = auto["mode_info"]["mode_map"]["s"]
+    lim = auto.diagnostics["m_lim"]
+    p2s = auto.mode("p2s")
+    s = auto.mode("s")
     lim_p2s = lim[1, ..., p2s]
     assert np.all(lim_p2s >= 2)
     assert np.all(lim[..., s] == 1)
@@ -428,32 +408,23 @@ def test_auto_m_max_raises_edge_modes_only(segmented):
     plain = np.all(lim[0] == 1)
     fixed1 = _gain_m(analysis, sig, 1)
     if plain:
-        assert np.isclose(auto["gain_db"][0], fixed1["gain_db"][0], atol=1e-9)
+        assert np.isclose(auto.gain_db[0], fixed1.gain_db[0], atol=1e-9)
     # at the edge, auto agrees with the fixed run at the raised order
     fixed = _gain_m(analysis, sig, int(lim_p2s.max()))
-    assert abs(auto["gain_db"][1] - fixed["gain_db"][1]) < 0.05
+    assert abs(auto.gain_db[1] - fixed.gain_db[1]) < 0.05
 
 
 def test_mismatch_cutoff_capped_at_zone_edge():
     """Kept rows: |dk + G_m| < cutoff * min(k_proc, pi/d), never beyond pi/d; complete."""
-    from test_bloch import CELL_L, CELL_U
-
-    from twpasolver import TWPAnalysis
     from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
     from twpasolver.cmes.prep import prepare_relations_coefficients
-    from twpasolver.models import TWPA
-    from twpasolver.modes_rwa import ModeArrayFactory
+    from twpasolver.modes_rwa import ModeSet
 
-    analysis = TWPAnalysis(
-        twpa=TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10), freqs=(0.05, 20, 1e-2)
-    )
-    ma = ModeArrayFactory.create_extended_3wm(
-        analysis.linear, n_pump_harmonics=1, n_frequency_conversion=1
-    )
-    rels = prepare_relations_coefficients(
-        ma.get_rwa_terms(2), ma.get_rwa_terms(3), 1.0, 1.0
-    )[:2]
-    nm, d = len(ma.modes), 20
+    ma = ModeSet.extended_3wm(n_pump_harmonics=1, n_frequency_conversion=1)
+    rels = prepare_relations_coefficients(ma.rwa_terms(2), ma.rwa_terms(3), 1.0, 1.0)[
+        :2
+    ]
+    nm, d = len(ma.labels), 20
     g, k_edge = 2 * np.pi / d, np.pi / d
     rng = np.random.default_rng(2)
 
@@ -532,18 +503,18 @@ def test_stopband_modes_switched_off(segmented):
         Is0=1e-9,
         pump=16.0,
         model="bloch",
-        mode_array_config="ext2",
+        modes=EXT2,
         bloch_config=BlochSolverConfig(
             passes=80, anderson_depth=15, simulate_stopband_modes=False
         ),
     )
-    p2s = res["mode_info"]["mode_map"]["p2s"]
-    s = res["mode_info"]["mode_map"]["s"]
-    w = res["bloch"]["edge_weights"]
-    assert "edge_flag" not in res["bloch"]
+    p2s = res.mode("p2s")
+    s = res.mode("s")
+    w = res.diagnostics["edge_weights"]
+    assert "edge_flag" not in res.diagnostics
     assert np.all(w[0, ..., p2s] < 1.0) and np.all(w[..., s] == 1.0)
-    assert res["bloch"]["converged"].all()
-    assert np.all(np.isfinite(res["gain_db"]))
+    assert res.diagnostics["converged"].all()
+    assert np.all(np.isfinite(res.gain_db))
 
 
 def test_stopband_edges_match_per_frequency_search():
@@ -638,22 +609,11 @@ def test_folding_point_is_not_an_edge():
 def test_folding_point_modes_match_native_basis():
     """Unfolded holotype: modes at folding points give the native-basis gain exactly."""
     analysis = _unfolded_holotype()
-    from twpasolver.modes_rwa import ModeArrayFactory
-
-    analysis.add_mode_array(
-        "ext2",
-        ModeArrayFactory.create_extended_3wm(
-            analysis.linear,
-            n_pump_harmonics=3,
-            n_frequency_conversion=2,
-            n_signal_harmonics=0,
-        ),
-    )
     sig = [3.75, 13.75]  # p2s and pi at folding points (split < 0.1, no gap)
     fixed = _gain(analysis, sig, 0.10)
     native = _gain(analysis, sig, None)
-    assert not fixed["bloch"].get("edge_flag", np.zeros(1, bool)).any()
-    assert np.allclose(fixed["gain_db"], native["gain_db"], atol=1e-9)
+    assert not fixed.diagnostics.get("edge_flag", np.zeros(1, bool)).any()
+    assert np.allclose(fixed.gain_db, native.gain_db, atol=1e-9)
 
 
 def test_contra_qpm_survives_edge_basis():
@@ -663,31 +623,26 @@ def test_contra_qpm_survives_edge_basis():
     the default edge threshold must leave it in the native basis.
     """
     from twpasolver.cmes.solver_config import BlochSolverConfig
-    from twpasolver.modes_rwa import ModeArrayFactory
+    from twpasolver.modes_rwa import ModeSet
 
     D, fp, Ip, Is = 102, 18.3, 1e-4, 1e-9
     eta = 1 + 0.5 * np.cos(2 * np.pi * 5 * (np.arange(D) + 0.5) / D)
     analysis = _unfolded_holotype(nl_scale=eta, delta=0.0)
-    analysis.add_mode_array(
-        "c",
-        ModeArrayFactory.create_custom(
-            analysis.linear, ["p", "s", "ps"], [["ps", "p+s"]]
-        ),
-    )
+    modes = ModeSet(("p", "s", "ps"), [["ps", "p+s"]])
     out = {}
     for th in (0.10, None):
         r = analysis.gain(
             signal_freqs=np.array([4.5335]),
             pump=fp,
             model="bloch",
-            mode_array_config="c",
+            modes=modes,
             initial_amplitudes_fwd=[Ip, Is, 0],
             initial_amplitudes_bwd=[0, 0, 0],
             bloch_config=BlochSolverConfig(
                 passes=100, anderson_depth=20, m_max=6, edge_threshold=th
             ),
         )
-        c = r["mode_info"]["mode_map"]["ps"]
-        out[th] = np.abs(r["ports"]["b_in"][0, c] / Is) ** 2 * 4.5335 / (4.5335 + fp)
+        c = r.mode("ps")
+        out[th] = np.abs(r.b_in[0, c] / Is) ** 2 * 4.5335 / (4.5335 + fp)
     assert out[None] > 0.8
     assert abs(out[0.10] - out[None]) < 1e-9

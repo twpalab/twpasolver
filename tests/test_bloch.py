@@ -3,12 +3,14 @@
 import numpy as np
 import pytest
 
-from twpasolver.analysis import GainModel, TWPAnalysis, _drop_segment_axis
+from twpasolver.analysis import GainModel, Ports, TWPAnalysis
+from twpasolver.analysis.gain import _drop_segment_axis
 from twpasolver.cmes.bloch import bloch_mode_tables
 from twpasolver.cmes.bloch_fb import bloch_fb_segmented_cmes_solve
 from twpasolver.cmes.prep import prepare_bloch_segmented
 from twpasolver.cmes.solver_config import BlochSolverConfig
 from twpasolver.models import TWPA, LCLfBaseCell
+from twpasolver.modes_rwa import ModeSet
 
 CELL_U = {"name": "LCLfBaseCell", "N": 30, "L": 49.9e-12, "C": 24.2e-15, "Lf": 0.87e-9}
 CELL_L = {"name": "LCLfBaseCell", "N": 6, "L": 48.6e-12, "C": 8.2e-15, "Lf": 0.28e-9}
@@ -21,18 +23,9 @@ def _forward_gamma(twpa, freqs, n_cells):
     return np.where(gamma.imag < 0, -gamma, gamma)
 
 
-def _segment_bloch_tables(analysis, mode_array, cme_inputs):
-    """Bloch tables of a uniform device solved as one segment."""
-    segments, bounds = analysis._bloch_segments()
-    return prepare_bloch_segmented(
-        mode_array, cme_inputs, segments, bounds, analysis.unit_multiplier
-    )
-
-
-def _uniform_bloch_tables(analysis, mode_array, cme_inputs):
+def _uniform_bloch_tables(pr):
     """Bloch tables of a uniform device, without the segment axis."""
-    tables = _segment_bloch_tables(analysis, mode_array, cme_inputs)
-    return _drop_segment_axis(tables, cme_inputs["n_freq"])
+    return _drop_segment_axis(prepare_bloch_segmented(pr), pr.n_freq)
 
 
 def _solve_one_segment(x, y0_fwd, y0_bwd, ci, sg, **kwargs):
@@ -42,9 +35,9 @@ def _solve_one_segment(x, y0_fwd, y0_bwd, ci, sg, **kwargs):
         sg["seg_bounds"],
         y0_fwd,
         y0_bwd,
-        np.transpose(ci["gammas"], (0, 2, 1)),
-        ci["relations_3wm"],
-        ci["relations_4wm"],
+        np.transpose(ci.gammas, (0, 2, 1)),
+        ci.relations_3wm,
+        ci.relations_4wm,
         sg["base_3wm"],
         sg["base_4wm"],
         sg["prefac"],
@@ -87,7 +80,7 @@ def _mismatched_analysis(Ip0, Z_ext=70.0, N=100):
         Ip0=Ip0,
         Z0_ref=Z_ext,
     )
-    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-3), port_Z_ext=Z_ext)
+    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-3), ports=Ports(Z_ext=Z_ext))
     return analysis
 
 
@@ -96,13 +89,13 @@ def test_phase_matching_optimal_pump():
     pm = analysis.phase_matching(
         process="PA",
         mixing="3WM",
-        signal_arange=(2.0, 6.5, 0.25),
-        pump_arange=(14.25, 18.0, 0.25),
+        signal_freqs=(2.0, 6.5, 0.25),
+        pump_freqs=(14.25, 18.0, 0.25),
     )
-    best = pm["optimal_pump_freq"]
-    assert best in pm["pump_freqs"]
-    mean = np.nanmean(np.abs(pm["delta"]), axis=0)
-    assert best == pm["pump_freqs"][np.argmin(mean)]
+    best = pm.optimal_pump_freq
+    assert best in pm.pump_freqs
+    mean = np.nanmean(np.abs(pm.delta), axis=0)
+    assert best == pm.pump_freqs[np.argmin(mean)]
 
 
 def test_phase_matching_masks_stopband_pumps():
@@ -111,15 +104,15 @@ def test_phase_matching_masks_stopband_pumps():
     pm = analysis.phase_matching(
         process="PA",
         mixing="3WM",
-        signal_arange=(2.0, 6.5, 0.25),
-        pump_arange=(12.5, 16.0, 0.05),
+        signal_freqs=(2.0, 6.5, 0.25),
+        pump_freqs=(12.5, 16.0, 0.05),
     )
     sb = analysis.linear.stopbands
-    pumps = pm["pump_freqs"]
+    pumps = pm.pump_freqs
     in_gap = ((pumps[:, None] >= sb[:, 0]) & (pumps[:, None] <= sb[:, 1])).any(axis=1)
     assert in_gap.any() and (~in_gap).any()
-    assert np.isnan(pm["delta"][:, in_gap]).all()
-    assert not in_gap[pumps == pm["optimal_pump_freq"]].any()
+    assert np.isnan(pm.delta[:, in_gap]).all()
+    assert not in_gap[pumps == pm.optimal_pump_freq].any()
 
 
 def test_fb_linear_limit_matches_abcd():
@@ -137,8 +130,8 @@ def test_fb_linear_limit_matches_abcd():
     )
     s21 = 20 * np.log10(np.abs(analysis.linear.S21[idx]))
     s11 = 20 * np.log10(np.abs(analysis.linear.S11[idx]))
-    assert np.allclose(res["gain_db"], s21, atol=1e-3)
-    assert np.allclose(res["gain_db_11"], s11, atol=1e-2)
+    assert np.allclose(res.gain_db, s21, atol=1e-3)
+    assert np.allclose(res.gain_db_11, s11, atol=1e-2)
 
 
 def _connector(z0, length, L_series, C_shunt, R_series):
@@ -185,9 +178,7 @@ def test_fb_linear_limit_with_connectors(segmented):
     analysis = TWPAnalysis(
         twpa=device,
         freqs=(0.2, 40, 1e-3),
-        port_Z_ext=Ze,
-        port=conn_in,
-        port_out=conn_out,
+        ports=Ports(input=conn_in, output=conn_out, Z_ext=Ze),
     )
     idx = np.searchsorted(analysis.linear.freqs, [2.0, 5.0, 8.0, 11.0, 12.5])
     f = analysis.linear.freqs[idx]
@@ -212,16 +203,16 @@ def test_fb_linear_limit_with_connectors(segmented):
         thin=20,
     )
     fwd = analysis.gain(f, Is0=1e-6, **kw)
-    labels = list(fwd["mode_info"]["mode_map"])
+    labels = list(fwd.mode_labels)
     y_f, y_b = np.zeros(len(labels)), np.zeros(len(labels))
     y_f[labels.index("p")] = base.Ip0
     y_b[labels.index("s")] = 1e-6
     bwd = analysis.gain(f, initial_amplitudes_fwd=y_f, initial_amplitudes_bwd=y_b, **kw)
     sim = {
-        "21": fwd["gain_db"],
-        "11": fwd["gain_db_11"],
-        "12": bwd["gain_db_12"],
-        "22": bwd["gain_db_22"],
+        "21": fwd.gain_db,
+        "11": fwd.gain_db_11,
+        "12": bwd.gain_db_12,
+        "22": bwd.gain_db_22,
     }
     for k, tol in (("21", 1e-3), ("12", 1e-3), ("11", 1e-2), ("22", 1e-2)):
         assert np.allclose(sim[k], 20 * np.log10(np.abs(ref[k])), atol=tol), k
@@ -241,11 +232,10 @@ def test_fb_energy_balance_lossless(m_max):
     Z_ext, Ip0 = 70.0, 2.5e-4
     analysis = _mismatched_analysis(Ip0=Ip0, Z_ext=Z_ext)
     signal_freqs = np.array([1.75, 2.0, 12.5])
-    mode_array = analysis.get_mode_array("basic_3wm")
-    ci = analysis._prepare_cme_inputs(mode_array, signal_freqs, 14.3, "s", "p")
-    sg = _segment_bloch_tables(analysis, mode_array, ci)
-    bl = _drop_segment_axis(sg, ci["n_freq"])
-    labels = ci["mode_labels"]
+    ci = analysis.problem("basic_3wm", {"p": 14.3, "s": signal_freqs})
+    sg = prepare_bloch_segmented(ci)
+    bl = _drop_segment_axis(sg, ci.n_freq)
+    labels = ci.mode_labels
     p, s = labels.index("p"), labels.index("s")
     n = len(signal_freqs)
     y0 = np.zeros((n, len(labels)), dtype=complex)
@@ -288,12 +278,8 @@ def test_backward_inputs_rejected_without_reflections():
 
 def test_mode_array_without_relations():
     """A ModeArray with only independent modes builds (used to hang)."""
-    from twpasolver.modes_rwa import ModeArrayFactory
-
-    twpa = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10)
-    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-2))
-    mode_array = ModeArrayFactory.create_custom(analysis.linear, ["s", "c"], [])
-    assert mode_array.independent_modes == {"s", "c"}
+    modes = ModeSet(["s", "c"], [])
+    assert set(modes.independent) == {"s", "c"}
 
 
 def _process_signatures(rows, n_modes, n_in):
@@ -328,17 +314,12 @@ def test_mismatch_filter_keeps_partner_terms_together():
     """Partner terms of a process are always kept or dropped together."""
     from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
     from twpasolver.cmes.prep import prepare_relations_coefficients
-    from twpasolver.modes_rwa import ModeArrayFactory
 
-    twpa = TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10)
-    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-2))
-    mode_array = ModeArrayFactory.create_extended_3wm(
-        analysis.linear, n_pump_harmonics=1, n_frequency_conversion=1
-    )
+    modes = ModeSet.extended_3wm(n_pump_harmonics=1, n_frequency_conversion=1)
     rel3, rel4, _, _ = prepare_relations_coefficients(
-        mode_array.get_rwa_terms(2), mode_array.get_rwa_terms(3), 1.0, 1.0
+        modes.rwa_terms(2), modes.rwa_terms(3), 1.0, 1.0
     )
-    n_modes = len(mode_array.modes)
+    n_modes = len(modes.labels)
     rng = np.random.default_rng(1)
 
     def run(kappas, cutoff):
@@ -370,16 +351,15 @@ def test_bloch_rhs_conserves_energy_with_reciprocal_vectors():
     from twpasolver.cmes.bloch_fb import bloch_fb_segment_rhs
 
     analysis = _mismatched_analysis(Ip0=2.5e-4, Z_ext=50.0, N=100)
-    mode_array = analysis.get_mode_array("basic_3wm")
-    ci = analysis._prepare_cme_inputs(mode_array, np.array([12.5]), 14.3, "s", "p")
-    bl = _uniform_bloch_tables(analysis, mode_array, ci)
-    kappas = np.ascontiguousarray(ci["gammas"][0, :, 0].imag)
+    ci = analysis.problem("basic_3wm", {"p": 14.3, "s": np.array([12.5])})
+    bl = _uniform_bloch_tables(ci)
+    kappas = np.ascontiguousarray(ci.gammas[0, :, 0].imag)
     W = bl["W"][0].real
     L = float(analysis.twpa.N_tot)
     rows3, rows4 = _filter_wm_terms_bloch(
         kappas,
-        ci["relations_3wm"],
-        ci["relations_4wm"],
+        ci.relations_3wm,
+        ci.relations_4wm,
         0.2,
         bl["n_cells"],
         np.full(len(kappas), 5),
@@ -506,13 +486,12 @@ def test_anderson_converges_near_bragg_coupling():
         Ip0=Ip0,
         Z0_ref=Ze,
     )
-    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-3), port_Z_ext=Ze)
+    analysis = TWPAnalysis(twpa=twpa, freqs=(0.05, 20, 1e-3), ports=Ports(Z_ext=Ze))
     sig = np.array([7.46, 7.48, 7.50, 7.52])
-    mode_array = analysis.get_mode_array("basic_3wm")
-    ci = analysis._prepare_cme_inputs(mode_array, sig, pump, "s", "p")
-    sg = _segment_bloch_tables(analysis, mode_array, ci)
+    ci = analysis.problem("basic_3wm", {"p": pump, "s": sig})
+    sg = prepare_bloch_segmented(ci)
     sg["base_4wm"] = 0 * sg["base_4wm"]
-    labels = ci["mode_labels"]
+    labels = ci.mode_labels
     ip, is_ = labels.index("p"), labels.index("s")
     x = np.linspace(0, twpa.N_tot, 400)
     y0f = np.zeros((len(sig), 3), complex)
@@ -559,8 +538,8 @@ def test_result_does_not_depend_on_anderson_depth():
         ),
         **kw,
     )
-    assert np.allclose(acc["gain_db"], shallow["gain_db"], atol=1e-3)
-    assert np.allclose(acc["gain_db_11"], shallow["gain_db_11"], atol=1e-2)
+    assert np.allclose(acc.gain_db, shallow.gain_db, atol=1e-3)
+    assert np.allclose(acc.gain_db_11, shallow.gain_db_11, atol=1e-2)
 
 
 def test_nan_iterate_stops_unconverged():
@@ -576,8 +555,8 @@ def test_nan_iterate_stops_unconverged():
         bloch_config=BlochSolverConfig(passes=30, save_all_passes=True),
         thin=20,
     )
-    assert not res["bloch"]["converged"].any()
-    assert np.isinf(res["bloch"]["residuals"]).all()
+    assert not res.diagnostics["converged"].any()
+    assert np.isinf(res.diagnostics["residuals"]).all()
 
 
 @pytest.mark.parametrize("model", ["simple", "bloch"])
@@ -589,7 +568,7 @@ def test_rk_config_step_cap_is_live_and_reported(caplog, model):
     analysis = _mismatched_analysis(Ip0=1.5e-4)
     kw = dict(pump=14.3, Is0=1e-8, model=model, thin=20)
     ok = analysis.gain(np.array([6.0]), **kw)
-    assert np.isfinite(ok["gain_db"]).all()
+    assert np.isfinite(ok.gain_db).all()
     log.addHandler(caplog.handler)
     try:
         capped = analysis.gain(
@@ -600,7 +579,7 @@ def test_rk_config_step_cap_is_live_and_reported(caplog, model):
         )
     finally:
         log.removeHandler(caplog.handler)
-    assert np.isnan(capped["gain_db"]).all()
+    assert np.isnan(capped.gain_db).all()
     expected = "step cap" if model == "simple" else "did not converge"
     assert any(expected in r.getMessage() for r in caplog.records)
 
@@ -673,16 +652,15 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
     from twpasolver.cmes.bloch_fb import bloch_fb_segment_rhs
 
     analysis = _mismatched_analysis(Ip0=2.5e-4, Z_ext=50.0, N=100)
-    mode_array = analysis.get_mode_array("basic_3wm")
-    ci = analysis._prepare_cme_inputs(mode_array, np.array([12.5]), 14.3, "s", "p")
-    bl = _uniform_bloch_tables(analysis, mode_array, ci)
-    kappas = np.ascontiguousarray(ci["gammas"][0, :, 0].imag)
+    ci = analysis.problem("basic_3wm", {"p": 14.3, "s": np.array([12.5])})
+    bl = _uniform_bloch_tables(ci)
+    kappas = np.ascontiguousarray(ci.gammas[0, :, 0].imag)
     W = bl["W"][0].real
     L = float(analysis.twpa.N_tot)
     rows3, rows4 = _filter_wm_terms_bloch(
         kappas,
-        ci["relations_3wm"],
-        ci["relations_4wm"],
+        ci.relations_3wm,
+        ci.relations_4wm,
         0.2,
         bl["n_cells"],
         np.full(len(kappas), 5),
@@ -690,8 +668,8 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
     rng = np.random.default_rng(11)
     mode_w = rng.uniform(0.1, 1.0, size=(1, 3))
     pw = {
-        "3wm": process_weights(ci["relations_3wm"], mode_w)[0][rows3[:, 3]],
-        "4wm": process_weights(ci["relations_4wm"], mode_w)[0][rows4[:, 4]],
+        "3wm": process_weights(ci.relations_3wm, mode_w)[0][rows3[:, 3]],
+        "4wm": process_weights(ci.relations_4wm, mode_w)[0][rows4[:, 4]],
     }
     if perturb_one_row:
         pw["3wm"] = pw["3wm"].copy()
@@ -751,22 +729,18 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
         assert worst < 1e-9
 
 
-def _holotype_analysis():
-    from twpasolver.modes_rwa import ModeArrayFactory
+EXT1 = ModeSet.extended_3wm(
+    n_pump_harmonics=3, n_frequency_conversion=1, n_signal_harmonics=0
+)
+EXT2 = ModeSet.extended_3wm(
+    n_pump_harmonics=3, n_frequency_conversion=2, n_signal_harmonics=0
+)
 
+
+def _holotype_analysis():
     analysis = TWPAnalysis(twpa=str(HOLOTYPE), freqs=(0.2, 80, 2e-3))
     for cell in analysis.twpa.cells:
         cell.delta = 2e-4
-    for nfc in (1, 2):
-        analysis.add_mode_array(
-            f"ext{nfc}",
-            ModeArrayFactory.create_extended_3wm(
-                analysis.linear,
-                n_pump_harmonics=3,
-                n_frequency_conversion=nfc,
-                n_signal_harmonics=0,
-            ),
-        )
     return analysis
 
 

@@ -385,7 +385,7 @@ Order: 3.1 → 3.2 → 3.3, then 3.4/3.5 per the decisions.
   - `_apply_edge_basis` (`~1273`) → `_apply_edge_basis_segmented` (`~1376`).
   - Stop computing the unused `coeffs_3wm`/`coeffs_4wm` on the forward–backward path (rebuilt at `~1356-1360`
     and never used by the kernel).
-- [ ] **3.3 One boundary-table helper, one forward–backward post-processing helper** (per-pass split, port gains,
+- [x] **3.3 One boundary-table helper, one forward–backward post-processing helper** (per-pass split, port gains,
   prompt reflections, `mode_info`), shared by every forward–backward driver. Folded into WP4.4 (2026-11-07).
 - [x] **3.4 Guard systems** (per D2/D3/D4). Mostly done 2026-11-06: the `bloch_no_reflections` guard stack is
   removed and `process_weights` is the single N-d version. With `quantum/` gone (D3), the only guard left is the
@@ -521,7 +521,7 @@ Items (each step keeps golden gains bit-identical on the holotype, the segmented
     `test_linear_follows_grid_and_unit`, `test_twpanalysis_json_round_trip_keeps_grid`. 133 tests, mypy 9.
   - **For 7.2:** docs notebooks and `implementing_models.rst` still use `f_arange`, `update_base_data`,
     `an.data[...]`, `parameter_sweep`, `save_data` and argument-less `plot_*`.
-- [ ] **4.4 `problem.py`: one builder for both models**, computing relations and coefficients once per call;
+- [x] **4.4 `problem.py`: one builder for both models**, computing relations and coefficients once per call;
   absorbs 3.3 (shared port tables and post-processing). Ignored parameters go: `idler_mode` is derived from the
   relations; `Z0`/`Ze` duplicates removed.
   - **Ports, decided with Pietro 2026-11-07 (separate port fields):** the outgoing currents were split
@@ -536,17 +536,36 @@ Items (each step keeps golden gains bit-identical on the holotype, the segmented
     `b_out = I(L)`, `a_out = 0`, `b_in = NaN`. Results gain a `ports` field. Golden: gains within 1e-14 dB,
     profile interiors bit-identical, last points now internal currents (reference re-recorded). This also
     fixes `plot_mode_currents(backward=True)`, which drew the mirrored profile.
-- [ ] **4.5b Result dataclasses** (`GainResult`, `PhaseMatchingResult`): every model has the same fields
+- [x] **4.5b Result dataclasses** (`GainResult`, `PhaseMatchingResult`): every model has the same fields
   (`I_fwd`, `I_bwd` zeros for `simple`, `gain_db`, `gain_db_11/12/22` NaN for `simple`, `converged`,
   `diagnostics`, the optional per-pass history of `save_all_passes`), one naming scheme, NaN-safe dB;
   `save`/`load` through `file_utils`, `plot` through `plotting`.
-- [ ] **4.6 Units:** user unit at the facade, Hz everywhere inside; express the Hz spans (`1e9/4e9/8e9`) in the
+- [x] **4.6 Units:** user unit at the facade, Hz everywhere inside; express the Hz spans (`1e9/4e9/8e9`) in the
   user unit or document them.
-- [ ] **4.7 Residual metric:** document on the result that the forward–backward residual is relative and
+- [x] **4.7 Residual metric:** document on the result that the forward–backward residual is relative and
   dominated by nearly empty backward envelopes (floor 1e-3 to 1e-1 is common; observables stable); better,
   weight it by mode power. One convergence test, the same as the reported metric.
-- [ ] **4.8 Split into the package** above, `__init__` re-exporting `TWPAnalysis`, `GainModel`, `Ports`,
+- [x] **4.8 Split into the package** above, `__init__` re-exporting `TWPAnalysis`, `GainModel`, `Ports`,
   `ModeSet` and the result types.
+  - **Done 2026-11-07 (audit-fixes), 4.4 + 4.5b + 4.6 + 4.7 + 4.8 together with 5.3:** `twpasolver/analysis/` is
+    `linear.py` (`LinearData`, `linear_data`, `ParameterInterpolator`, `segments_of`), `problem.py`
+    (`build_problem` -> `CMEProblem`, defined in `cmes/prep.py`: mode frequencies signed in the analysis unit and
+    `|f|` in Hz, per-segment gammas/reflections/Zb, relations and coefficients computed once), `ports.py`
+    (`Ports(input, output, Z_ext)`, vectorised boundary tables), `gain.py` (`GainModel`, `solve_simple`,
+    `solve_bloch`, `port_gains`), `phase_matching.py`, `results.py` (`GainResult`, `PhaseMatchingResult`:
+    same fields for both models, `save`/`load` to HDF5, `plot`, `GainResult.bandwidth`, `plot_currents`,
+    `mode(label)`) and `core.py` (`TWPAnalysis(twpa, freqs, unit, ports)` with `linear`, `problem(modes,
+    tones)`, `gain(..., modes, tones)`, `phase_matching(signal_freqs, pump_freqs, ...)`, `plot_response`).
+    Removed: the mode-array registry (`get_mode_array`, `add_mode_array`, `mode_array_config`), `idler_mode` of
+    `gain` (metadata only; kept in `phase_matching`, where it picks the idler), `port`/`port_out`/
+    `port_Z_ext`, the `_prepare_cme_inputs` dict. `prep.py` functions take the `CMEProblem`, so the solvers get
+    Hz from one place (4.6; the remaining Hz constants are internal edge-search windows). 4.7: the residual is
+    already one metric for the test and the report (per-mode change over the largest forward plus backward
+    envelope; the `anderson_depth=0` route that differed went in 2.28); documented on `GainResult.diagnostics`.
+    Extra independent tones (a second pump) go through `tones=` instead of mutating a mode array; a missing
+    tone raises instead of counting as 0 Hz. Golden (scratch `golden.py`, self-contained): all 42 arrays
+    bit-identical (gains, currents, phase mismatch). Tests migrated (`MIGRATION` notes in the job scratch);
+    174 tests, mypy 9.
 - [ ] **4.9 Plain NumPy 2×2 algebra:** `matmul_2x2`/`matpow_2x2` duplicate `a @ b` and
   `np.linalg.matrix_power` on stacks; keep the `ABCDArray`/`SMatrixArray` accessors (`.A`, `.S21`) as thin views.
 
@@ -583,7 +602,7 @@ History of the earlier WP4 items:
 - [ ] **5.2 First-class nonlinear-element hook.** The Bloch code accepts `bloch_nl_elements()` on cells; document
   it, and consider an `nl_scale` field on `LCLfBaseCell`/`StubBaseCell`. That would remove the subclass in
   `contra_qpm` and allow nonlinearity-only gratings in JSON models.
-- [ ] **5.3 `modes_rwa`:**
+- [x] **5.3 `modes_rwa`:**
   - Replace the two parsers (`RWAAnalyzer._parse_expression` `~269`, `ModeArray._parse_expression_for_propagation`
     `~425`) and the two resolvers (sympy substitution, dict linear combination) with integer coefficient vectors.
     This drops the sympy dependency (current build: 18 modes, 1363 terms, 0.12 s).
@@ -598,6 +617,12 @@ History of the earlier WP4 items:
   - Remove `n_sidebands` (`~1066`) and the unused `edge_colors`/`edge_styles`. Done 2026-11-06 (audit-fixes),
     together with the `general_no_reflections` alias of `GainModel`.
   - `get_dependent_modes` has no docstring and no caller.
+  - **Done 2026-11-07 (audit-fixes):** `modes_rwa.py` is `ModeSet` (frozen: labels, relations, `independent`,
+    integer `matrix`; `basic`, `extended_3wm`, `frequencies(tones)`, `rwa_terms(power)` cached, `dependents`
+    (replaces `get_dependent_modes`), `expression`, `__str__`, `plot_relations` without `plt.show()`).
+    `RWAAnalyzer`, `Mode`, `ModeArray`, `ModeArrayFactory` and sympy are gone (dependency dropped, lock
+    refreshed). Regression: `tests/data/rwa_terms.json` freezes the sympy term lists of 39 mode sets (8,750 terms,
+    all factory configs and a dual-pump set); `ModeSet` matches all of them exactly (`tests/test_modes.py`).
   - No `plt.show()` in library code (`~914`); deduplicate `plot_mode_relations`/`print_symbolic_expressions`.
 - [x] **5.4 Logging:** `logger.py:39-40` sets INFO and adds a handler at import, so messages print twice under
   pytest. A library should add only a `NullHandler`; keep a helper (`twpasolver.logger.enable(level)`) for users.

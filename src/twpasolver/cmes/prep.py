@@ -1,5 +1,6 @@
 """CME input preparation: relation coefficients, per-segment Bloch tables, stopband treatment."""
 
+from dataclasses import dataclass
 from typing import Any, Optional, Tuple
 
 import numpy as np
@@ -17,7 +18,54 @@ from twpasolver.cmes.bloch import (
 )
 from twpasolver.cmes.solver_config import BlochSolverConfig
 from twpasolver.logger import log
-from twpasolver.modes_rwa import ModeArray
+
+
+@dataclass
+class CMEProblem:
+    """
+    Inputs of the CME solvers for one set of mode frequencies; a uniform device
+    is one segment.
+
+    Attributes:
+        mode_labels: Mode names, in the order of the amplitudes.
+        freqs: Signed mode frequencies in the analysis unit, (n_freq, n_modes).
+        freqs_hz: ``|freqs|`` in Hz.
+        gammas: Kernel propagation constants ``-alpha - j k`` per unit cell,
+            (n_freq, n_modes, n_seg).
+        reflections, Zb: Reflection coefficient against ``twpa.Z0_ref`` and Bloch
+            impedance, (n_freq, n_modes, n_seg).
+        relations_3wm, relations_4wm: Mode-index relations, (n_rel, 3) / (n_rel, 4).
+        unit_3wm, unit_4wm: Relation coefficients for unit epsilon / xi, (n_rel,).
+        coeffs_3wm, coeffs_4wm: Coefficients of every segment, (n_rel, n_seg).
+        segments: Uniform segments (``TWPA``), each a whole number of supercells.
+        seg_bounds, seg_midpoints: Segment boundaries and midpoints (unit cells).
+    """
+
+    mode_labels: list[str]
+    freqs: np.ndarray
+    freqs_hz: np.ndarray
+    gammas: np.ndarray
+    reflections: np.ndarray
+    Zb: np.ndarray
+    relations_3wm: np.ndarray
+    relations_4wm: np.ndarray
+    unit_3wm: np.ndarray
+    unit_4wm: np.ndarray
+    coeffs_3wm: np.ndarray
+    coeffs_4wm: np.ndarray
+    segments: list
+    seg_bounds: np.ndarray
+    seg_midpoints: np.ndarray
+
+    @property
+    def n_freq(self) -> int:
+        """Number of frequency points."""
+        return self.freqs.shape[0]
+
+    @property
+    def n_modes(self) -> int:
+        """Number of modes."""
+        return len(self.mode_labels)
 
 
 def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
@@ -28,7 +76,7 @@ def prepare_relations_coefficients(terms_3wm, terms_4wm, epsilon, xi):
     ----------
     terms_3wm, terms_4wm : list
         RWA terms ``(mode, (indices...), coefficient)`` from
-        ``ModeArray.get_rwa_terms``.
+        ``ModeSet.rwa_terms``.
     epsilon, xi : float
         Nonlinearities; the coefficients are scaled by ``epsilon / 4`` and
         ``xi / 4``. An empty term list gives a single dummy zero relation.
@@ -283,11 +331,10 @@ def _log_edge_basis_skipped(labels, near_injected, entries, e_edge):
 
 def fb_stopbands(
     bloch: dict[str, Any],
-    cme_inputs: dict[str, Any],
+    problem: CMEProblem,
     gammas: np.ndarray,
     injected: np.ndarray,
     bloch_config: BlochSolverConfig,
-    segments: list,
 ) -> dict[str, Any]:
     """
     Stopband treatment and harmonic limits of the Bloch forward-backward models.
@@ -305,7 +352,7 @@ def fb_stopbands(
     ``pw4`` (None when every process has weight 1).
     """
     e = bloch_config.edge_threshold
-    labels = cme_inputs["mode_labels"]
+    labels = problem.mode_labels
     kd_pi = (
         np.abs(np.transpose(gammas.imag, (0, 2, 1)))
         * np.asarray(bloch["n_cells"])[None, :, None]
@@ -328,7 +375,7 @@ def fb_stopbands(
     if e is None:
         return out
     if bloch_config.simulate_stopband_modes:
-        edge = apply_edge_basis_segmented(bloch, cme_inputs, injected, e, segments)
+        edge = apply_edge_basis_segmented(bloch, problem, injected, e)
         if edge is not None:
             out["edge"] = edge
             out["gammas"] = edge["gammas"]  # kernel and carrier: -1j kappa_e
@@ -347,17 +394,16 @@ def fb_stopbands(
     bloch["edge_weights"] = weights
     if np.all(weights == 1.0):
         return out
-    out["pw3"] = process_weights(cme_inputs["relations_3wm"], weights)
-    out["pw4"] = process_weights(cme_inputs["relations_4wm"], weights)
+    out["pw3"] = process_weights(problem.relations_3wm, weights)
+    out["pw4"] = process_weights(problem.relations_4wm, weights)
     return out
 
 
 def apply_edge_basis_segmented(
     bloch: dict[str, Any],
-    cme_inputs: dict[str, Any],
+    problem: CMEProblem,
     injected: np.ndarray,
     threshold: float,
-    segments: list,
 ) -> Optional[dict[str, Any]]:
     """
     Fixed ("edge") Bloch basis for modes close to a stopband edge.
@@ -378,8 +424,9 @@ def apply_edge_basis_segmented(
     ``bloch``.
     """
     e_edge = float(threshold)
-    gammas = cme_inputs["gammas"]  # (n_freq, n_modes, n_seg)
-    labels = cme_inputs["mode_labels"]
+    gammas = problem.gammas  # (n_freq, n_modes, n_seg)
+    labels = problem.mode_labels
+    segments = problem.segments
     n_freq, n_seg, n_modes = bloch["split"].shape
     freqs_hz = bloch["freqs_hz"]
     flag = np.zeros((n_freq, n_seg, n_modes), dtype=bool)
@@ -478,23 +525,14 @@ def apply_edge_basis_segmented(
     }
 
 
-def prepare_bloch_segmented(
-    mode_array: ModeArray,
-    cme_inputs: dict[str, Any],
-    segments: list,
-    seg_bounds: np.ndarray,
-    unit_multiplier: float,
-) -> dict[str, Any]:
+def prepare_bloch_segmented(problem: CMEProblem) -> dict[str, Any]:
     """
     Per-segment Bloch tables for the forward-backward solver.
 
-    ``cme_inputs["gammas"]`` must carry a segment axis (length 1 for a
-    uniform device); mode frequencies times ``unit_multiplier`` are in Hz,
-    ``seg_bounds`` are the segment boundaries in unit cells. Every segment is a uniform ``TWPA`` of whole
-    supercells; its Bloch modes come from :func:`bloch_mode_tables` on its
-    own supercell, with the branch of ``k`` set by its kernel wavenumber.
-    Intracell arrays are zero-padded to the largest number of nonlinear
-    inductors per supercell.
+    Every segment is a uniform ``TWPA`` of whole supercells; its Bloch modes come
+    from :func:`bloch_mode_tables` on its own supercell, with the branch of ``k``
+    set by its kernel wavenumber. Intracell arrays are zero-padded to the largest
+    number of nonlinear inductors per supercell.
 
     Returns
     -------
@@ -507,23 +545,12 @@ def prepare_bloch_segmented(
         ``seg_bounds`` : (n_seg + 1,) and the diagnostics ``eig_residual``,
         ``gamma_mismatch`` : (n_freq, n_seg, n_modes).
     """
-    mode_labels = cme_inputs["mode_labels"]
-    mode_params = cme_inputs["mode_params"]
-    n_freq = cme_inputs["n_freq"]
-    n_modes = cme_inputs["n_modes"]
-    gammas = cme_inputs["gammas"]  # (n_freq, n_modes, n_seg)
+    n_freq, n_modes = problem.n_freq, problem.n_modes
+    gammas = problem.gammas  # (n_freq, n_modes, n_seg)
+    segments, seg_bounds = problem.segments, problem.seg_bounds
     n_seg = len(segments)
-
-    _, _, unit_3wm, unit_4wm = prepare_relations_coefficients(
-        mode_array.get_rwa_terms(power=2),
-        mode_array.get_rwa_terms(power=3),
-        1.0,
-        1.0,
-    )
-    freqs_hz = (
-        np.stack([np.abs(mode_params[m]["freqs"]) for m in mode_labels], axis=-1)
-        * unit_multiplier
-    )
+    unit_3wm, unit_4wm = problem.unit_3wm, problem.unit_4wm
+    freqs_hz = problem.freqs_hz
     omegas = 2 * np.pi * freqs_hz
 
     cache: dict[Any, dict[str, Any]] = {}

@@ -1,7 +1,7 @@
 """Collection of plot functions."""
 
 # mypy: ignore-errors
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,8 +11,11 @@ from twpasolver.mathutils import I_to_dBm
 
 
 def plot_mode_currents(
-    gain_result: Dict[str, Any],
-    mode_names: Optional[List[str]] = None,
+    x: np.ndarray,
+    I_tuples: np.ndarray,
+    mode_names: List[str],
+    pump_freq: Optional[float] = None,
+    freqs_unit: str = "GHz",
     figsize: tuple = (9, 5),
     log_scale: bool = True,
     line_styles: Optional[List[str]] = None,
@@ -20,27 +23,17 @@ def plot_mode_currents(
     title: Optional[str] = None,
     ylim: Optional[tuple] = None,
     lw=2,
-    backward=False,
 ) -> Axes:
     """
-    Plot the mean current of each mode in dBm as a function of cell number.
+    Plot the mean current of each mode over frequency as a function of cell number.
 
     Args:
-        gain_result: Output of :meth:`TWPAnalysis.gain`.
-        mode_names: Legend labels; taken from the mode map if not given.
+        x: Positions in unit cells, shape (n_x,).
+        I_tuples: Mode currents, shape (n_freq, n_modes, n_x).
+        mode_names: Legend labels.
         log_scale: Plot in dBm (True) or in A (False).
-        backward: Plot the backward-propagating currents (``bloch`` model).
     """
-    x = gain_result["x"]
-    if backward and "I_tuples_bwd" in gain_result:
-        I_tuples = gain_result["I_tuples_bwd"]
-    else:
-        I_tuples = gain_result["I_tuples"]
     n_modes = I_tuples.shape[1]
-
-    if mode_names is None:
-        reverse_mode_map = gain_result.get("mode_info", {}).get("reverse_mode_map", {})
-        mode_names = [reverse_mode_map.get(i, f"Mode {i}") for i in range(n_modes)]
 
     mean_currents = np.mean(np.abs(I_tuples), axis=0)
 
@@ -83,10 +76,8 @@ def plot_mode_currents(
     if title:
         ax.set_title(title)
     else:
-        pump_freq = gain_result.get("pump_freq", "N/A")
-        ax.set_title(
-            f"Mean Mode Currents vs Cell Number\nPump Frequency: {np.round(pump_freq, 3)} GHz"
-        )
+        pump = "N/A" if pump_freq is None else f"{np.round(pump_freq, 3)} {freqs_unit}"
+        ax.set_title(f"Mean Mode Currents vs Cell Number\nPump Frequency: {pump}")
 
     if ylim:
         ax.set_ylim(ylim)

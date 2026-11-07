@@ -3,19 +3,20 @@
 import logging
 import os
 import warnings
+from dataclasses import asdict, replace
 
 import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from twpasolver.analysis import TWPAnalysis
+from twpasolver.analysis import GainResult, PhaseMatchingResult, Ports, TWPAnalysis
 from twpasolver.cmes.solver_config import BlochSolverConfig
 from twpasolver.file_utils import read_file, save_to_file
 from twpasolver.logger import log
 from twpasolver.matrices_arrays import ABCDArray
 from twpasolver.models import TWPA, LCLfBaseCell
 from twpasolver.models.oneport import Capacitance, OnePortArray, Resistance
-from twpasolver.modes_rwa import RWAAnalyzer
+from twpasolver.modes_rwa import ModeSet
 
 CELL_U = {"name": "LCLfBaseCell", "N": 30, "L": 49.9e-12, "C": 24.2e-15, "Lf": 0.87e-9}
 CELL_L = {"name": "LCLfBaseCell", "N": 6, "L": 48.6e-12, "C": 8.2e-15, "Lf": 0.28e-9}
@@ -73,24 +74,26 @@ def _assert_same(a, b):
 def test_twpanalysis_end_to_end(analysis, tmp_path):
     an = analysis
     simple = an.gain(SIGNALS, pump=PUMP, Is0=1e-8, model="simple", thin=20)
-    assert np.all(np.isfinite(simple["gain_db"]))
+    assert np.all(np.isfinite(simple.gain_db))
     bloch = _bloch_gain(an)
-    assert np.all(np.isfinite(bloch["gain_db"]))
-    assert "gains_all_passes" in bloch
-    pm = an.phase_matching(pump_arange=PUMP + np.arange(3), signal_arange=SIGNALS)
-    assert pm["delta"].shape == (len(pm["signal_freqs"]), len(pm["pump_freqs"]))
-    bw = an.bandwidth(bloch)
-    assert bw["max_gain"] == np.max(bloch["gain_db"])
+    assert np.all(np.isfinite(bloch.gain_db))
+    assert bloch.history
+    pm = an.phase_matching(pump_freqs=PUMP + np.arange(3), signal_freqs=SIGNALS)
+    assert pm.delta.shape == (len(pm.signal_freqs), len(pm.pump_freqs))
+    bw = bloch.bandwidth()
+    assert bw["max_gain"] == np.max(bloch.gain_db)
 
-    name = str(tmp_path / "run.hdf5")
-    results = {"gain": bloch, "phase_matching": pm, "bandwidth": bw}
-    save_to_file(name, results, writer="hdf5")
-    loaded = read_file(name, writer="hdf5")
-    _assert_same(results, loaded)
-    # Int dict keys come back as int, so plot_mode_currents keeps its labels.
-    reverse = loaded["gain"]["mode_info"]["reverse_mode_map"]
-    assert all(isinstance(k, int) for k in reverse)
-    assert isinstance(loaded["gain"]["gains_all_passes"], list)
+    name = str(tmp_path / "gain.hdf5")
+    bloch.save(name)
+    loaded = GainResult.load(name)
+    _assert_same(asdict(bloch), asdict(loaded))
+    assert loaded.mode("p") == bloch.mode("p")
+    name = str(tmp_path / "pm.hdf5")
+    pm.save(name)
+    _assert_same(asdict(pm), asdict(PhaseMatchingResult.load(name)))
+    name = str(tmp_path / "bw.hdf5")
+    save_to_file(name, bw, writer="hdf5")
+    _assert_same(bw, read_file(name, writer="hdf5"))
 
 
 def test_sweep_of_gain_results_saves(analysis, tmp_path):
@@ -99,8 +102,9 @@ def test_sweep_of_gain_results_saves(analysis, tmp_path):
         for p in (11.0, 12.0)
     ]
     name = str(tmp_path / "sweep.hdf5")
-    save_to_file(name, {"sweep": res}, writer="hdf5")
-    _assert_same({"sweep": res}, read_file(name, writer="hdf5"))
+    data = {"sweep": [asdict(r) for r in res]}
+    save_to_file(name, data, writer="hdf5")
+    _assert_same(data, read_file(name, writer="hdf5"))
 
 
 def test_digit_keyed_dict_stays_dict(tmp_path):
@@ -137,9 +141,9 @@ def test_linear_follows_grid_and_unit():
 
 def test_base_data_computed_on_demand():
     an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, 20, 1e-2))
-    g = an.gain(SIGNALS, pump=PUMP)["gain_db"]
+    g = an.gain(SIGNALS, pump=PUMP).gain_db
     an.twpa.N = 40
-    g_long = an.gain(SIGNALS, pump=PUMP)["gain_db"]
+    g_long = an.gain(SIGNALS, pump=PUMP).gain_db
     assert np.all(np.isfinite(g)) and not np.allclose(g, g_long)
 
 
@@ -201,16 +205,16 @@ def test_phase_matching_kerr_mismatch_on_flat_line(mixing, config, pump, kerr):
     Ip = 1e-3
     kw = dict(
         mixing=mixing,
-        mode_array_config=config,
-        pump_arange=[pump],
-        signal_arange=[5.0, 6.0],
+        modes=config,
+        pump_freqs=[pump],
+        signal_freqs=[5.0, 6.0],
         relative=False,
     )
     dk = an.phase_matching(pump_Ip0=Ip, **kw)
-    dk_lin = an.phase_matching(pump_Ip0=0.0, **kw)["delta"]
+    dk_lin = an.phase_matching(pump_Ip0=0.0, **kw).delta
     chi = an.twpa.xi * Ip**2 / 8
-    k_p = dk["triplets"]["k"][0][0]
-    np.testing.assert_allclose((dk["delta"] - dk_lin) / (chi * k_p), kerr, rtol=1e-3)
+    k_p = dk.k_triplets[0][0]
+    np.testing.assert_allclose((dk.delta - dk_lin) / (chi * k_p), kerr, rtol=1e-3)
 
 
 # gain(Ip0=...) is local, position grid
@@ -226,9 +230,7 @@ def test_gain_ip0_does_not_change_twpa(analysis):
             kw["bloch_config"] = BlochSolverConfig(passes=10)
         res = analysis.gain(SIGNALS, Ip0=5e-4, **kw)
         assert analysis.twpa.Ip0 == 1e-3
-        np.testing.assert_array_equal(
-            res["gain_db"], ref.gain(SIGNALS, **kw)["gain_db"]
-        )
+        np.testing.assert_array_equal(res.gain_db, ref.gain(SIGNALS, **kw).gain_db)
 
 
 def test_gain_position_grid_has_two_points_at_least(analysis):
@@ -238,17 +240,17 @@ def test_gain_position_grid_has_two_points_at_least(analysis):
         model="simple",
         thin=10 * analysis.twpa.N_tot,
     )
-    assert len(res["x"]) == 2
+    assert len(res.x) == 2
 
 
 # phase_matching ranges
 
 
 def test_phase_matching_explicit_ranges(analysis):
-    pm = analysis.phase_matching(pump_arange=[13, 14, 15], signal_arange=[3.0, 5.0])
-    np.testing.assert_array_equal(pm["pump_freqs"], [13, 14, 15])
-    pm = analysis.phase_matching(pump_arange=(13, 14, 0.1), signal_arange=[3.0])
-    assert len(pm["pump_freqs"]) == 10
+    pm = analysis.phase_matching(pump_freqs=[13, 14, 15], signal_freqs=[3.0, 5.0])
+    np.testing.assert_array_equal(pm.pump_freqs, [13, 14, 15])
+    pm = analysis.phase_matching(pump_freqs=(13, 14, 0.1), signal_freqs=[3.0])
+    assert len(pm.pump_freqs) == 10
 
 
 def test_phase_matching_segmented_is_length_weighted_mean():
@@ -256,22 +258,22 @@ def test_phase_matching_segmented_is_length_weighted_mean():
         TWPA(cells=[CELL_U, CELL_L, CELL_U], N=20, Istar=6.3e-3, Idc=1e-3, Ip0=1e-3),
         TWPA(cells=[CELL_U, CELL_L, CELL_U], N=10, Istar=9e-3, Idc=1e-3, Ip0=1e-3),
     ]
-    kw = dict(pump_arange=[PUMP], signal_arange=SIGNALS, relative=False)
+    kw = dict(pump_freqs=[PUMP], signal_freqs=SIGNALS, relative=False)
     f = (0.05, 20, 1e-2)
     dev = TWPA(cells=segs, Ip0=1e-3)
-    delta = TWPAnalysis(twpa=dev, freqs=f).phase_matching(**kw)["delta"]
-    parts = [TWPAnalysis(twpa=s, freqs=f).phase_matching(**kw)["delta"] for s in segs]
+    delta = TWPAnalysis(twpa=dev, freqs=f).phase_matching(**kw).delta
+    parts = [TWPAnalysis(twpa=s, freqs=f).phase_matching(**kw).delta for s in segs]
     w = np.array([s.N_tot for s in segs], dtype=float)
     assert np.all(np.isfinite(delta))
     np.testing.assert_allclose(delta, (w[0] * parts[0] + w[1] * parts[1]) / w.sum())
 
 
 def test_phase_matching_zero_pump_is_linear(analysis):
-    kw = dict(pump_arange=[13.0], signal_arange=[3.0, 5.0], relative=False)
-    lin = analysis.phase_matching(pump_Ip0=0.0, **kw)["delta"]
-    kerr = analysis.phase_matching(**kw)["delta"]
+    kw = dict(pump_freqs=[13.0], signal_freqs=[3.0, 5.0], relative=False)
+    lin = analysis.phase_matching(pump_Ip0=0.0, **kw).delta
+    kerr = analysis.phase_matching(**kw).delta
     pm = analysis.phase_matching(pump_Ip0=0.0, **kw)
-    k_p, k_s, k_i = np.array(pm["triplets"]["k"]).T
+    k_p, k_s, k_i = pm.k_triplets.T
     np.testing.assert_allclose(lin[:, 0], k_p - k_s - k_i)
     assert not np.allclose(lin, kerr)
 
@@ -280,26 +282,22 @@ def test_phase_matching_zero_pump_is_linear(analysis):
 
 
 def test_bloch_2d_initial_amplitudes(analysis):
-    labels = list(analysis.get_mode_array("basic_3wm").modes)
+    labels = list(ModeSet.basic().labels)
     y0 = np.zeros(len(labels), dtype=complex)
     y0[labels.index("p")] = analysis.twpa.Ip0
     y0[labels.index("s")] = 1e-8
     ref = _bloch_gain(analysis, initial_amplitudes_fwd=y0)
     res = _bloch_gain(analysis, initial_amplitudes_fwd=np.tile(y0, (len(SIGNALS), 1)))
-    np.testing.assert_array_equal(res["gain_db"], ref["gain_db"])
+    np.testing.assert_array_equal(res.gain_db, ref.gain_db)
 
 
 # bandwidth
 
 
-def test_bandwidth_of_nan_gain_raises():
-    nan_gain = {
-        "gain_db": np.full(3, np.nan),
-        "signal_freqs": SIGNALS,
-        "pump_freq": PUMP,
-    }
+def test_bandwidth_of_nan_gain_raises(analysis):
+    res = analysis.gain(SIGNALS, pump=PUMP, Is0=1e-8, model="simple", thin=20)
     with pytest.raises(ValueError, match="NaN"):
-        TWPAnalysis.bandwidth(nan_gain)
+        replace(res, gain_db=np.full(3, np.nan)).bandwidth()
 
 
 # Logging
@@ -327,7 +325,7 @@ def test_twpanalysis_rejects_unknown_fields():
 
 def test_port_must_be_a_model():
     with pytest.raises(ValidationError, match="TwoPortModel"):
-        TWPAnalysis(twpa=_small_twpa(), freqs=(1, 2, 0.5), port=[50.0, 50.0])
+        Ports(input=[50.0, 50.0])
 
 
 def test_twpanalysis_json_round_trip_keeps_grid(tmp_path):
@@ -416,4 +414,4 @@ def test_resistance_on_integer_freqs():
 
 def test_cyclic_relations_raise():
     with pytest.raises(ValueError, match="cyclic"):
-        RWAAnalyzer(["a", "b", "c"], [["a", "b+c"], ["b", "a-c"]])
+        ModeSet(["a", "b", "c"], [["a", "b+c"], ["b", "a-c"]])
