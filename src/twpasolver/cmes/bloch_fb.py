@@ -258,6 +258,46 @@ def segmented_phase(kappas: FloatArray, seg_bounds: FloatArray, x: FloatArray):
 # --------------------------------------------------------------------------- #
 
 
+@nb.njit(cache=True)
+def _rhs_fields(x, currents, kappas, x0, phi0, ctr_x, ctr_vals, ctr_y0, ctr_phi0, end):
+    """
+    Field vector of :func:`bloch_fb_segment_rhs` at ``x``.
+
+    Returns ``ar`` (4 n: own, conj own, counter, conj counter, with their
+    carriers), the own carriers ``ep`` and the counter carriers ``en``.
+    """
+    n = len(currents)
+    y = end - x
+    ep = np.exp(1j * (phi0 + kappas * (x - x0)))
+    en = np.exp(1j * (ctr_phi0 + kappas * (y - ctr_y0)))
+    ar = np.empty(4 * n, dtype=nb.complex128)
+    i0, w0, w1, w2, w3 = _cubic_stencil(ctr_x, y)
+    for i in range(n):
+        ctr = _stencil_value(ctr_vals, i, i0, w0, w1, w2, w3) * en[i]
+        ar[i] = currents[i] * ep[i]
+        ar[i + n] = np.conj(ar[i])
+        ar[i + 2 * n] = ctr
+        ar[i + 3 * n] = np.conj(ctr)
+    return ar, ep, en
+
+
+@nb.njit(cache=True)
+def _rhs_rows(ar, n, rows_3wm, rows_4wm, c3, c4, g3, g4, xl):
+    """Mixing terms of every target (carrier not yet removed) from the field vector ``ar``."""
+    out = np.zeros(n, nb.complex128)
+    for r in range(rows_3wm.shape[0]):
+        term = c3[r] * ar[rows_3wm[r, 1]] * ar[rows_3wm[r, 2]]
+        if g3[r] != 0.0:
+            term *= np.exp(1j * g3[r] * xl)
+        out[rows_3wm[r, 0]] += term
+    for r in range(rows_4wm.shape[0]):
+        term = c4[r] * ar[rows_4wm[r, 1]] * ar[rows_4wm[r, 2]] * ar[rows_4wm[r, 3]]
+        if g4[r] != 0.0:
+            term *= np.exp(1j * g4[r] * xl)
+        out[rows_4wm[r, 0]] += term
+    return out
+
+
 @nb.njit(
     nb_complex1d(
         nb.float64,
@@ -313,38 +353,20 @@ def bloch_fb_segment_rhs(
     * reciprocal-vector phase ``exp(j G (x - x0))``.
     """
     n = len(currents)
-    out = np.zeros(n, nb.complex128)
-    xl = x - x0
-    y = end - x
-    yl = y - ctr_y0
-    ep = np.exp(1j * (phi0 + kappas * xl))
-    en = np.exp(1j * (ctr_phi0 + kappas * yl))
-
-    ar = np.empty(4 * n, dtype=nb.complex128)
-    i0, w0, w1, w2, w3 = _cubic_stencil(ctr_x, y)
-    for i in range(n):
-        ctr = _stencil_value(ctr_vals, i, i0, w0, w1, w2, w3) * en[i]
-        ar[i] = currents[i] * ep[i]
-        ar[i + n] = np.conj(ar[i])
-        ar[i + 2 * n] = ctr
-        ar[i + 3 * n] = np.conj(ctr)
-
-    for r in range(rows_3wm.shape[0]):
-        term = row_coeffs_3wm[r] * ar[rows_3wm[r, 1]] * ar[rows_3wm[r, 2]]
-        if row_g_3wm[r] != 0.0:
-            term *= np.exp(1j * row_g_3wm[r] * xl)
-        out[rows_3wm[r, 0]] += term
-    for r in range(rows_4wm.shape[0]):
-        term = (
-            row_coeffs_4wm[r]
-            * ar[rows_4wm[r, 1]]
-            * ar[rows_4wm[r, 2]]
-            * ar[rows_4wm[r, 3]]
-        )
-        if row_g_4wm[r] != 0.0:
-            term *= np.exp(1j * row_g_4wm[r] * xl)
-        out[rows_4wm[r, 0]] += term
-
+    ar, ep, _ = _rhs_fields(
+        x, currents, kappas, x0, phi0, ctr_x, ctr_vals, ctr_y0, ctr_phi0, end
+    )
+    out = _rhs_rows(
+        ar,
+        n,
+        rows_3wm,
+        rows_4wm,
+        row_coeffs_3wm,
+        row_coeffs_4wm,
+        row_g_3wm,
+        row_g_4wm,
+        x - x0,
+    )
     for i in range(n):
         out[i] = out[i] / ep[i] + alphas[i] * currents[i]
     return out
@@ -517,7 +539,6 @@ def _edge_sources_segmented(
     S_plus = np.zeros((n_flag, xs.shape[0]), dtype=np.complex128)
     S_minus = np.zeros((n_flag, xs.shape[0]), dtype=np.complex128)
     J = np.zeros((n_flag, xs.shape[0], 2, 2), dtype=np.complex128)
-    zeros_alpha = np.zeros(n_modes, dtype=np.float64)
     for s in range(n_seg):
         q = n_seg - 1 - s
         a = offsets[s]
@@ -561,50 +582,43 @@ def _edge_sources_segmented(
         k_s = np.ascontiguousarray(kappas_seg[s])
         pf = np.ascontiguousarray(Phi_f_b[:, s])
         pb = np.ascontiguousarray(Phi_b_b[:, q])
-        # Fields with a unit c+ (col 0) or c- (col 1) on each edge mode, for
-        # the Jacobian columns of its self-linear rows.
-        Af_u = np.empty((n_flag, 2) + Af.shape, dtype=np.complex128)
-        Ab_u = np.empty((n_flag, 2) + Ab.shape, dtype=np.complex128)
-        for qq in range(n_flag):
-            f = flag_idx[qq]
-            for col in range(2):
-                Af_u[qq, col] = Af
-                Ab_u[qq, col] = Ab
-                Af_u[qq, col, f, :] = 1.0 - col
-                Ab_u[qq, col, f, :] = col / phase_end[f]
+        n = n_modes
         for j in range(sub_off[s], sub_off[s + 1]):
             x = xs[j]
             y = end - x
             cur = _interp_rows(Af, seg_x, x)
             cur_b = _interp_rows(Ab, seg_s, y)
             # fmt: off
-            out = bloch_fb_segment_rhs(
-                x, cur, zeros_alpha, k_s, sr3, sr4, sc3f, sc4f, sg3, sg4,
-                seg_x[0], pf, seg_s, Ab, seg_s[0], pb, end,
-            )
-            out_b = bloch_fb_segment_rhs(
-                y, cur_b, zeros_alpha, k_s, sr3, sr4, sc3b, sc4b, sg3, sg4,
-                seg_s[0], pb, seg_x, Af, seg_x[0], pf, end,
-            )
+            ar, ep, en = _rhs_fields(x, cur, k_s, seg_x[0], pf, seg_s, Ab, seg_s[0], pb, end)
+            ar_b, ep_b, en_b = _rhs_fields(y, cur_b, k_s, seg_s[0], pb, seg_x, Af, seg_x[0], pf, end)
+            out = _rhs_rows(ar, n, sr3, sr4, sc3f, sc4f, sg3, sg4, x - seg_x[0])
+            out_b = _rhs_rows(ar_b, n, sr3, sr4, sc3b, sc4b, sg3, sg4, y - seg_s[0])
             for qq in range(n_flag):
                 f = flag_idx[qq]
-                S_plus[qq, j] = out[f]
-                S_minus[qq, j] = -phase_end[f] * out_b[f]
+                pe = phase_end[f]
+                S_plus[qq, j] = out[f] / ep[f]
+                S_minus[qq, j] = -pe * out_b[f] / ep_b[f]
+                # Jacobian columns: the same fields with a unit c+ (col 0) or
+                # c- (col 1) on the mode (backward storage B = c- / pe).
+                saved = (ar[f], ar[f + 2 * n], ar_b[f], ar_b[f + 2 * n])
                 for col in range(2):
-                    cu = cur.copy()
-                    cu_b = cur_b.copy()
-                    cu[f] = 1.0 - col
-                    cu_b[f] = col / phase_end[f]
-                    o = bloch_fb_segment_rhs(
-                        x, cu, zeros_alpha, k_s, lr3, lr4, lc3f, lc4f, lg3, lg4,
-                        seg_x[0], pf, seg_s, Ab_u[qq, col], seg_s[0], pb, end,
-                    )
-                    o_b = bloch_fb_segment_rhs(
-                        y, cu_b, zeros_alpha, k_s, lr3, lr4, lc3b, lc4b, lg3, lg4,
-                        seg_s[0], pb, seg_x, Af_u[qq, col], seg_x[0], pf, end,
-                    )
-                    J[qq, j, 0, col] = o[f]
-                    J[qq, j, 1, col] = -phase_end[f] * o_b[f]
+                    u = 1.0 - col
+                    v = col / pe
+                    ar[f] = u * ep[f]
+                    ar[f + 2 * n] = v * en[f]
+                    ar_b[f] = v * ep_b[f]
+                    ar_b[f + 2 * n] = u * en_b[f]
+                    for k in (f, f + 2 * n):
+                        ar[k + n] = np.conj(ar[k])
+                        ar_b[k + n] = np.conj(ar_b[k])
+                    o = _rhs_rows(ar, n, lr3, lr4, lc3f, lc4f, lg3, lg4, x - seg_x[0])
+                    o_b = _rhs_rows(ar_b, n, lr3, lr4, lc3b, lc4b, lg3, lg4, y - seg_s[0])
+                    J[qq, j, 0, col] = o[f] / ep[f]
+                    J[qq, j, 1, col] = -pe * o_b[f] / ep_b[f]
+                ar[f], ar[f + 2 * n], ar_b[f], ar_b[f + 2 * n] = saved
+                for k in (f, f + 2 * n):
+                    ar[k + n] = np.conj(ar[k])
+                    ar_b[k + n] = np.conj(ar_b[k])
             # fmt: on
     return S_plus, S_minus, J
 
