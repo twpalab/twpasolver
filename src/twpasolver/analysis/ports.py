@@ -62,7 +62,9 @@ class Ports(BaseModel):
                 abcd = np.zeros((*freqs_hz.shape, 4), dtype=np.complex128)
                 abcd[..., 0] = abcd[..., 3] = 1.0
             else:
-                m = np.asarray(model.get_abcd(freqs_hz.ravel()))
+                m = np.asarray(
+                    model.get_abcd(freqs_hz.ravel())
+                )  # pylint: disable=no-member
                 abcd = m.reshape(*freqs_hz.shape, 4).astype(np.complex128)
                 A, B, C, D = (abcd[..., k] for k in range(4))
                 Zout = (D * Ze + B) / (C * Ze + A)

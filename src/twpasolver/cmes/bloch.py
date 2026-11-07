@@ -157,7 +157,7 @@ def _wind_backward(steps, counts, V, I, Z0):
     n_runs, n_steps, _, n_f = steps.shape
     kd = np.zeros(n_f)
     max_step = np.zeros(n_f)
-    for f in nb.prange(n_f):
+    for f in nb.prange(n_f):  # pylint: disable=not-an-iterable
         a = V[f] + Z0 * I[f]
         v, i = V[f] / a, I[f] / a  # normalised so that a = 1 before each step
         acc = 0.0

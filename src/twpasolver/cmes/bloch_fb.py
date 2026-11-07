@@ -912,7 +912,7 @@ def _bloch_fb_solve_segmented(
     converged_flags = np.zeros(n_freq, dtype=np.bool_)
     residuals = np.full(n_freq, np.inf)
 
-    for i in nb.prange(n_freq):
+    for i in nb.prange(n_freq):  # pylint: disable=not-an-iterable
         alphas_seg = np.ascontiguousarray(gammas_seg[i].real)  # (n_seg, n_modes)
         kappas_seg = np.ascontiguousarray(gammas_seg[i].imag)
 
@@ -1407,6 +1407,7 @@ def bloch_fb_segmented_cmes_solve(
     if anderson_depth < 1:
         raise ValueError(f"anderson_depth must be >= 1, got {anderson_depth}.")
 
+    edge_mode_f: np.ndarray
     if edge_mode is None:
         edge_mode_f = np.zeros((n_freq, n_modes), dtype=np.float64)
     else:
@@ -1479,7 +1480,7 @@ def bloch_fb_segmented_cmes_solve(
         diagnostics["residuals"] = residuals
 
     n_saved = passes if save_all_passes else 1
-    raw = I_out.reshape(2, n_saved, n_freq, n_modes, len(x_array))
+    raw = I_out.reshape((2, n_saved, n_freq, n_modes, len(x_array)))
     Phi_f, Phi_b = segmented_phase(
         np.transpose(gammas_seg.imag, (0, 2, 1)), seg_bounds, x_array
     )

@@ -20,7 +20,7 @@ from typing import Tuple
 import numba as nb
 import numpy as np
 
-EPS = np.finfo(np.float64).eps
+EPS = float(np.finfo(np.float64).eps)
 
 # Multiply steps computed from asymptotic behaviour of errors by this.
 SAFETY = 0.9

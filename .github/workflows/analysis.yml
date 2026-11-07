@@ -1,17 +1,20 @@
 name: Lint-Test-Mypy
 
-on: [push]
+on:
+  push:
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install and configure poetry
@@ -30,19 +33,13 @@ jobs:
       run: poetry install --no-interaction --no-root --with analysis
 
     - name: install_project
-      run: poetry install --no-interaction
+      run: poetry install --no-interaction --with analysis
 
-    - name: Analysing the code with pylint
-      run: |
-        source $VENV
-        pylint src/ || pylint-exit $?
+    - name: Pylint (errors only)
+      run: poetry run pylint --errors-only src/twpasolver
 
-    - name: Running tests
-      run: |
-        source $VENV
-        pytest tests/
+    - name: Mypy
+      run: poetry run mypy src/
 
-    - name: Running Mypy analysis
-      run: |
-        source $VENV
-        mypy src/
+    - name: Tests with coverage
+      run: poetry run pytest tests/ --cov=twpasolver --cov-report=term-missing:skip-covered

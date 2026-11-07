@@ -368,7 +368,7 @@ def fb_stopbands(
         )
         bloch["m_lim"] = m_max
     else:
-        m_max = bloch_config.m_max
+        m_max = np.asarray(bloch_config.m_max)
     out: dict[str, Any] = dict(
         gammas=gammas, edge=None, m_max=m_max, pw3=None, pw4=None
     )
@@ -489,7 +489,7 @@ def apply_edge_basis_segmented(
     )
     if not flag.any():
         return None
-    edge_mode = flag.any(axis=1)
+    edge_mode = np.any(flag, axis=1, keepdims=False).astype(bool)
     # Native segments of a mode solved exactly: decoupled directions with
     # the kernel attenuation (forward decays along +x, backward along -x).
     for i, n in zip(*np.nonzero(edge_mode)):

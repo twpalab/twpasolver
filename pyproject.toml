@@ -1,32 +1,44 @@
-[tool.poetry]
+[project]
 name = "twpasolver"
 version = "0.1.0"
-description = "Project twpasolver created by twpalab"
-authors = ["twpalab"]
-license = "Apache License 2.0"
+description = "Simulation of traveling-wave parametric amplifiers: circuit models, Bloch-mode coupled mode equations, gain and phase matching."
+authors = [{ name = "twpalab" }]
+maintainers = [{ name = "Pietro Campana", email = "p.campana1@campus.unimib.it" }]
+license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/twpalab/twpasolver"
-keywords = []
+requires-python = ">=3.10,<4.0"
+keywords = ["TWPA", "parametric amplifier", "coupled mode equations", "superconducting circuits", "Bloch modes"]
 classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Physics",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+  "numpy>=1.26",
+  "numba>=0.59.0",
+  "pydantic>=2.6.3",
+  "scikit-rf>=0.32.0",
+  "scipy>=1.12.0",
+  "h5py>=3.10,<4",
+  "matplotlib>=3.7",
+  "networkx>=3.0",
+  "typing-extensions>=4.6",
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.10,<4.0"
-numpy = ">=1.26"
-numba = ">=0.59.0"
-pydantic =">=2.6.3"
-scikit-rf=">=0.32.0"
-scipy=">=1.12.0"
-h5py = "^3.10.0"
-matplotlib = ">=3.7"
-networkx = "<=3.*"
+[project.urls]
+repository = "https://github.com/twpalab/twpasolver"
+documentation = "https://twpalab.github.io/twpasolver/"
 
-[tool.poetry.scripts]
+[project.scripts]
 twpasolver-warmup = "twpasolver.cmes.warmup:main"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.analysis]
@@ -56,5 +68,21 @@ ipykernel = ">=6.15.2"
 ipython = ">=8.4.0"
 
 [[tool.mypy.overrides]]
-module=["numba.*", "h5py.*", "skrf", "scipy.*", "matplotlib.*", "CyRK.*", "networkx.*"]
+module=["numba.*", "h5py.*", "skrf", "scipy.*", "matplotlib.*", "networkx.*"]
 ignore_missing_imports = true
+
+[tool.pycln]
+all = true
+
+[tool.pylint.basic]
+# Physics symbols: circuit elements, currents, matrices and Greek-letter names.
+good-names-rgxs = ["^[A-Z][A-Za-z0-9_]{0,15}$", "^[a-z][a-z0-9]?(_[A-Za-z0-9]+)*$"]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.black]
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"

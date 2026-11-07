@@ -670,7 +670,7 @@ History of the earlier WP4 items:
 
 ## WP6: Packaging, CI, tooling
 
-- [ ] **6.1 `pyproject.toml`:**
+- [x] **6.1 `pyproject.toml`:**
   - real description; version per D7; license as SPDX `Apache-2.0`; author email; URLs; classifiers;
   - drop the `<3.13` upper bound; **done 2026-11-06** with version `0.1.0` (D7), lock refreshed;
   - `networkx = "<=3.*"` resolves to 3.0: use `>=3`;
@@ -681,23 +681,42 @@ History of the earlier WP4 items:
   - `[tool.pylint]` `good-names` for physics symbols (removes most of the 803 invalid-name warnings);
   - a `[tool.pycln]` section, or fix the pre-commit argument;
   - refresh `poetry.lock` (poetry is broken locally: fix it or do this in CI).
-- [ ] **6.2 CI (`.github/workflows/analysis.yml`, `deploy_docs.yml`):**
+  - Done 2026-11-07 (audit-fixes): PEP 621 `[project]` (Poetry 2 deprecates the `[tool.poetry]` metadata):
+    description, SPDX `Apache-2.0`, author `twpalab` and maintainer Pietro Campana with e-mail (poetry-core 2.1
+    writes only the first author into the metadata), documentation/repository URLs, keywords, classifiers for
+    3.10-3.13, `networkx>=3.0`, `typing-extensions` declared, `[project.scripts]` warmup entry, sympy gone, CyRK
+    mypy override dropped, `[tool.pycln] all`, `[tool.pylint]` name regexes for physics symbols and line length
+    100, `[tool.black]` py310, `[tool.isort]` black profile. Lock refreshed; `poetry build` gives a wheel with
+    the `analysis/`, `cmes/`, `models/` packages and complete metadata.
+- [x] **6.2 CI (`.github/workflows/analysis.yml`, `deploy_docs.yml`):**
   - bump checkout/setup-python/gh-pages from v3 (deprecated Node);
   - include the Python version in the venv cache key (3.10–3.12 currently share one `.venv`);
   - run on pull requests;
   - let pylint fail on errors only;
   - mypy must pass;
   - docs: drop the pinned 3.10.4 and the apt sphinx; deploy on tags or releases only.
-- [ ] **6.3 pre-commit:** isort is pinned to `9.0.0b1` (beta); the nbqa isort 5.6.4 and pyupgrade 2.7.3 pins are
+  - Done 2026-11-07 (audit-fixes): `analysis.yml` on push and pull requests, actions v4/v5, matrix 3.10-3.13,
+    pylint `--errors-only` (clean: Numba `prange` and one Pydantic field read get inline disables), mypy must
+    pass, pytest with coverage. `deploy_docs.yml` builds on every push/PR with Python 3.12 and pandoc and
+    deploys to gh-pages only for `v*` tags. New `publish.yml`: build and upload to PyPI on `v*` tags with
+    trusted publishing (configure the trusted publisher on PyPI first).
+- [x] **6.3 pre-commit:** isort is pinned to `9.0.0b1` (beta); the nbqa isort 5.6.4 and pyupgrade 2.7.3 pins are
   very old; add nbstripout (WP1.7).
-- [ ] **6.4 Coverage:** 40 % overall. Plotting 11 %, warmup 0 %, quantum 0 %; numba code reads low because
+  - Done 2026-11-07 (audit-fixes): isort 9.0.2 (was the 9.0.0b1 beta); nbQA hooks no longer pin isort 5.6.4 /
+    pyupgrade 2.7.3; the isort profile lives in pyproject so both isort hooks use it; nbstripout already in.
+    `pre-commit run --all-files` passes.
+- [x] **6.4 Coverage:** 40 % overall. Plotting 11 %, warmup 0 %, quantum 0 %; numba code reads low because
   coverage cannot trace jitted functions. Add a CI job with `NUMBA_DISABLE_JIT=1` for a real number, if
   feasible.
-- [ ] **6.5 mypy to zero:** 13 errors fixed by 3.8, 8 by 5.1, 2 by 2.27; numba types used as annotations
+  - 2026-11-07: 62 % (analysis package 94-100 %, plotting 15 %, Numba kernels read low). The
+    `NUMBA_DISABLE_JIT=1` coverage job was not added (a full suite without JIT would take far longer).
+- [x] **6.5 mypy to zero:** 13 errors fixed by 3.8, 8 by 5.1, 2 by 2.27; numba types used as annotations
   (`cmes/base.py:29`) need `TYPE_CHECKING` aliases; plus about 6 ndarray shape assignments.
 
 ## WP7: Documentation and release
 
+  - Done 2026-11-07 (audit-fixes): mypy reports no issues in 35 files (numba types out of annotations, `EPS` a
+    float, `cast` in `validate_cell`, array-typed reductions and annotations).
 - [ ] **7.1 Toctree** (`docs/source/tutorials.rst`/`index.rst`) has only notebooks 01-04. 05/06 and `quantum` were moved
   out on 2026-11-06 (thesis material). New docs notebooks for segmented devices and the edge basis can be written
   later from them, without thesis dependencies.
@@ -980,7 +999,7 @@ WP0 to WP4 and 5.3 are done (2.4 and 2.37 deferred); the API is the one of the W
 freqs, unit, ports)`, `ModeSet`, `GainResult`/`PhaseMatchingResult`). Nothing is pushed. Next, roughly in order:
 1. **WP5 is done** (2026-11-07). The open finding of 4.2 (segmented `simple` depends slightly on `thin`) is
    worth one measurement.
-2. **WP6:** rest of 6.1 (version and Python are set, sympy dropped), CI (add 3.13), pre-commit pins, mypy (9).
+2. **WP6 is done** (2026-11-07): metadata, CI, publish workflow, pre-commit, mypy clean.
 3. **WP7:** notebooks and `implementing_models.rst` on the new API (7.2); fix the Sphinx RST errors left in
    `bloch_mode_tables`, `edge_basis_tables`, the `bloch_fb` module docstring and the `|…|` field descriptions, and
    the duplicate-object warnings of the re-exported analysis classes and dataclass fields (7.3); toctree, README,

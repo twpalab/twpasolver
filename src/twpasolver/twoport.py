@@ -42,7 +42,7 @@ from __future__ import annotations
 import inspect
 import itertools
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import numpy as np
 import skrf as rf
@@ -237,7 +237,7 @@ class TwoPortModel(BaseModel, ABC):
             cell = type(cell).model_validate(cell)
         if not isinstance(cell, base):
             raise ValueError(f"Expected a {base.__name__}, got {type(cell).__name__}.")
-        return cell
+        return cast(TwoPortModel, cell)
 
     def update(self, **kwargs) -> None:
         """Update multiple attributes of the model; unknown names raise RuntimeError."""

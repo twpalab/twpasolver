@@ -22,7 +22,7 @@ from twpasolver.logger import log
     cache=True,
     inline="always",
 )
-def _sorted_interp_bracket(xp: nb_float1d, x: nb.float64):
+def _sorted_interp_bracket(xp: np.ndarray, x: float):
     """
     Return (lo, hi) bracket indices for x in the sorted grid xp.
 
@@ -173,7 +173,7 @@ def _no_reflections_solve_segmented(
     x_span = (x_array[0], x_array[-1])
     I_tuples = np.empty((n_freq, n_modes, n_x), dtype=nb.complex128)
 
-    for i in nb.prange(n_freq):
+    for i in nb.prange(n_freq):  # pylint: disable=not-an-iterable
         # gammas_array[i]: (n_modes, n_segments)
         alphas_i = np.ascontiguousarray(gammas_array[i].real)
         kappas_i = np.ascontiguousarray(gammas_array[i].imag)
