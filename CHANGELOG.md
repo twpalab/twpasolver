@@ -57,3 +57,5 @@ tutorials for the new workflow).
 - Phase matching of segmented devices (length-weighted per-segment mismatch with each segment's nonlinearity).
 - Mode frequencies outside the grid of the linear response raise instead of using extrapolated
   wavenumbers.
+- Mode currents along the line (`I_fwd`, `I_bwd`) come from the integrator's fourth-order dense output instead of
+  a linear interpolation between its adaptive steps.

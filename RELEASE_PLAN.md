@@ -342,7 +342,7 @@ Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` da
   One test on the 3-cell device (`gain` simple and bloch, `phase_matching`, `save_data`/`load_data`, stopband
   start < end) would have caught 2.11, 2.29-2.32.
   - Done 2026-11-06 (audit-fixes): `test_twpanalysis_end_to_end` (simple and bloch gain, `phase_matching`, `bandwidth`, save/load). Stopband start < end is left to 2.11.
-- [ ] **2.37 The segmented edge-basis `bloch` solve amplifies rounding by about 1e12** (found 2026-11-06 while
+- [x] **2.37 The segmented edge-basis `bloch` solve amplifies rounding by about 1e12** (found 2026-11-06 while
   checking the winding k, 77a7e00). On `_segmented_holotype((1, 1.02, 0.98, 1))` with the edge basis on (ext2,
   pump 16 GHz, passes 80, anderson_depth 15), multiplying `data["k"]` by (1 + 1e-15) moves `gain_db` by up to
   1.9e-3 dB (S11 more) at every signal, and it stays at 400 passes; the old (unwrap) code shows the same. Uniform
@@ -356,6 +356,17 @@ Confirmed by running unless marked "read". Line numbers refer to `bloch-cmes` da
     (`edge_threshold=None`): 3e-11 dB; uniform in all three modes: <= 2e-11 dB. So the junctions and the Anderson
     iteration are fine; the culprit is the fixed edge basis across segment junctions (edge-mode junction step or
     per-segment `edge_K`). Start there.
+  - **Done 2026-11-07** (ebbdf2d, cada7ee). Not an ill-conditioned junction: the iteration never converged. On
+    that device `p4` (64 GHz) lies deep in the stopband of segment 2 only (|K01| L_seg = 218), is ~2000x below
+    the pump, and jittered by a few % per pass, so the residual floor was ~1e-2, the default threshold: which pass
+    stopped depended on rounding (k x (1 + 1e-15) changed the passes used at every point). Without `p4` the same
+    device converges to 1e-10. Cause: `rk45_solve` linearly interpolated its adaptive steps onto `t_eval`, so the
+    stored envelopes carried an O(h^2) error that depended discontinuously on the step placement (atol=1e-20
+    gave the same floor drop, at 3-10x the cost). Fix: Dormand-Prince dense output. Floor 1e-2 -> 1e-4, all 9
+    points converge (was 7/9) in 17-36 passes (was 21-80); at a tight threshold the rounding perturbation moves
+    the gain by <= 5e-5 dB. The uniform holotype gain at 6 GHz moved by -0.023 dB (old value was interpolation
+    error; matches an atol=1e-20 reference). EDGE_SUBSTEPS 4 -> 16 changes gains by <= 1.5e-4 dB: the edge grid is
+    fine.
 
 **Acceptance:** each item has a test; the full suite is green; mypy errors go down.
 
@@ -820,12 +831,25 @@ clean, tutorials 01-06 execute (~2.5 min in total). Import 0.6 s; cold compile o
     forward-backward iteration is fragile (Malnou P3 design in notebook 05: 17/17 -> 0/17; Floquet 14/15 -> 7/15;
     40-segment random chip seed 3). The old code fails the same way with a dense `thin` (Malnou: thin=9 0/17,
     thin=3 all NaN), so dense internal grids destabilise the iteration; reverted, see 9.9.
-- [ ] **9.9 Forward-backward iteration diverges on dense internal grids** with edge-basis modes (stopband
+- [x] **9.9 Forward-backward iteration diverges on dense internal grids** with edge-basis modes (stopband
   modes: p3 of the Malnou design, p+s of random segmented chips). Reproducers: notebook 05 design with
   `thin=9`; `seed3.py`-like 40-segment holotype (sigma 2 %, rng seed 3) with `thin=20`. Probably the same
   ill-conditioning as 2.37 (edge-basis propagation over many short steps). Fixing it would allow a
   thin-independent internal grid (patch in the 9.8 note). Also consider an observable-based stopping test:
   the uniform holotype at 5 GHz stalls at residual 1e-4 while the gain is stable to 2e-5 dB.
+  - **Done 2026-11-07** (cada7ee). Not 2.37: the edge-mode BVP took the rows linear in the edge mode itself
+    (XPM from pump/signal/idler, pump-induced coupling of its two directions) as explicit sources lagged by one
+    pass. Once the grid resolves the evanescent profile, that loop has gain > 1 (Malnou `p3` grew 1.3x per pass
+    at thin=9; zeroing those 4 rows made it converge in 4 passes). Fix: those rows form an exact 2x2 Jacobian
+    J(x), and the BVP steps with exp((K + J_mid) h). Malnou thin=9/3 converge 17/17 with the thin=100 gains;
+    seed-3 thin=20 converges 20/20 within 0.02 dB of thin=100; the 2.37 device needs 10-27 passes instead of
+    17-36. Cost: the Jacobian is 4 extra RHS evaluations of the few self-linear rows per edge-grid point; end to
+    end +11 % on the 2.37 device, -11 % on seed 3. Notebook 06 now converges at every point (the uniform 5 GHz
+    point too). At thin=100 the output-grid interpolation still costs up to ~0.02 dB near the upper band edge
+    (12-12.5 GHz on the 2.37 device), in either direction: that is 9.10.
+- [ ] **9.10 Thin-independent internal grid.** Dense grids now converge (9.9), so the per-segment refinement
+  tried in 9.8 (steps from `kappa_cutoff`, independent of `thin`) can be re-applied. Measure its cost first:
+  the pass time grows with the internal grid.
 
 ## WP8: General devices and user models (after the first release)
 
