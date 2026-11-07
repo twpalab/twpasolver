@@ -724,8 +724,9 @@ History of the earlier WP4 items:
 - [x] **7.2 Notebooks** must use the post-refactor API, and must not depend on thesis files (`palette.py`,
   `prl_aps.mplstyle`, `edge_basis_sweep.py` → keep only what the docs need).
   - Done 2026-11-07: 03 and 04 ported to the new API (04's Floquet section moved to 05); new 05_other_twpas
-    (resonant phase matching with notch resonators in a 4WM Josephson line after Denney/Malnou 2026, with a
-    user-defined cell and the Bloch hook; Floquet TWPA from segments on the KI holotype: 13 dB fewer photons in
+    (Malnou's 4WM KI-TWPA, PR Applied 25, 054016 (2026), Appendix I values: rpm notch at 9.71 GHz from a user-defined
+    cell with the Bloch hook, modulated capacitors opening the 26-30 GHz stopband; 17-19 dB at 9.1 GHz / 22 uA,
+    third harmonic suppressed by 23 dB; Floquet TWPA from segments on the KI holotype: 13 dB fewer photons in
     conversion modes at equal gain) and 06_segmented_devices (identical segments vs uniform, runtime vs
     n_seg, random L/Lf variations, Lf taper). All execute without errors: 03 ~2 s, 04 ~23 s, 05 ~13 s,
     06 ~1 min 50 s. 01/02 used no analysis API.
