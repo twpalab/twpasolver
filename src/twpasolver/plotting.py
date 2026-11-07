@@ -1,6 +1,5 @@
 """Collection of plot functions."""
 
-# mypy: ignore-errors
 from typing import List, Optional
 
 import matplotlib.pyplot as plt
@@ -43,7 +42,7 @@ def plot_mode_currents(
         line_styles = ["-", "--", "-.", ":", "-", "--", "-."] * 3
 
     if colors is None:
-        colors = plt.cm.tab10(np.linspace(0, 1, n_modes))
+        colors = plt.get_cmap("tab10")(np.linspace(0, 1, n_modes))
 
     for i in range(n_modes):
         if log_scale:

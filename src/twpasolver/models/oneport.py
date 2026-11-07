@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Annotated, Literal, Union
+from typing import ClassVar, Literal
 
 import numpy as np
 from pydantic import Field, NonNegativeFloat
@@ -57,10 +57,7 @@ class OnePortArray(OnePortModel, ModelArray):
     parallel: bool = Field(
         default=False, description="Connect internal OnePortModels in parallel."
     )
-    cells: list[AnyOnePortModel] = Field(
-        default_factory=list,
-        description="List of OnePortModel representing the basic cells. Nested cells are allowed.",
-    )
+    cell_base: ClassVar[type] = OnePortModel
 
     def Z(self, freqs: np.ndarray) -> np.ndarray:
         """Impedance of the cells in series, or in parallel if ``parallel``."""
@@ -114,9 +111,3 @@ class Stub(OnePortModel):
     def Z(self, freqs: np.ndarray) -> np.ndarray:
         """Impedance of the stub."""
         return stub(freqs, L=self.L, C=self.C, length=self.length, open=self.open)
-
-
-AnyOnePortModel = Annotated[
-    Union[Resistance, Inductance, Capacitance, Stub, OnePortArray],
-    Field(discriminator="name"),
-]

@@ -39,8 +39,10 @@ Save and load from file:
 
 from __future__ import annotations
 
+import inspect
 import itertools
 from abc import ABC, abstractmethod
+from typing import Any, ClassVar
 
 import numpy as np
 import skrf as rf
@@ -207,6 +209,36 @@ class TwoPortModel(BaseModel, ABC):
         description="Number of repetitions of the model in the computed abcd matrix.",
     )
 
+    # Models declaring their own ``name`` field, by name, for validating cells from dicts.
+    registry: ClassVar[dict[str, type[TwoPortModel]]] = {}
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        """Register a subclass that declares its own ``name`` field (default = key)."""
+        super().__pydantic_init_subclass__(**kwargs)
+        if "name" in inspect.get_annotations(cls):
+            TwoPortModel.registry[cls.model_fields["name"].default] = cls
+
+    @staticmethod
+    def validate_cell(cell: Any, base: type) -> TwoPortModel:
+        """
+        A copy of ``cell`` (a model instance, or a dict with a registered ``name``),
+        checked to be a ``base``.
+        """
+        if isinstance(cell, dict):
+            model = TwoPortModel.registry.get(cell.get("name", ""))
+            if model is None:
+                raise ValueError(
+                    f"Unknown model name {cell.get('name')!r}; registered: "
+                    f"{sorted(TwoPortModel.registry)}."
+                )
+            cell = model.model_validate(cell)
+        elif isinstance(cell, TwoPortModel):
+            cell = type(cell).model_validate(cell)
+        if not isinstance(cell, base):
+            raise ValueError(f"Expected a {base.__name__}, got {type(cell).__name__}.")
+        return cell
+
     def update(self, **kwargs) -> None:
         """Update multiple attributes of the model; unknown names raise RuntimeError."""
         for key, value in kwargs.items():
@@ -217,9 +249,9 @@ class TwoPortModel(BaseModel, ABC):
 
     def __mul__(self, factor: int) -> TwoPortModel:
         """Return a copy of the model with ``N`` multiplied by ``factor``."""
-        new_instance = self.__class__(**self.model_dump())
-        new_instance.N = factor * self.N
-        return new_instance
+        new = self.model_copy(deep=True)
+        new.N = factor * self.N
+        return new
 
     @abstractmethod
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:

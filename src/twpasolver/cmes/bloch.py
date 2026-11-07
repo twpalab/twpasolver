@@ -67,22 +67,24 @@ def series_nl_elements(cell: Any) -> list[tuple[int, float]]:
     Each element is ``(port, L)``: the nonlinear inductance ``L`` carries the
     current of the cell's input (``PORT_IN``) or output (``PORT_OUT``) port.
     Custom cells can define a ``bloch_nl_elements()`` method returning the same
-    list to be supported.
+    list to be supported. The package cells scale ``L`` by their ``nl_scale``.
     """
     hook = getattr(cell, "bloch_nl_elements", None)
     if callable(hook):
         return list(hook())
     if isinstance(cell, LCLfBaseCell):
         # Shunt-first cell [Y][L]; centered variant is [L/2][Y][L/2].
+        L = cell.L * cell.nl_scale
         if cell.centered:
-            return [(PORT_IN, cell.L / 2), (PORT_OUT, cell.L / 2)]
-        return [(PORT_OUT, cell.L)]
+            return [(PORT_IN, L / 2), (PORT_OUT, L / 2)]
+        return [(PORT_OUT, L)]
     if isinstance(cell, StubBaseCell):
+        L = cell.L * cell.nl_scale
         if cell.line:
             # Lumped centre line split around the stubs: [L/2][stubs][L/2].
-            return [(PORT_IN, cell.L / 2), (PORT_OUT, cell.L / 2)]
+            return [(PORT_IN, L / 2), (PORT_OUT, L / 2)]
         # get_stub_cell is shunt-first [Y][L*l2].
-        return [(PORT_OUT, cell.L * cell.l2)]
+        return [(PORT_OUT, L * cell.l2)]
     raise NotImplementedError(
         f"Bloch CMEs: no nonlinear-element description for {type(cell).__name__}. "
         "Define a bloch_nl_elements() method returning [(port, L), ...]."

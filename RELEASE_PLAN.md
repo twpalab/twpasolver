@@ -599,7 +599,7 @@ History of the earlier WP4 items:
 
 ## WP5: models, modes and logging
 
-- [ ] **5.1 `AnyModel` blocks user models** (`models/twoportarrays.py:167-168`). The union is built from
+- [x] **5.1 `AnyModel` blocks user models** (`models/twoportarrays.py:167-168`). The union is built from
   `all_subclasses` at import, so a user `TwoPortModel` subclass defined later fails validation. Yet
   `docs/source/implementing_models.rst:11` promises it works, and `notebooks/contra_qpm/cqpm.py` works around it
   with `tw.cells[:] = ...`.
@@ -607,9 +607,24 @@ History of the earlier WP4 items:
     `__init_subclass__`), or a custom validator dispatching on `name`.
   - Also remove the `# mypy: ignore-errors` headers (`twoportarrays.py:9`, `plotting.py:3`); the opaque union
     causes 8 mypy errors in analysis/bloch.
-- [ ] **5.2 First-class nonlinear-element hook.** The Bloch code accepts `bloch_nl_elements()` on cells; document
+  - Done 2026-11-07 (audit-fixes): `TwoPortModel` keeps a `registry` filled in `__pydantic_init_subclass__` by
+    every subclass that declares its own `name`; `ModelArray` validates each cell through
+    `TwoPortModel.validate_cell` (dict by registered name, instance copied, nested list wrapped), checked
+    against `cell_base` (`OnePortModel` for `OnePortArray`). User models defined after import work as
+    instances, dicts and through JSON; an unnamed subclass (e.g. the contra_qpm cell with its own hook) keeps
+    its type. `AnyModel`, `AnyOnePortModel` and `all_subclasses` removed; `cells` stays `list[Any]` because a
+    `list[TwoPortModel]` field with `revalidate_instances="always"` would revalidate subclass instances as the
+    base class and drop their fields. Both `# mypy: ignore-errors` headers removed (`computed_field` and the
+    `name` override get the codes Pydantic documents; `plt.get_cmap`); mypy stays at 9. Tests
+    `tests/test_models_registry.py`. Golden bit-identical; 176 tests.
+- [x] **5.2 First-class nonlinear-element hook.** The Bloch code accepts `bloch_nl_elements()` on cells; document
   it, and consider an `nl_scale` field on `LCLfBaseCell`/`StubBaseCell`. That would remove the subclass in
   `contra_qpm` and allow nonlinearity-only gratings in JSON models.
+  - Done 2026-11-07 (audit-fixes): `nl_scale` (default 1) on `LCLfBaseCell` and `StubBaseCell` scales their
+    nonlinear elements in the bloch CMEs only (not the linear response, not `simple`); the
+    `bloch_nl_elements()` hook and `nl_scale` are documented in `implementing_models.rst` (whose method name
+    `get_single_abcd` was wrong: it is `single_abcd`). Test: `nl_scale=0.5` gives bit-identical bloch gains to
+    a subclass whose hook returns half of `L`.
 - [x] **5.3 `modes_rwa`:**
   - Replace the two parsers (`RWAAnalyzer._parse_expression` `~269`, `ModeArray._parse_expression_for_propagation`
     `~425`) and the two resolvers (sympy substitution, dict linear combination) with integer coefficient vectors.
@@ -645,9 +660,10 @@ History of the earlier WP4 items:
   and `LCLfBaseCell`.
   - Done 2026-11-06 (audit-fixes) except `get_dependent_modes` (kept: used in
     `notebooks/amplification/twpasolver_thesis/05_quantum_time.ipynb`). Test `test_stub_cell_line_abcd`.
-- [ ] **5.5 `matrices_arrays.py`:** the 12 duplicated property pairs on ABCD/S/Z arrays become a small descriptor.
+- [x] **5.5 `matrices_arrays.py`:** the 12 duplicated property pairs on ABCD/S/Z arrays become a small descriptor.
   `TwoPortModel.__mul__` should use `model_copy(update=...)`.
   - Done 2026-11-06 (audit-fixes): descriptor `_Element`, same validation. Left: `__mul__`.
+  - Done 2026-11-07 (audit-fixes): `__mul__` is a deep `model_copy` with a validated `N` assignment.
 - [x] **5.6 `quantum/`** (per D3). Dead functions: `gaussian.expm_batch`, `magnus4_omega`,
   `transfer_to_scattering`. The Python `star`/`cascade` duplicate the numba versions in `kernels.py`;
   `linearize.py:146` uses `col` possibly before assignment.
@@ -962,8 +978,8 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
 
 WP0 to WP4 and 5.3 are done (2.4 and 2.37 deferred); the API is the one of the WP4 design (`TWPAnalysis(twpa,
 freqs, unit, ports)`, `ModeSet`, `GainResult`/`PhaseMatchingResult`). Nothing is pushed. Next, roughly in order:
-1. **WP5:** 5.1 user models (the `AnyModel` union), `__mul__` of 5.5 (5.2 can wait for WP8). The open finding of
-   4.2 (segmented `simple` depends slightly on `thin`) is worth one measurement.
+1. **WP5 is done** (2026-11-07). The open finding of 4.2 (segmented `simple` depends slightly on `thin`) is
+   worth one measurement.
 2. **WP6:** rest of 6.1 (version and Python are set, sympy dropped), CI (add 3.13), pre-commit pins, mypy (9).
 3. **WP7:** notebooks and `implementing_models.rst` on the new API (7.2); fix the Sphinx RST errors left in
    `bloch_mode_tables`, `edge_basis_tables`, the `bloch_fb` module docstring and the `|…|` field descriptions, and

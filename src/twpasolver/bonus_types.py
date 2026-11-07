@@ -15,13 +15,6 @@ from pydantic_core import core_schema
 from typing_extensions import Annotated
 
 
-def all_subclasses(cls) -> list:
-    """Recursively get all subclasses of a given class."""
-    return cls.__subclasses__() + [
-        s for c in cls.__subclasses__() for s in all_subclasses(c)
-    ]
-
-
 def validate_impedance(Z: complex | float | str) -> complex | float:
     """Convert impedance to complex with positive real part; purely real values become float."""
     try:

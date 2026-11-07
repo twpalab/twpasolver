@@ -1,27 +1,20 @@
 """Arrays of TwoPortModels, including nested lists, and the TWPA model."""
 
-# mypy: ignore-errors
 from __future__ import annotations
 
-from typing import Annotated, Literal, Union
+from typing import Literal
 
 import numpy as np
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 
-from twpasolver.bonus_types import all_subclasses
 from twpasolver.matrices_arrays import ABCDArray, abcd_identity
 from twpasolver.models.modelarray import ModelArray
-from twpasolver.twoport import TwoPortModel
 
 
 class TwoPortArray(ModelArray):
     """Generic container for arrays of TwoPortModels."""
 
     name: Literal["TwoPortArray"] = Field(default="TwoPortArray")
-    cells: list[AnyModel] = Field(
-        default_factory=list,
-        description="List of TwoPortModels representing the basic cells. Nested lists are allowed.",
-    )
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
         """Cascade the ABCD matrices of the cells."""
@@ -30,7 +23,7 @@ class TwoPortArray(ModelArray):
             sc = sc @ cell.get_abcd(freqs)
         return sc
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def N_tot(self) -> NonNegativeInt:
         """Total number of base cells, counting nested arrays and repetitions ``N``."""
@@ -46,7 +39,7 @@ class TwoPortArray(ModelArray):
 class TWPA(TwoPortArray):
     """Simple model for TWPAs."""
 
-    name: Literal["TWPA"] = Field(default="TWPA")
+    name: Literal["TWPA"] = Field(default="TWPA")  # type: ignore[assignment]
     Istar: NonNegativeFloat = Field(
         default=6.5e-3, description="Nonlinearity scale current parameter."
     )
@@ -56,7 +49,7 @@ class TWPA(TwoPortArray):
     Idc: NonNegativeFloat = Field(default=1e-3, description="Bias dc current.")
     Ip0: NonNegativeFloat = Field(default=2e-4, description="Rf pump amplitude.")
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def epsilon(self) -> NonNegativeFloat:
         """
@@ -75,7 +68,7 @@ class TWPA(TwoPortArray):
             / self._xi_denominator
         )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def xi(self) -> NonNegativeFloat:
         """Coefficient of second-order term in inductance (see ``epsilon``)."""
@@ -94,19 +87,20 @@ class TWPA(TwoPortArray):
 
         Equals Istar^2 * Istar2^4 * L(Idc) / Lk.
         """
+        assert self.Istar2 is not None
         return (
             (self.Istar * self.Istar2**2) ** 2
             + (self.Istar * self.Idc**2) ** 2
             + (self.Idc * self.Istar2**2) ** 2
         )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def chi(self) -> NonNegativeFloat:
         """Coefficient for second term of phase matching relation."""
         return self.Ip0**2 * self.xi / 8
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def alpha(self) -> NonNegativeFloat:
         """Second-order correction term for inductance as function of dc current."""
@@ -115,12 +109,8 @@ class TWPA(TwoPortArray):
             alpha += self.Idc**4 / self.Istar2**4
         return alpha
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def Iratio(self) -> NonNegativeFloat:
         """Ratio ``Idc / Istar`` between bias and nonlinearity current."""
         return self.Idc / self.Istar
-
-
-named_models = [c for c in all_subclasses(TwoPortModel) if "name" in c.model_fields]
-AnyModel = Annotated[Union[tuple(named_models)], Field(discriminator="name")]

@@ -20,7 +20,6 @@ TWPA cells:
 
 Two-port arrays and models:
   * TWPA
-  * AnyModel
   * TwoPortArray
 
 Utility functions:
@@ -58,5 +57,5 @@ from twpasolver.models.oneport import (
 )
 from twpasolver.models.transmission_lines import LosslessTL
 from twpasolver.models.twpa_cells import LCLfBaseCell, StubBaseCell
-from twpasolver.models.twoportarrays import TWPA, AnyModel, TwoPortArray
+from twpasolver.models.twoportarrays import TWPA, TwoPortArray
 from twpasolver.models.compose import compose

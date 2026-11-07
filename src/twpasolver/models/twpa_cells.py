@@ -56,6 +56,13 @@ class StubBaseCell(TwoPortModel):
     l2: NonNegativeFloat = Field(1, description="Length of the straight line.")
     qp_loss: NonNegativeFloat = Field(0, description=("Quasiparticle-loss coefficient"))
     delta: NonNegativeFloat = Field(0, description="Loss Tangent")
+    nl_scale: NonNegativeFloat = Field(
+        1.0,
+        description=(
+            "Fraction of the line inductance L that is nonlinear: scales the nonlinear "
+            "elements of the bloch CMEs (not the linear response, nor the simple model)."
+        ),
+    )
     line: bool = Field(
         False,
         description=(
@@ -90,6 +97,13 @@ class LCLfBaseCell(TwoPortModel):
     Lf: NonNegativeFloat = required(description="Inductance of the stub finger.")
     delta: NonNegativeFloat = Field(0, description="Loss Tangent")
     qp_loss: NonNegativeFloat = Field(0, description=("Quasiparticle-loss coefficient"))
+    nl_scale: NonNegativeFloat = Field(
+        1.0,
+        description=(
+            "Fraction of the line inductance L that is nonlinear: scales the nonlinear "
+            "elements of the bloch CMEs (not the linear response, nor the simple model)."
+        ),
+    )
     centered: bool = False
 
     def single_abcd(self, freqs: np.ndarray) -> ABCDArray:
