@@ -341,6 +341,39 @@ def test_warmup_runs():
     warmup(verbose=False)
 
 
+def test_history_stops_at_the_passes_used(analysis):
+    """History entries after the last pass a point ran are NaN, not repeated."""
+    r = _bloch_gain(analysis)
+    used = r.diagnostics["passes_used"]
+    g = r.history["gain_db"]
+    assert g.shape[0] == 10 and np.all((used >= 1) & (used <= 10))
+    for f, u in enumerate(used):
+        assert np.isclose(g[u - 1, f], r.gain_db[f]) and np.isnan(g[u:, f]).all()
+
+
+def test_response_with_connectors_matches_unpumped_bloch():
+    """With no pump, the bloch S21/S11 are the linear response including the connectors."""
+    from twpasolver.models import Capacitance, Inductance, compose
+
+    ports = Ports(
+        input=Inductance(L=3e-10),
+        output=compose(
+            Inductance(L=2e-10), Capacitance(C=1e-13, twoport_parallel=True)
+        ),
+        Z_ext=50.0,
+    )
+    an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, 20, 1e-2), ports=ports)
+    cfg = BlochSolverConfig(passes=200, convergence_threshold=1e-10)
+    r = an.gain(SIGNALS, pump=PUMP, Ip0=0.0, Is0=1e-8, model="bloch", bloch_config=cfg)
+    lin = TWPAnalysis(twpa=_small_twpa(), freqs=list(SIGNALS), ports=ports).response()
+    np.testing.assert_allclose(r.gain_db, 20 * np.log10(np.abs(lin.s.S21)), atol=1e-6)
+    np.testing.assert_allclose(
+        r.gain_db_11, 20 * np.log10(np.abs(lin.s.S11)), atol=1e-6
+    )
+    bare = an.response(connectors=False)
+    np.testing.assert_allclose(np.asarray(bare.abcd), an.linear.abcd)
+
+
 def test_modes_outside_grid_raise():
     """Mode parameters are never extrapolated beyond the linear-response grid."""
     an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, 20, 1e-2))

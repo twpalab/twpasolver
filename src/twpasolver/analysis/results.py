@@ -58,7 +58,8 @@ class GainResult(_Saveable):
             1e-3 to 1e-1 is common while the gains are stable.
         history: With ``BlochSolverConfig(save_all_passes=True)``, every pass:
             ``I_fwd``, ``I_bwd``, ``b_in``, ``b_out`` and the four gains with a
-            leading pass axis; otherwise empty.
+            leading pass axis of length ``passes``; NaN after the last pass a point
+            ran (``diagnostics["passes_used"]``). Otherwise empty.
     """
 
     model: str

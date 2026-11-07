@@ -221,10 +221,19 @@ def solve_bloch(
     a_in, a_out = out["a_in"], out["a_out"]
     history: dict[str, Any] = {}
     if bloch_config.save_all_passes:
-        history = {k: out[k] for k in ("I_fwd", "I_bwd", "b_in", "b_out")}
+        # The kernel repeats the last pass of a point that stopped early; blank it.
+        unused = np.arange(len(out["I_fwd"]))[:, None] >= diag["passes_used"][None, :]
+        history = {}
+        for key in ("I_fwd", "I_bwd", "b_in", "b_out"):
+            arr = out[key].copy()
+            arr[unused] = np.nan
+            history[key] = arr
         history.update(
             port_gains(
-                a_in[:, s], a_out[:, s], out["b_in"][..., s], out["b_out"][..., s]
+                a_in[:, s],
+                a_out[:, s],
+                history["b_in"][..., s],
+                history["b_out"][..., s],
             )
         )
     b_in, b_out = out["b_in"][-1], out["b_out"][-1]

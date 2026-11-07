@@ -794,11 +794,17 @@ clean, tutorials 01-06 execute (~2.5 min in total). Import 0.6 s; cold compile o
   tests and notebooks 03/04/06 unaffected.
 - [x] **9.2 Plot smoke test** (`test_plots_render`, Agg backend) for every plot entry point; plotting was at 15 %.
 - [x] **9.3 Numba cache in CI**, keyed on the sources and the lock file (saves the ~1-2 min compile per job).
-- [ ] **9.4 Linear response with connectors.** `an.linear.S21/S11` are those of the bare device; `ports` only enter
+- [x] **9.4 Linear response with connectors.** `an.linear.S21/S11` are those of the bare device; `ports` only enter
   the `bloch` gain. Cascading the connector ABCDs (or an `an.s_parameters()` with ports) would let users compare
   the linear response with measurements of a packaged device. Small.
-- [ ] **9.5 `GainResult.history` pads converged points** with their last pass (`bloch_fb.py` kernel), so the pass
+  - Done 2026-11-07: `TWPAnalysis.response(connectors=True)` returns the `TwoPortCell` of the device with the
+    connectors cascaded (output one reversed), referred to `Z_ext`. Test: with no pump, bloch S21/S11 equal it to
+    1e-6 dB with a tight `convergence_threshold` (4e-5 dB at the default 1e-2: the end reflections come out of the
+    forward-backward iteration and inherit its tolerance).
+- [x] **9.5 `GainResult.history` pads converged points** with their last pass (`bloch_fb.py` kernel), so the pass
   axis is always `passes` long. Store the passes used per point in `diagnostics` (or mask the padding). Small.
+  - Done 2026-11-07: the kernel returns the passes each point ran (`diagnostics["passes_used"]`); history entries
+    after it are NaN (the last slot still holds the result). Test `test_history_stops_at_the_passes_used`.
 - [ ] **9.6 `thin`** is documented as a spacing in unit cells but sets `N_tot / thin` points; either document it as
   such or use `arange(0, N_tot + thin, thin)` (changes the x grid). Trivial.
 - [ ] **9.7 Pump power in dBm.** `gain(Ip0=...)` takes amperes; `mathutils.dBm_to_I` exists but users must find it.

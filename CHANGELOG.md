@@ -18,7 +18,8 @@ tutorials for the new workflow).
 - `TWPAnalysis.linear` (`LinearData`): Bloch parameters per segment, all stopbands in the grid, `k_star`; computed
   on demand and refreshed when the model or the grid changes. `k` follows the winding of the mode, so it is
   continuous across resonator notches and negative in left-handed bands.
-- `Ports(input, output, Z_ext)`: connector models at both ends (`bloch` only).
+- `Ports(input, output, Z_ext)`: connector models at both ends (`bloch` only); `TWPAnalysis.response()` gives the
+  linear two-port response including them.
 - User models: any `TwoPortModel` subclass that declares a `name` is accepted in cell lists and JSON files, also
   when defined after import; custom cells support the `bloch` model through `bloch_nl_elements()`.
 - `nl_scale` on `LCLfBaseCell` and `StubBaseCell`: nonlinear fraction of the line inductance (`bloch` couplings).

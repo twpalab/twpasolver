@@ -49,6 +49,9 @@ reports the currents incident from the external lines (``a_in`` at x=0, ``a_out`
 (``b_in``, ``b_out``), including the prompt reflection of the incident waves, and the signal gains ``gain_db``
 (S21), ``gain_db_12``, ``gain_db_11`` and ``gain_db_22``. A gain whose reference input is zero is NaN. With inputs at
 both ends the outputs contain the response to both, so inject from one side at a time to measure S-parameters.
+The linear response including the connectors, for comparison with measurements of a packaged device, is
+:meth:`TWPAnalysis.response() <twpasolver.analysis.TWPAnalysis.response>`; without pump the ``bloch`` gains
+reduce to it.
 
 Stopband edges and the edge basis
 ---------------------------------

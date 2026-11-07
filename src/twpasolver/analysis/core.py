@@ -26,6 +26,7 @@ from twpasolver.logger import log
 from twpasolver.models import TWPA
 from twpasolver.modes_rwa import ModeSet, as_mode_set
 from twpasolver.plotting import plot_response
+from twpasolver.twoport import TwoPortCell
 
 _UNIT_MULTIPLIERS = {"Hz": 1, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9, "THz": 1e12}
 
@@ -111,6 +112,28 @@ class TWPAnalysis(BaseModel):
             self._interp = interpolator(self._linear)
             self._linear_key = key
         return self._linear
+
+    def response(self, connectors: bool = True) -> TwoPortCell:
+        """
+        Linear two-port response of the device on the grid (``.s.S21``, ``.abcd``, ...).
+
+        With ``connectors`` the connectors of ``ports`` are cascaded at both ends (the
+        output one reversed: its port 2 faces the device) and the parameters refer to
+        ``ports.Z_ext``, as the ``bloch`` gains do; otherwise the bare device, referred
+        to ``twpa.Z0_ref`` as in :attr:`linear`.
+        """
+        T = np.asarray(self.linear.abcd)
+        if not connectors:
+            return TwoPortCell(self.f, abcd=T, Z0=self.twpa.Z0_ref)
+        p = self.ports
+        out = p.output if p.output is not None else p.input
+        if p.input is not None:
+            T = np.asarray(p.input.get_abcd(self.f)) @ T
+        if out is not None:
+            m = np.asarray(out.get_abcd(self.f))
+            det = m[:, 0, 0] * m[:, 1, 1] - m[:, 0, 1] * m[:, 1, 0]
+            T = T @ (m[:, ::-1, ::-1].transpose(0, 2, 1) / det[:, None, None])
+        return TwoPortCell(self.f, abcd=T, Z0=p.Z_ext)
 
     def problem(
         self, modes: Union[str, ModeSet], tones: Mapping[str, Any]

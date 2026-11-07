@@ -911,6 +911,7 @@ def _bloch_fb_solve_segmented(
         I_out = np.empty((2 * n_freq, n_modes, n_x), dtype=np.complex128)
     converged_flags = np.zeros(n_freq, dtype=np.bool_)
     residuals = np.full(n_freq, np.inf)
+    passes_used = np.zeros(n_freq, dtype=np.int64)
 
     for i in nb.prange(n_freq):  # pylint: disable=not-an-iterable
         alphas_seg = np.ascontiguousarray(gammas_seg[i].real)  # (n_seg, n_modes)
@@ -1219,6 +1220,7 @@ def _bloch_fb_solve_segmented(
             I_out[i + id_add_bwd] = A_bwd_x
 
             u_k = np.ascontiguousarray(u_next)
+            passes_used[i] = k + 1
 
             if converged or blown_up:
                 converged_flags[i] = converged
@@ -1228,7 +1230,7 @@ def _bloch_fb_solve_segmented(
                         I_out[i + kk * n_freq + n_freq * passes] = A_bwd_x
                 break
 
-    return I_out, converged_flags, residuals
+    return I_out, converged_flags, residuals, passes_used
 
 
 # --------------------------------------------------------------------------- #
@@ -1416,7 +1418,7 @@ def bloch_fb_segmented_cmes_solve(
         edge_K = np.zeros((n_freq, n_seg, n_modes, 2, 2), dtype=np.complex128)
 
     c = np.ascontiguousarray
-    I_out, converged, residuals = _bloch_fb_solve_segmented(
+    I_out, converged, residuals, passes_used = _bloch_fb_solve_segmented(
         c(x_int),
         c(s_int),
         c(offsets),
@@ -1478,6 +1480,7 @@ def bloch_fb_segmented_cmes_solve(
     if diagnostics is not None:
         diagnostics["converged"] = converged
         diagnostics["residuals"] = residuals
+        diagnostics["passes_used"] = passes_used
 
     n_saved = passes if save_all_passes else 1
     raw = I_out.reshape((2, n_saved, n_freq, n_modes, len(x_array)))
