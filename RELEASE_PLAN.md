@@ -566,8 +566,16 @@ Items (each step keeps golden gains bit-identical on the holotype, the segmented
     tone raises instead of counting as 0 Hz. Golden (scratch `golden.py`, self-contained): all 42 arrays
     bit-identical (gains, currents, phase mismatch). Tests migrated (`MIGRATION` notes in the job scratch);
     174 tests, mypy 9.
-- [ ] **4.9 Plain NumPy 2×2 algebra:** `matmul_2x2`/`matpow_2x2` duplicate `a @ b` and
+- [x] **4.9 Plain NumPy 2×2 algebra:** `matmul_2x2`/`matpow_2x2` duplicate `a @ b` and
   `np.linalg.matrix_power` on stacks; keep the `ABCDArray`/`SMatrixArray` accessors (`.A`, `.S21`) as thin views.
+  - Done 2026-11-07 (audit-fixes): `ABCDArray.__matmul__` (same-length check kept, now `ValueError`) and
+    `__pow__` (`**0` is the identity) and `supercell_matrix` use `np.matmul` / `np.linalg.matrix_power`;
+    `mathutils.matmul_2x2`/`matpow_2x2` and their tests removed. Overflow to inf in stopbands is silenced as the
+    Numba code did. Linear data of the holotype grid: 0.22 s -> 0.24 s. **Not bit-identical:** the product order
+    of `matrix_power` differs at the 1e-16 level, which moves results within the solver tolerance (default
+    `convergence_threshold` 1e-2 relative): `simple` and phase matching by <= 4e-12 dB, `bloch` S21 by
+    <= 2e-4 dB (segmented holotype with edge basis, the 2.37 sensitivity) and 4e-6 dB elsewhere, S11 by
+    <= 4e-3 dB. Golden reference re-recorded. 170 tests, mypy 9.
 
 Estimate: `analysis.py` 1,836 lines → ~1,200 in the package (facade ~200); `src/` ~8,200 → ~6,500 together
 with 5.3. Order: 4.1, 4.2, 4.3b with 4.3c, 4.4, 4.5b with 5.3, 4.6/4.7, 4.8; 4.9 any time.

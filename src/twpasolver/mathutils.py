@@ -1,57 +1,9 @@
-"""
-Numba-compiled utilities for arrays of 2x2 matrices.
-
-Products, powers, ABCD/S/Z conversions and dB/dBm unit conversions.
-"""
+"""Numba-compiled ABCD/S/Z conversions of 2x2 matrix arrays, and dB/dBm unit conversions."""
 
 import numba as nb
 import numpy as np
 
 from twpasolver.bonus_types import ComplexArray, FloatArray
-
-
-@nb.njit(cache=True)
-def matmul_2x2(
-    matrices_a: ComplexArray,
-    matrices_b: ComplexArray,
-) -> ComplexArray:
-    """Product of two arrays of 2x2 matrices, shape (n, 2, 2)."""
-    assert matrices_a.shape == matrices_b.shape
-    assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
-
-    n_mat = matrices_a.shape[0]
-    result_matrices = np.empty((n_mat, 2, 2), dtype=np.complex128)
-    for k in range(n_mat):
-        for i in range(2):
-            for j in range(2):
-                result_matrices[k, i, j] = (
-                    matrices_a[k, i, 0] * matrices_b[k, 0, j]
-                    + matrices_a[k, i, 1] * matrices_b[k, 1, j]
-                )
-
-    return result_matrices
-
-
-@nb.njit(cache=True)
-def matpow_2x2(matrices_a: ComplexArray, exponent: int) -> ComplexArray:
-    """Positive integer power of an array of 2x2 matrices, by repeated squaring."""
-    assert matrices_a.shape[1] == 2 and matrices_a.shape[2] == 2
-    assert exponent > 0
-    base = matrices_a.astype(np.complex128)
-    result = base.copy()
-    have_result = False
-    e = exponent
-    while e > 0:
-        if e & 1:
-            if have_result:
-                result = matmul_2x2(result, base)
-            else:
-                result = base.copy()
-                have_result = True
-        e >>= 1
-        if e > 0:
-            base = matmul_2x2(base, base)
-    return result
 
 
 @nb.njit(cache=True)

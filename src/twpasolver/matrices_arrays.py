@@ -5,8 +5,6 @@ from typing import Any
 import numpy as np
 from typing_extensions import Self
 
-from twpasolver.mathutils import matmul_2x2, matpow_2x2
-
 
 class TwoByTwoArray:
     """A class representing an array of 2x2 matrices."""
@@ -81,12 +79,19 @@ class ABCDArray(TwoByTwoArray):
     """A class representing an array of ABCD matrices."""
 
     def __matmul__(self, other: Self) -> Self:
-        """Element-wise 2x2 matrix product with another ABCDArray."""
-        return self.__class__(matmul_2x2(self._matarray, other._matarray))
+        """Element-wise 2x2 matrix product with another ABCDArray of the same length."""
+        if self._matarray.shape != other._matarray.shape:
+            raise ValueError(
+                f"Shapes {self._matarray.shape} and {other._matarray.shape} differ."
+            )
+        with np.errstate(over="ignore", invalid="ignore"):
+            return self.__class__(np.matmul(self._matarray, other._matarray))
 
     def __pow__(self, exponent: int) -> Self:
-        """Raise each 2x2 matrix to an integer power."""
-        return self.__class__(matpow_2x2(self._matarray, exponent))
+        """Raise each 2x2 matrix to an integer power (0 gives the identity)."""
+        # Evanescent (stopband) cells overflow to inf at large powers, by design.
+        with np.errstate(over="ignore", invalid="ignore"):
+            return self.__class__(np.linalg.matrix_power(self._matarray, exponent))
 
     A = _Element(0, 0)
     B = _Element(0, 1)

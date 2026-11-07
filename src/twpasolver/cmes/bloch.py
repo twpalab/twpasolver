@@ -47,7 +47,6 @@ import numpy as np
 
 from twpasolver.bonus_types import ComplexArray, FloatArray
 from twpasolver.logger import log
-from twpasolver.mathutils import matmul_2x2, matpow_2x2
 from twpasolver.models.twoportarrays import TwoPortArray
 from twpasolver.models.twpa_cells import LCLfBaseCell, StubBaseCell
 
@@ -350,8 +349,11 @@ def supercell_matrix(twpa: TwoPortArray, freqs_hz: FloatArray) -> np.ndarray:
     freqs_hz = np.atleast_1d(np.asarray(freqs_hz, dtype=np.float64))
     T = None
     for cell, n in expand_unit_cells(twpa):
-        Tc = matpow_2x2(np.asarray(cell.single_abcd(freqs_hz), dtype=np.complex128), n)
-        T = Tc if T is None else matmul_2x2(T, Tc)
+        with np.errstate(over="ignore", invalid="ignore"):
+            Tc = np.linalg.matrix_power(
+                np.asarray(cell.single_abcd(freqs_hz), dtype=np.complex128), n
+            )
+            T = Tc if T is None else T @ Tc
     if T is None:
         return np.broadcast_to(
             np.eye(2, dtype=np.complex128), (len(freqs_hz), 2, 2)

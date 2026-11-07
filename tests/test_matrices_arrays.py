@@ -72,3 +72,15 @@ def test_pow_and_mul(abcd_array):
     mat = np.asarray(abcd_array)
     assert np.array_equal(pow, mat @ mat)
     assert np.array_equal(mul, mat @ mat)
+
+
+def test_power_and_shape_checks():
+    """Powers match explicit products, the zero power is the identity, shapes must agree."""
+    mats = np.array([[[2.0, 0.0], [1.0, 2.0]], [[-1.0, 2.0], [0.0, -1.0]]])
+    arr = ABCDArray(mats)
+    np.testing.assert_allclose(np.asarray(arr**3), mats @ mats @ mats)
+    np.testing.assert_array_equal(
+        np.asarray(arr**0), np.broadcast_to(np.eye(2), mats.shape)
+    )
+    with pytest.raises(ValueError):
+        arr @ ABCDArray(mats[:1])
