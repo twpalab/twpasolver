@@ -850,6 +850,10 @@ clean, tutorials 01-06 execute (~2.5 min in total). Import 0.6 s; cold compile o
 - [ ] **9.10 Thin-independent internal grid.** Dense grids now converge (9.9), so the per-segment refinement
   tried in 9.8 (steps from `kappa_cutoff`, independent of `thin`) can be re-applied. Measure its cost first:
   the pass time grows with the internal grid.
+- [ ] **9.11 (after the release) Cheaper edge-mode Jacobian.** The implicit self-terms (9.9) cost ~25 % on the
+  uniform holotype (40 signals: 1.2 -> 1.5 s at fixed settings; ~50 % per pass, one pass saved). J depends almost
+  only on the pump, which settles in the first passes: refresh it every few passes and add the defect correction
+  ``(J_new - J_frozen) c_prev`` explicitly, so the fixed point is unchanged. Stability first was the choice for 0.1.0.
 
 ## WP8: General devices and user models (after the first release)
 
