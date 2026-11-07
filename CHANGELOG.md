@@ -54,3 +54,5 @@ tutorials for the new workflow).
 - Stopband detection independent of where the frequency grid ends; HDF5 saves no longer destroy the previous file
   on failure; complex `Z0` handled consistently in S-parameters; NaN results reported instead of passed silently.
 - Phase matching of segmented devices (length-weighted per-segment mismatch with each segment's nonlinearity).
+- Mode frequencies outside the grid of the linear response raise instead of using extrapolated
+  wavenumbers.

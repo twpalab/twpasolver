@@ -780,6 +780,31 @@ History of the earlier WP4 items:
     go too.
 - [ ] **7.9 Tag the release**; PyPI per D7.
 
+## WP9: Assessment 2026-11-07 (after WP4-WP7)
+
+State: `src/` 7.4k lines (14.8k at the first review), 178 tests, coverage ~62 %, mypy clean, pylint errors-only
+clean, tutorials 01-06 execute (~2.5 min in total). Import 0.6 s; cold compile on first use: `simple` ~12 s,
+`bloch` ~62 s (hence `twpasolver-warmup`). Largest remaining units are the Numba solver functions
+(`_bloch_fb_solve_segmented` 378 lines, `bloch_fb_segmented_cmes_solve` 273, `rk45_solve` 253).
+
+- [x] **9.1 Silent extrapolation of mode parameters.** Modes above the top of `freqs` (e.g. the fourth pump
+  harmonic, 63 GHz, on a 40 GHz grid) got a cubic-spline extrapolated k (0.372 instead of 0.462 rad/cell on the
+  holotype): gains off by up to 0.6 dB and NaN at 3 of 8 signals, with no warning. Done 2026-11-07:
+  `build_problem` raises a `ValueError` naming the modes and the grid. Test `test_modes_outside_grid_raise`;
+  tests and notebooks 03/04/06 unaffected.
+- [x] **9.2 Plot smoke test** (`test_plots_render`, Agg backend) for every plot entry point; plotting was at 15 %.
+- [x] **9.3 Numba cache in CI**, keyed on the sources and the lock file (saves the ~1-2 min compile per job).
+- [ ] **9.4 Linear response with connectors.** `an.linear.S21/S11` are those of the bare device; `ports` only enter
+  the `bloch` gain. Cascading the connector ABCDs (or an `an.s_parameters()` with ports) would let users compare
+  the linear response with measurements of a packaged device. Small.
+- [ ] **9.5 `GainResult.history` pads converged points** with their last pass (`bloch_fb.py` kernel), so the pass
+  axis is always `passes` long. Store the passes used per point in `diagnostics` (or mask the padding). Small.
+- [ ] **9.6 `thin`** is documented as a spacing in unit cells but sets `N_tot / thin` points; either document it as
+  such or use `arange(0, N_tot + thin, thin)` (changes the x grid). Trivial.
+- [ ] **9.7 Pump power in dBm.** `gain(Ip0=...)` takes amperes; `mathutils.dBm_to_I` exists but users must find it.
+  A `pump_dbm=`/`signal_dbm=` convenience or a documented recipe in notebook 03. Small.
+- [ ] **9.8 The 4.2 finding** (segmented `simple` slightly depends on `thin`): measure once.
+
 ## WP8: General devices and user models (after the first release)
 
 Goal: any lumped/distributed ladder (left-handed, CRLH, shunt-JJ, SNAIL, mixed JJ/kinetic) and user models that

@@ -165,3 +165,6 @@ docs/source/api-reference/
 *.pkl
 *.npz
 Claude outputs/
+
+# Numba cache directory used in CI
+.numba_cache/

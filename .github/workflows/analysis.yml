@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Compiled CME kernels, cached across runs until the sources change.
+      NUMBA_CACHE_DIR: ${{ github.workspace }}/.numba_cache
     strategy:
       fail-fast: false
       matrix:
@@ -28,6 +31,12 @@ jobs:
       with:
         path: .venv
         key: pydeps-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+    - name: cache compiled kernels
+      uses: actions/cache@v4
+      with:
+        path: .numba_cache
+        key: numba-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('src/**/*.py', 'poetry.lock') }}
 
     - name: install_dependencies_only
       run: poetry install --no-interaction --no-root --with analysis

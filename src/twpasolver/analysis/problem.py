@@ -27,6 +27,15 @@ def build_problem(
     f = modes.frequencies(tones)
     freqs = np.ascontiguousarray(f.reshape(len(modes.labels), -1).T)
     n_freq, n_modes = freqs.shape
+    lo, hi = lin.freqs[0], lin.freqs[-1]
+    outside = (np.abs(freqs) < lo) | (np.abs(freqs) > hi)
+    if outside.any():
+        bad = sorted({modes.labels[j] for j in np.flatnonzero(outside.any(axis=0))})
+        raise ValueError(
+            f"Modes {bad} reach |f| = {np.abs(freqs)[outside].min():.3g} to "
+            f"{np.abs(freqs)[outside].max():.3g}, outside the frequency grid [{lo:.3g}, "
+            f"{hi:.3g}] of the linear response; extend TWPAnalysis.freqs to cover them."
+        )
     n_seg = len(segments)
     p = interp.interpolate(np.abs(freqs).ravel())
 

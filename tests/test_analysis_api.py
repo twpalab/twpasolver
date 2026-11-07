@@ -341,6 +341,31 @@ def test_warmup_runs():
     warmup(verbose=False)
 
 
+def test_modes_outside_grid_raise():
+    """Mode parameters are never extrapolated beyond the linear-response grid."""
+    an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, 20, 1e-2))
+    with pytest.raises(ValueError, match=r"\['p2'\].*extend TWPAnalysis.freqs"):
+        an.gain(SIGNALS, pump=PUMP, modes=ModeSet.extended_3wm(1, 0, 0))
+
+
+def test_plots_render():
+    """Every plot entry point draws without errors."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, 30, 1e-2))
+    r = an.gain(SIGNALS, pump=PUMP, Is0=1e-8, model="bloch")
+    an.plot_response()
+    r.plot()
+    r.plot_currents()
+    r.plot_currents(backward=True, log_scale=False)
+    an.phase_matching([3.0, 5.0], [11.0, 12.0]).plot()
+    ModeSet.extended_3wm(1, 1, 0).plot_relations(tones={"p": PUMP, "s": 5.0})
+    plt.close("all")
+
+
 def test_frequencies_validation():
     with pytest.raises(ValidationError):
         TWPAnalysis(twpa=_small_twpa(), freqs=(1, 2, 0))
