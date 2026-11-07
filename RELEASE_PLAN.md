@@ -689,6 +689,9 @@ History of the earlier WP4 items:
   `prl_aps.mplstyle`, `edge_basis_sweep.py` → keep only what the docs need).
 - [ ] **7.3 API reference:** `run_apidoc` in `conf.py` writes into the repo, so either ignore its output (1.5) or
   generate it at build time only. It currently lacks bloch*, rk45, warmup and quantum.
+  - 2026-11-07: the `analysis/` package gives ~40 "duplicate object description" warnings (classes on
+    both the package page, through the re-exports, and the module pages; dataclass fields both in
+    `Attributes:` and as members). Document the package page only, or turn off member docs for dataclasses.
 - [ ] **7.4 Execution policy:** `nbsphinx_execute` is unset (auto), so stripped notebooks run at every build,
   which is slow given numba compile times. Either commit outputs for heavy notebooks and set `never` for them, or
   cache them. Pandoc is needed for the build and is not installed locally.
@@ -955,14 +958,16 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
   Base data bit-identical; `supercell_matrix` moves by ~2e-13 (product order), so uniform `bloch` gains move
   <= 3.5e-11 dB, `simple` is identical, and the segmented edge-basis case moves 3.3e-3 dB (item 2.37).
 
-## Where to pick up (updated 2026-11-06, `audit-fixes`)
+## Where to pick up (updated 2026-11-07, `audit-fixes`)
 
-WP0 is closed (PyPI, `0.1.0`, Python ≥3.10, any API break allowed). WP1, WP2 and WP3 except 3.3 are done (2.4 and
-2.37 deferred); comments and docstrings are trimmed. Nothing is pushed. Next, roughly in order:
-1. **WP4 (API, before the docs are written against it):** follow the design and order in WP4 (4.1 move solver
-   prep to `cmes/`, 4.2 one-segment shapes, 4.3b/4.3c lazy linear data and flat facade, 4.4 one problem builder, 4.5b result
-   dataclasses with 5.3 `ModeSet`, 4.6/4.7, 4.8 package split); golden gains bit-identical at every step.
-2. **WP5:** 5.1 user models, 5.3 `modes_rwa` (with 4.5b), `__mul__` of 5.5 (5.2 can wait for WP8).
-3. **WP6:** rest of 6.1 (version and Python are set), CI (add 3.13), pre-commit pins, mypy.
-4. **WP7:** fix the Sphinx RST errors left in `gain`, `bloch_mode_tables`, `edge_basis_tables`, the `bloch_fb`
-   module docstring and the `|…|` field descriptions; toctree, notebooks, README, changelog; tag and publish.
+WP0 to WP4 and 5.3 are done (2.4 and 2.37 deferred); the API is the one of the WP4 design (`TWPAnalysis(twpa,
+freqs, unit, ports)`, `ModeSet`, `GainResult`/`PhaseMatchingResult`). Nothing is pushed. Next, roughly in order:
+1. **WP5:** 5.1 user models (the `AnyModel` union), `__mul__` of 5.5 (5.2 can wait for WP8). The open finding of
+   4.2 (segmented `simple` depends slightly on `thin`) is worth one measurement.
+2. **WP6:** rest of 6.1 (version and Python are set, sympy dropped), CI (add 3.13), pre-commit pins, mypy (9).
+3. **WP7:** notebooks and `implementing_models.rst` on the new API (7.2); fix the Sphinx RST errors left in
+   `bloch_mode_tables`, `edge_basis_tables`, the `bloch_fb` module docstring and the `|…|` field descriptions, and
+   the duplicate-object warnings of the re-exported analysis classes and dataclass fields (7.3); toctree, README,
+   changelog; tag and publish.
+4. **Regression reference:** the golden script used for WP4 lives in the job scratch only; put a reduced version
+   (gains only) in `tests/` before further numerical work.
