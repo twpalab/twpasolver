@@ -809,7 +809,23 @@ clean, tutorials 01-06 execute (~2.5 min in total). Import 0.6 s; cold compile o
   such or use `arange(0, N_tot + thin, thin)` (changes the x grid). Trivial.
 - [ ] **9.7 Pump power in dBm.** `gain(Ip0=...)` takes amperes; `mathutils.dBm_to_I` exists but users must find it.
   A `pump_dbm=`/`signal_dbm=` convenience or a documented recipe in notebook 03. Small.
-- [ ] **9.8 The 4.2 finding** (segmented `simple` slightly depends on `thin`): measure once.
+- [x] **9.8 The 4.2 finding** (segmented `simple` slightly depends on `thin`): measure once.
+  - Done 2026-11-07: `simple` moves <= 1e-4 dB with `thin` (9e-4 dB at thin=400, 4 varied segments): negligible.
+    `bloch` depends more (vs thin=2: uniform 2e-4 dB at thin=100, 0.011 dB at 400; 4 varied segments 2.2e-3 and
+    0.035 dB), because the stored envelopes are interpolated (4-point Lagrange) on the internal grid, which is the
+    output grid plus segment edges. Identical segments vs the uniform device: 2e-3 dB at the defaults (200
+    segments), from the convergence tolerance (each run stops at a different point within 1e-2) plus the
+    interpolation; tight threshold + thin=20 gives ~0. Tried refining the internal grid per segment (independent
+    of `thin`, steps from kappa_cutoff): it removes the thin dependence but breaks convergence where the
+    forward-backward iteration is fragile (Malnou P3 design in notebook 05: 17/17 -> 0/17; Floquet 14/15 -> 7/15;
+    40-segment random chip seed 3). The old code fails the same way with a dense `thin` (Malnou: thin=9 0/17,
+    thin=3 all NaN), so dense internal grids destabilise the iteration; reverted, see 9.9.
+- [ ] **9.9 Forward-backward iteration diverges on dense internal grids** with edge-basis modes (stopband
+  modes: p3 of the Malnou design, p+s of random segmented chips). Reproducers: notebook 05 design with
+  `thin=9`; `seed3.py`-like 40-segment holotype (sigma 2 %, rng seed 3) with `thin=20`. Probably the same
+  ill-conditioning as 2.37 (edge-basis propagation over many short steps). Fixing it would allow a
+  thin-independent internal grid (patch in the 9.8 note). Also consider an observable-based stopping test:
+  the uniform holotype at 5 GHz stalls at residual 1e-4 while the gain is stable to 2e-5 dB.
 
 ## WP8: General devices and user models (after the first release)
 
