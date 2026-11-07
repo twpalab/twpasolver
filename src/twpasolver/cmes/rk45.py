@@ -49,8 +49,9 @@ def rk45_solve(
     Adaptive Dormand-Prince RK45.
 
     Scalar tolerances, a given positive ``first_step`` and a non-empty
-    ``t_eval`` (the only way it is called); returns the solution interpolated
-    on ``t_eval``, shape ``(y_size, t_eval.size)``.
+    ``t_eval`` sorted along the integration direction (the only way it is
+    called); returns the solution on ``t_eval`` from the fourth-order dense
+    output, shape ``(y_size, t_eval.size)``, NaN past a failed integration.
     """
     # Elementwise assignment: an np.array([...]) literal inside an inline="always"
     # function under parallel=True hits a Numba compiler bug.
@@ -96,6 +97,29 @@ def rk45_solve(
     E[5] = -22 / 525
     E[6] = 1 / 40
 
+    # Fourth-order continuous extension of Dormand-Prince (as in SciPy's RK45):
+    # y(t_old + x h) = y_old + h sum_j K_j sum_p P[j, p] x^(p+1).
+    P = np.zeros((7, 4), dtype=np.float64)
+    P[0, 0] = 1.0
+    P[0, 1] = -8048581381 / 2820520608
+    P[0, 2] = 8663915743 / 2820520608
+    P[0, 3] = -12715105075 / 11282082432
+    P[2, 1] = 131558114200 / 32700410799
+    P[2, 2] = -68118460800 / 10900136933
+    P[2, 3] = 87487479700 / 32700410799
+    P[3, 1] = -1754552775 / 470086768
+    P[3, 2] = 14199869525 / 1410260304
+    P[3, 3] = -10690763975 / 1880347072
+    P[4, 1] = 127303824393 / 49829197408
+    P[4, 2] = -318862633887 / 49829197408
+    P[4, 3] = 701980252875 / 199316789632
+    P[5, 1] = -282668133 / 205662961
+    P[5, 2] = 2019193451 / 616988883
+    P[5, 3] = -1453857185 / 822651844
+    P[6, 1] = 40617522 / 29380423
+    P[6, 2] = -110615467 / 29380423
+    P[6, 3] = 69997945 / 29380423
+
     t_start = t_span[0]
     t_end = t_span[1]
     direction = np.sign(t_end - t_start) if t_end != t_start else 1
@@ -104,10 +128,17 @@ def rk45_solve(
     y_size_sqrt = np.sqrt(y_size)
     dtype = y0.dtype
 
-    y_result_store = np.empty(y_size, dtype=dtype)
-
-    time_domain_list = [t_start]
-    y_result_list = [np.copy(y0)]
+    # Solution on t_eval (sorted along the integration direction), filled by
+    # the dense output of every accepted step; unreached points stay NaN.
+    t_eval = np.asarray(t_eval, dtype=np.float64)
+    n_eval = t_eval.size
+    y_results_reduced = np.full((y_size, n_eval), np.nan, dtype=dtype)
+    w_dense = np.empty(7, dtype=np.float64)
+    k_eval = 0
+    while k_eval < n_eval and direction * (t_eval[k_eval] - t_start) <= 0:
+        for i in range(y_size):
+            y_results_reduced[i, k_eval] = y0[i]
+        k_eval += 1
 
     # Integrator status: 0 = ongoing, 1 = success, <0 = error.
     status = 0
@@ -252,37 +283,22 @@ def rk45_solve(
             status = -7
             break
 
+        # Dense output on the t_eval points of [t_old, t_new]; K[6] = f(t_new).
+        while k_eval < n_eval and direction * (t_eval[k_eval] - t_new) <= 0:
+            x = (t_eval[k_eval] - t_old) / step
+            for j in range(rk_n_stages_plus1):
+                w_dense[j] = x * (P[j, 0] + x * (P[j, 1] + x * (P[j, 2] + x * P[j, 3])))
+            for i in range(y_size):
+                acc = K[0, i] * w_dense[0]
+                for j in range(2, rk_n_stages_plus1):
+                    acc += K[j, i] * w_dense[j]
+                y_results_reduced[i, k_eval] = y_old[i] + step * acc
+            k_eval += 1
+
         t_old = t_new
         for i in range(y_size):
             y_old[i] = y_new[i]
             dydt_old[i] = dydt_new[i]
-            y_result_store[i] = y_new[i]
-
-        time_domain_list.append(t_new)
-        y_result_list.append(np.copy(y_result_store))
         len_t += 1
-
-    # To match the format that scipy follows, we will take the transpose of y.
-    time_domain = np.empty(len_t, dtype=np.float64)
-    y_results = np.empty((y_size, len_t), dtype=dtype)
-    for t_i in range(len_t):
-        time_domain[t_i] = time_domain_list[t_i]
-        y_results_list_at_t = y_result_list[t_i]
-        for y_i in range(y_size):
-            y_results[y_i, t_i] = y_results_list_at_t[y_i]
-
-    # No dense output implemented (matching CyRK's own approach): linearly
-    # interpolate the accepted-step trajectory onto the requested grid.
-    t_eval = np.asarray(t_eval, dtype=np.float64)
-    y_results_reduced = np.empty((y_size, t_eval.size), dtype=dtype)
-    for i in range(y_size):
-        y_results_reduced[i, :] = np.interp(t_eval, time_domain, y_results[i, :])
-    if status != 1:
-        # Failed integration: do not extrapolate the last accepted point.
-        t_reached = time_domain[len_t - 1]
-        for k in range(t_eval.size):
-            if direction * (t_eval[k] - t_reached) > 0:
-                for i in range(y_size):
-                    y_results_reduced[i, k] = np.nan
 
     return y_results_reduced
