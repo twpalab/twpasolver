@@ -236,8 +236,10 @@ class TWPAnalysis(BaseModel):
             signal_freqs: Signal frequencies, in ``unit``.
             pump: Pump frequency. There is no automatic choice; for an estimate use
                 ``phase_matching(...).optimal_pump_freq``.
-            Is0: Signal current injected at x=0 (A).
-            Ip0: Pump current injected at x=0 (A); defaults to ``twpa.Ip0``.
+            Is0: Signal current amplitude injected at x=0 (A).
+            Ip0: Pump current amplitude injected at x=0 (A); defaults to
+                ``twpa.Ip0``. From a power in dBm use
+                ``twpasolver.mathutils.dBm_to_I(P_dBm, Z0=twpa.Z0_ref)``.
             model: ``"simple"`` (forward-only textbook CMEs, no reflections or
                 connectors) or ``"bloch"`` (forward-backward CMEs in the Bloch
                 basis with exact couplings and boundaries); see :class:`GainModel`.
@@ -249,7 +251,10 @@ class TWPAnalysis(BaseModel):
                 incident at x=0 and at x=L, shape (n_modes,) or (n_freq, n_modes);
                 ``initial_amplitudes_fwd`` overrides ``Is0`` and ``Ip0``. Backward
                 inputs need ``"bloch"``.
-            thin: Spacing in unit cells of the position grid (at least two points).
+            thin: Approximate spacing in unit cells of the stored positions:
+                ``N_tot // thin`` points (at least two), evenly spaced and including
+                both ends. ``bloch`` iterates its envelopes on this grid (plus
+                segment edges), so it also sets their interpolation accuracy.
             bloch_config: Settings of ``"bloch"`` (default ``BlochSolverConfig()``).
             rk_config: Settings of the RK45 integrator (default ``RKSolverConfig()``).
         """

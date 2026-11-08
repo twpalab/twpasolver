@@ -158,6 +158,8 @@ Each fix gets a test.
   base period's harmonics with `m_max='auto'`: the 102-cell holotype differs by dB from the 34-cell one.
   - **Fix:** detect the primitive period of the linear cells, or at least document this and scale the auto base
     by q.
+  - **Documented 2026-11-08** in `BlochSolverConfig.m_max` (build the supercell from one period, or scale m_max
+    and kappa_cutoff by q); the automatic fix stays open for after the release.
   - The auto window also falls back to a hardcoded 0.10 when `edge_threshold=None` (`~1234`).
   - **Experiment 2026-11-06 (snapshot 95a9250, scripts and logs in the job tmp `mmax/`):** scaling *both* the
     harmonic limit and the π/D cap by q (102 cells: m=12, kc=0.6) matches the 34-cell run to 0.02–0.03 dB;
@@ -816,10 +818,12 @@ clean, tutorials 01-06 execute (~2.5 min in total). Import 0.6 s; cold compile o
   axis is always `passes` long. Store the passes used per point in `diagnostics` (or mask the padding). Small.
   - Done 2026-11-07: the kernel returns the passes each point ran (`diagnostics["passes_used"]`); history entries
     after it are NaN (the last slot still holds the result). Test `test_history_stops_at_the_passes_used`.
-- [ ] **9.6 `thin`** is documented as a spacing in unit cells but sets `N_tot / thin` points; either document it as
+- [x] **9.6 `thin`** is documented as a spacing in unit cells but sets `N_tot / thin` points; either document it as
   such or use `arange(0, N_tot + thin, thin)` (changes the x grid). Trivial.
-- [ ] **9.7 Pump power in dBm.** `gain(Ip0=...)` takes amperes; `mathutils.dBm_to_I` exists but users must find it.
+  - Done 2026-11-08: documented (`gain` docstring, notebook 03); the grid is unchanged.
+- [x] **9.7 Pump power in dBm.** `gain(Ip0=...)` takes amperes; `mathutils.dBm_to_I` exists but users must find it.
   A `pump_dbm=`/`signal_dbm=` convenience or a documented recipe in notebook 03. Small.
+  - Done 2026-11-08: documented recipe (`Is0`/`Ip0` docstrings, notebook 03), no new arguments.
 - [x] **9.8 The 4.2 finding** (segmented `simple` slightly depends on `thin`): measure once.
   - Done 2026-11-07: `simple` moves <= 1e-4 dB with `thin` (9e-4 dB at thin=400, 4 varied segments): negligible.
     `bloch` depends more (vs thin=2: uniform 2e-4 dB at thin=100, 0.011 dB at 400; 4 varied segments 2.2e-3 and
@@ -1088,9 +1092,9 @@ Record what was done, by which chat or branch, and anything learned (numbers, su
   Base data bit-identical; `supercell_matrix` moves by ~2e-13 (product order), so uniform `bloch` gains move
   <= 3.5e-11 dB, `simple` is identical, and the segmented edge-basis case moves 3.3e-3 dB (item 2.37).
 
-## Where to pick up (updated 2026-11-07, `audit-fixes`)
+## Where to pick up (updated 2026-11-08, `audit-fixes`)
 
-WP0 to WP4 and 5.3 are done (2.4 and 2.37 deferred); the API is the one of the WP4 design (`TWPAnalysis(twpa,
+WP0 to WP4 and 5.3 are done (2.37 done 2026-11-07; 2.4 documented, automatic fix deferred); the API is the one of the WP4 design (`TWPAnalysis(twpa,
 freqs, unit, ports)`, `ModeSet`, `GainResult`/`PhaseMatchingResult`). Nothing is pushed. Next, roughly in order:
 1. **WP5 is done** (2026-11-07). The open finding of 4.2 (segmented `simple` depends slightly on `thin`) is
    worth one measurement.
@@ -1098,5 +1102,7 @@ freqs, unit, ports)`, `ModeSet`, `GainResult`/`PhaseMatchingResult`). Nothing is
 3. **WP7 is done except 7.8/7.9** (Pietro): merge the branches, configure the PyPI trusted publisher for
    `publish.yml`, check the author/maintainer metadata in `pyproject.toml`, build the docs once with pandoc,
    then tag `v0.1.0` (the tag publishes to PyPI and deploys the docs).
-4. **Regression reference:** the golden script used for WP4 lives in the job scratch only; put a reduced version
-   (gains only) in `tests/` before further numerical work.
+4. **Regression reference: done 2026-11-08.** `tests/test_regression.py` compares S21/S11 of the holotype,
+   a 4-segment holotype and two small devices (`simple` and `bloch`) plus two phase-matching maps with
+   `tests/data/regression_gains.npz` (1e-3 dB). Re-record with `python tests/test_regression.py` after an
+   intended change.

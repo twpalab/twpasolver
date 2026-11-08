@@ -37,8 +37,9 @@ def save_to_file(savename: str, d: Dict[str, Any], writer: str = "json") -> None
     {"hdf5": save_to_hdf5, "json": save_to_json}.get(writer, save_to_hdf5)(savename, d)
 
 
-def add_extension(filename: str, extension: str) -> str:
+def add_extension(filename: str | os.PathLike, extension: str) -> str:
     """Add ``.extension`` to the filename if not already present."""
+    filename = os.fspath(filename)
     if not filename.endswith(f".{extension}"):
         return f"{filename}.{extension}"
     return filename

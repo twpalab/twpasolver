@@ -164,6 +164,7 @@ docs/source/api-reference/
 # Data and notes produced by local runs (keep them outside the repository)
 *.pkl
 *.npz
+!tests/data/*.npz
 Claude outputs/
 
 # Numba cache directory used in CI

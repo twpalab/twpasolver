@@ -95,7 +95,11 @@ class BlochSolverConfig(BaseModel):
         " splitting is below twice edge_threshold, at the frequencies (and in the"
         " segments) where it does; a process uses the largest limit among its"
         " modes, so partner terms stay together. The counter-propagating"
-        " component of a mode at the m-th edge is reached only through G_m.",
+        " component of a mode at the m-th edge is reached only through G_m."
+        " Both m and the pi / d cap of kappa_cutoff count per supercell (one"
+        " repetition of ``twpa.cells``): build it from a single period. A supercell"
+        " of q identical periods needs m_max and kappa_cutoff scaled by q to keep"
+        " the same terms, which 'auto' does not do.",
     )
     anderson_depth: int = Field(
         default=20,
