@@ -298,6 +298,7 @@ def test_edge_bvp_constant_jacobian_shifts_K():
 
 def test_segmented_edge_basis_converges_below_default_threshold():
     """Item 2.37: p4 in the stopband of one segment no longer stalls the iteration."""
+    from twpasolver import ModeSet
     from twpasolver.cmes.solver_config import BlochSolverConfig
 
     r = _segmented_holotype((1.0, 1.02, 0.98, 1.0)).gain(
@@ -305,7 +306,9 @@ def test_segmented_edge_basis_converges_below_default_threshold():
         Is0=1e-9,
         pump=16.0,
         model="bloch",
-        modes=EXT2,
+        modes=ModeSet.extended_3wm(
+            n_pump_harmonics=3, n_frequency_conversion=2, n_signal_harmonics=0
+        ),
         bloch_config=BlochSolverConfig(
             passes=80, anderson_depth=15, convergence_threshold=1e-3
         ),
