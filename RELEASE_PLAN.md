@@ -1106,3 +1106,10 @@ freqs, unit, ports)`, `ModeSet`, `GainResult`/`PhaseMatchingResult`). Nothing is
    a 4-segment holotype and two small devices (`simple` and `bloch`) plus two phase-matching maps with
    `tests/data/regression_gains.npz` (1e-3 dB). Re-record with `python tests/test_regression.py` after an
    intended change.
+   `tests/test_harmonic_balance.py` checks `bloch` against a converged JosephsonCircuits.jl HB gain of the holotype
+   (`tests/data/hb_holotype_gain.csv`, 111 signals 2-13 GHz, pump 15.8 GHz; HB truncation 6/4 vs 12/8 differs
+   by < 3e-6 dB). The test uses `kappa_cutoff=0.2`: median 0.02 dB, <= 0.10 dB in band, flanks within ~30 MHz,
+   one known miss (12.9 GHz, a ripple near the stopband shifted ~50 MHz, 0.6 dB). With the default 0.1 the signal/idler
+   pair 5.4/10.4 GHz (edge mode p+i active) is 2.0/2.4 dB off; `convergence_threshold=1e-3` and 40 passes change
+   nothing. Cost of 0.2: 2.2 s vs 1.4 s for 111 signals (9 modes). Open question: default kappa_cutoff back to 0.2?
+   Regenerate with `notebooks/jc_comparison` (`twpa_to_jc.py --fp 15.8 --signal 2 13 0.1`, `run_jc_gain.jl`).

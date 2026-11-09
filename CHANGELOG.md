@@ -51,7 +51,7 @@ tutorials for the new workflow).
 
 ### Fixed
 
-- `TWPA.from_file`, `read_file` and `save_to_file` accept `pathlib.Path` file names.
+- `TWPAnalysis(twpa=...)`, `TWPA.from_file`, `read_file` and `save_to_file` accept `pathlib.Path` file names.
 - Base data no longer goes stale after editing the model or the grid; `gain(Ip0=...)` no longer changes the model.
 - Stopband detection independent of where the frequency grid ends; HDF5 saves no longer destroy the previous file
   on failure; complex `Z0` handled consistently in S-parameters; NaN results reported instead of passed silently.

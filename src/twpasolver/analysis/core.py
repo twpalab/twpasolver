@@ -1,5 +1,6 @@
 """``TWPAnalysis``: the interface for simulating a TWPA."""
 
+import os
 from typing import Any, List, Literal, Mapping, Optional, Tuple, Union
 
 import numpy as np
@@ -68,9 +69,9 @@ class TWPAnalysis(BaseModel):
 
     @field_validator("twpa", mode="before")
     @classmethod
-    def _load_model_from_file(cls, twpa: str | TWPA) -> TWPA:
+    def _load_model_from_file(cls, twpa: str | os.PathLike | TWPA) -> TWPA:
         """Load the twpa model from a JSON file when given a path."""
-        if isinstance(twpa, str):
+        if isinstance(twpa, (str, os.PathLike)):
             try:
                 return TWPA.from_file(twpa)
             except Exception as exc:
