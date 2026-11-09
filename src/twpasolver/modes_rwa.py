@@ -67,7 +67,7 @@ class ModeSet:
     independent: Tuple[str, ...] = field(init=False)
     matrix: np.ndarray = field(init=False, repr=False, compare=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Normalise the inputs, validate the relations and build ``matrix``."""
         labels = tuple(self.labels)
         relations = tuple((str(r), str(e)) for r, e in self.relations)

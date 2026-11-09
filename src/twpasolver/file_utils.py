@@ -9,7 +9,7 @@ import numpy as np
 from h5py import Group
 
 
-def read_file(savename: str, writer: str = "json") -> Dict[str, Any]:
+def read_file(savename: str | os.PathLike, writer: str = "json") -> Dict[str, Any]:
     """
     Read a dictionary from a file.
 
@@ -23,7 +23,9 @@ def read_file(savename: str, writer: str = "json") -> Dict[str, Any]:
     return {"hdf5": read_hdf5, "json": read_json}.get(writer, read_hdf5)(savename)
 
 
-def save_to_file(savename: str, d: Dict[str, Any], writer: str = "json") -> None:
+def save_to_file(
+    savename: str | os.PathLike, d: Dict[str, Any], writer: str = "json"
+) -> None:
     """
     Save a dictionary to a file, creating its directory if needed.
 
