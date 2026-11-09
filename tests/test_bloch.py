@@ -730,7 +730,7 @@ def test_process_weights_preserve_energy_identity(perturb_one_row):
 
 
 EXT1 = ModeSet.extended_3wm(
-    n_pump_harmonics=3, n_frequency_conversion=1, n_signal_harmonics=0
+    n_pump_harmonics=2, n_frequency_conversion=1, n_signal_harmonics=0
 )
 EXT2 = ModeSet.extended_3wm(
     n_pump_harmonics=2, n_frequency_conversion=2, n_signal_harmonics=0
