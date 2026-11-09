@@ -21,7 +21,8 @@ tutorials for the new workflow).
 - `Ports(input, output, Z_ext)`: connector models at both ends (`bloch` only); `TWPAnalysis.response()` gives the
   linear two-port response including them.
 - User models: any `TwoPortModel` subclass that declares a `name` is accepted in cell lists and JSON files, also
-  when defined after import; custom cells support the `bloch` model through `bloch_nl_elements()`.
+  when defined after import; custom cells support the `bloch` model through `bloch_nl_elements()`
+  (ports `PORT_IN`/`PORT_OUT` from `twpasolver.models`).
 - `nl_scale` on `LCLfBaseCell` and `StubBaseCell`: nonlinear fraction of the line inductance (`bloch` couplings).
 - `RKSolverConfig` and `BlochSolverConfig` for the integrator and the forward-backward solver; the
   `twpasolver-warmup` command compiles the kernels once.

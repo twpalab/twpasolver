@@ -50,11 +50,11 @@ Nonlinear Cells for the Bloch Model
 
 The ``bloch`` gain model needs to know which series inductors of a unit cell are nonlinear. ``LCLfBaseCell`` and ``StubBaseCell`` describe theirs; their ``nl_scale`` field (default 1) sets the nonlinear fraction of the line inductance ``L``, for example to model nonlinearity-only gratings. It affects only the nonlinear couplings of the ``bloch`` model, not the linear response or the ``simple`` model.
 
-A custom cell supports the ``bloch`` model by defining a **bloch_nl_elements()** method that returns a list of ``(port, L)`` pairs: each nonlinear inductance ``L`` carries the current of the cell's input port (``twpasolver.cmes.bloch.PORT_IN``) or output port (``PORT_OUT``).
+A custom cell supports the ``bloch`` model by defining a **bloch_nl_elements()** method that returns a list of ``(port, L)`` pairs: each nonlinear inductance ``L`` carries the current of the cell's input port (``PORT_IN``) or output port (``PORT_OUT``), both importable from ``twpasolver.models``.
 
 .. code-block:: python
 
-  from twpasolver.cmes.bloch import PORT_OUT
+  from twpasolver.models import PORT_OUT
 
   class HalfNonlinearCell(LCLfBaseCell):
       """Only half of the line inductance is nonlinear."""

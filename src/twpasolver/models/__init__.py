@@ -17,6 +17,7 @@ One-port models:
 TWPA cells:
   * LCLfBaseCell
   * StubBaseCell
+  * PORT_IN, PORT_OUT (ports of a nonlinear inductor, for ``bloch_nl_elements()``)
 
 Two-port arrays and models:
   * TWPA
@@ -56,6 +57,6 @@ from twpasolver.models.oneport import (
     OnePortArray,
 )
 from twpasolver.models.transmission_lines import LosslessTL
-from twpasolver.models.twpa_cells import LCLfBaseCell, StubBaseCell
+from twpasolver.models.twpa_cells import LCLfBaseCell, StubBaseCell, PORT_IN, PORT_OUT
 from twpasolver.models.twoportarrays import TWPA, TwoPortArray
 from twpasolver.models.compose import compose

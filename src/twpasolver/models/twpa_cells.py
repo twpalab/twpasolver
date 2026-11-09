@@ -19,6 +19,11 @@ from twpasolver.twoport import TwoPortModel
 
 required = partial(Field, ...)
 
+# Unit-cell port whose current flows through a series nonlinear inductor, for
+# ``bloch_nl_elements()`` of custom cells.
+PORT_IN = 0
+PORT_OUT = 1
+
 
 def _centered(freqs: np.ndarray, L: float, qp_loss: float, mid: ABCDArray) -> ABCDArray:
     """``[L/2][mid][L/2]``, with the quasiparticle loss on the series halves."""

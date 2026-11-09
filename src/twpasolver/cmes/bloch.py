@@ -48,12 +48,7 @@ import numpy as np
 from twpasolver.bonus_types import ComplexArray, FloatArray
 from twpasolver.logger import log
 from twpasolver.models.twoportarrays import TwoPortArray
-from twpasolver.models.twpa_cells import LCLfBaseCell, StubBaseCell
-
-# Unit-cell port whose current flows through a series nonlinear inductor.
-PORT_IN = 0
-PORT_OUT = 1
-
+from twpasolver.models.twpa_cells import PORT_IN, PORT_OUT, LCLfBaseCell, StubBaseCell
 
 # --------------------------------------------------------------------------- #
 # Linear part: unit cells, Bloch modes and intracell current profiles

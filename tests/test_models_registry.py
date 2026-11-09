@@ -7,9 +7,16 @@ import pytest
 from pydantic import ValidationError
 
 from twpasolver import TWPAnalysis
-from twpasolver.cmes.bloch import PORT_IN, PORT_OUT, series_nl_elements
+from twpasolver.cmes.bloch import series_nl_elements
 from twpasolver.matrices_arrays import ABCDArray
-from twpasolver.models import TWPA, Inductance, LCLfBaseCell, OnePortArray
+from twpasolver.models import (
+    PORT_IN,
+    PORT_OUT,
+    TWPA,
+    Inductance,
+    LCLfBaseCell,
+    OnePortArray,
+)
 from twpasolver.twoport import TwoPortModel
 
 CELL = dict(L=49.9e-12, C=24.2e-15, Lf=0.87e-9)

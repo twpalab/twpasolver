@@ -16,6 +16,18 @@ of the propagating mode through the elements of the supercell, so it is continuo
 notches and negative in left-handed bands. A segmented device (a chain of uniform segments, see notebook 05) has
 these quantities per segment, with arrays of shape ``(n_segments, n_freq)``.
 
+Nonlinearity
+------------
+
+The nonlinearity is a property of the :class:`~twpasolver.models.TWPA`, applied to the series line inductance of
+its cells. The kinetic inductance depends on the current through it as ``L(I) = Lk [1 + (I/Istar)^2 +
+(I/Istar2)^4]``; with a dc bias ``Idc`` and a small rf current ``i``, ``L = L(Idc) (1 + epsilon i + xi i^2)``.
+``epsilon`` (1/A) gives the three-wave-mixing and ``xi`` (1/A^2) the four-wave-mixing couplings; without
+``Istar2``, ``xi = 1 / (Istar^2 + Idc^2)`` and ``epsilon = 2 Idc xi``, so an unbiased line mixes four waves only.
+The cell inductance ``L`` is the biased one, ``L(Idc)``, and sets the dispersion as given. ``Ip0`` and ``Is0`` are
+peak amplitudes of the pump and signal waves incident at the input. In a segmented device every segment has its
+own ``Istar`` and ``Idc``.
+
 Gain models
 -----------
 
@@ -83,7 +95,8 @@ The forward-backward iteration stops when the largest change of any mode between
 largest forward plus backward envelope, falls below ``convergence_threshold`` (default 0.01). This residual is
 dominated by nearly empty backward envelopes, so values of 1e-3 to 1e-1 are common while the gains are already
 stable; results are determined to within that tolerance. ``GainResult.converged`` flags the points that reached
-it, and the solver warns about the others. Raise ``passes`` for those points, and lower
+it, and the solver warns about the others. Raise ``passes`` for those points (and ``anderson_depth`` with it,
+for example to ``passes - 10``, so that the acceleration uses the longer history), and lower
 ``convergence_threshold`` when comparing results that differ by less than the tolerance.
 
 Mode sets
@@ -91,9 +104,9 @@ Mode sets
 
 The CMEs only describe the modes in the :class:`~twpasolver.modes_rwa.ModeSet`. Pump harmonics and frequency
 conversion terms take power from the pump and the signal when they are phase matched, so a result should be
-checked by adding them (``ModeSet.extended_3wm``, or a custom set) until the gain stops changing. Lines without
-dispersion at high frequency, such as Josephson lines far below their plasma frequency, need particular care (see
-notebook 05).
+checked by adding them (``ModeSet.extended_3wm``, or a custom set) until the gain stops changing. Lines with little
+dispersion at high frequency, such as kinetic-inductance lines far below their cutoff, need particular care: their
+pump harmonics and up-conversion products stay nearly phase matched (see notebook 05).
 
 Custom nonlinear cells
 ----------------------
