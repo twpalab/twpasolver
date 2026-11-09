@@ -283,18 +283,27 @@ def _rhs_fields(x, currents, kappas, x0, phi0, ctr_x, ctr_vals, ctr_y0, ctr_phi0
 
 @nb.njit(cache=True)
 def _rhs_rows(ar, n, rows_3wm, rows_4wm, c3, c4, g3, g4, xl):
-    """Mixing terms of every target (carrier not yet removed) from the field vector ``ar``."""
+    """
+    Mixing terms of every target (carrier not yet removed) from the field vector ``ar``.
+
+    Rows sorted by reciprocal vector (as :func:`_segment_rows` returns them)
+    cost one exponential per distinct value.
+    """
     out = np.zeros(n, nb.complex128)
+    g_prev = 0.0
+    e = 1.0 + 0.0j
     for r in range(rows_3wm.shape[0]):
-        term = c3[r] * ar[rows_3wm[r, 1]] * ar[rows_3wm[r, 2]]
-        if g3[r] != 0.0:
-            term *= np.exp(1j * g3[r] * xl)
-        out[rows_3wm[r, 0]] += term
+        if g3[r] != g_prev:
+            g_prev = g3[r]
+            e = np.exp(1j * g_prev * xl)
+        out[rows_3wm[r, 0]] += c3[r] * ar[rows_3wm[r, 1]] * ar[rows_3wm[r, 2]] * e
     for r in range(rows_4wm.shape[0]):
-        term = c4[r] * ar[rows_4wm[r, 1]] * ar[rows_4wm[r, 2]] * ar[rows_4wm[r, 3]]
-        if g4[r] != 0.0:
-            term *= np.exp(1j * g4[r] * xl)
-        out[rows_4wm[r, 0]] += term
+        if g4[r] != g_prev:
+            g_prev = g4[r]
+            e = np.exp(1j * g_prev * xl)
+        out[rows_4wm[r, 0]] += (
+            c4[r] * ar[rows_4wm[r, 1]] * ar[rows_4wm[r, 2]] * ar[rows_4wm[r, 3]] * e
+        )
     return out
 
 
@@ -760,6 +769,9 @@ def _segment_rows(
             nc,
             np.ascontiguousarray(m_lim_seg[s]),
         )
+        # Sorted by reciprocal vector, for _rhs_rows.
+        a3 = a3[np.argsort(a3[:, 4])]
+        a4 = a4[np.argsort(a4[:, 5])]
         pp = np.ascontiguousarray(phi_plus_seg[s])
         pm = np.ascontiguousarray(phi_minus_seg[s])
         pf = np.ascontiguousarray(prefac_seg[s])
@@ -1476,51 +1488,57 @@ def bloch_fb_segmented_cmes_solve(
         edge_K = np.zeros((n_freq, n_seg, n_modes, 2, 2), dtype=np.complex128)
 
     c = np.ascontiguousarray
-    I_out, converged, residuals, passes_used = _bloch_fb_solve_segmented(
-        c(x_int),
-        c(s_int),
-        c(offsets),
-        c(take),
-        c(take_b),
-        c(seg_bounds),
-        c(y0_array_fwd, dtype=np.complex128),
-        c(y0_array_bwd, dtype=np.complex128),
-        c(gammas_seg),
-        c(relations_3wm, dtype=np.int64),
-        c(relations_4wm, dtype=np.int64),
-        c(base_3wm, dtype=np.complex128),
-        c(base_4wm, dtype=np.complex128),
-        c(prefac, dtype=np.complex128),
-        c(phi_plus, dtype=np.complex128),
-        c(phi_minus, dtype=np.complex128),
-        c(L_nl, dtype=np.float64),
-        c(positions, dtype=np.float64),
-        c(n_cells),
-        c(t),
-        c(tp),
-        c(rho_L),
-        c(rho_R),
-        c(Zp[:, 0, :]),
-        c(Zm[:, 0, :]),
-        c(Zp[:, -1, :]),
-        c(Zm[:, -1, :]),
-        int(passes),
-        float(kappa_cutoff),
-        c(np.broadcast_to(np.asarray(m_max, dtype=np.int64), (n_freq, n_seg, n_modes))),
-        float(convergence_threshold),
-        bool(save_all_passes),
-        int(anderson_depth),
-        c(pw3),
-        c(pw4),
-        c(Ze_table),
-        c(Zout_in_table),
-        c(Zout_out_table),
-        c(apcz_in),
-        c(apcz_out),
-        (rk_config if rk_config is not None else RKSolverConfig()).kernel_args(),
-        c(edge_K, dtype=np.complex128),
-        c(edge_mode_f),
-    )
+    # One point per chunk: the cost per point varies with the passes it needs.
+    with nb.parallel_chunksize(1):
+        I_out, converged, residuals, passes_used = _bloch_fb_solve_segmented(
+            c(x_int),
+            c(s_int),
+            c(offsets),
+            c(take),
+            c(take_b),
+            c(seg_bounds),
+            c(y0_array_fwd, dtype=np.complex128),
+            c(y0_array_bwd, dtype=np.complex128),
+            c(gammas_seg),
+            c(relations_3wm, dtype=np.int64),
+            c(relations_4wm, dtype=np.int64),
+            c(base_3wm, dtype=np.complex128),
+            c(base_4wm, dtype=np.complex128),
+            c(prefac, dtype=np.complex128),
+            c(phi_plus, dtype=np.complex128),
+            c(phi_minus, dtype=np.complex128),
+            c(L_nl, dtype=np.float64),
+            c(positions, dtype=np.float64),
+            c(n_cells),
+            c(t),
+            c(tp),
+            c(rho_L),
+            c(rho_R),
+            c(Zp[:, 0, :]),
+            c(Zm[:, 0, :]),
+            c(Zp[:, -1, :]),
+            c(Zm[:, -1, :]),
+            int(passes),
+            float(kappa_cutoff),
+            c(
+                np.broadcast_to(
+                    np.asarray(m_max, dtype=np.int64), (n_freq, n_seg, n_modes)
+                )
+            ),
+            float(convergence_threshold),
+            bool(save_all_passes),
+            int(anderson_depth),
+            c(pw3),
+            c(pw4),
+            c(Ze_table),
+            c(Zout_in_table),
+            c(Zout_out_table),
+            c(apcz_in),
+            c(apcz_out),
+            (rk_config if rk_config is not None else RKSolverConfig()).kernel_args(),
+            c(edge_K, dtype=np.complex128),
+            c(edge_mode_f),
+        )
     if not np.all(converged):
         bad = np.flatnonzero(~converged)
         log.warning(
