@@ -13,7 +13,7 @@ matrix ``T`` of a supercell, :attr:`TWPAnalysis.linear <twpasolver.analysis.TWPA
 wavenumber ``k`` and attenuation ``alpha`` per unit cell, the Bloch impedance ``Zb``, the stopbands
 (``|tr T / 2| > 1`` for the lossless supercell) and the transmission of the whole device. ``k`` follows the winding
 of the propagating mode through the elements of the supercell, so it is continuous across stopbands and resonator
-notches and negative in left-handed bands. A segmented device (a chain of uniform segments, see notebook 06) has
+notches and negative in left-handed bands. A segmented device (a chain of uniform segments, see notebook 05) has
 these quantities per segment, with arrays of shape ``(n_segments, n_freq)``.
 
 Gain models

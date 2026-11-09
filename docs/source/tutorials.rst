@@ -14,4 +14,3 @@ These tutorials showcase the basic functionalities of the package, providing ste
    notebooks/03_analysis
    notebooks/04_generalized_cmes
    notebooks/05_other_twpas
-   notebooks/06_segmented_devices
