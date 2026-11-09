@@ -1108,8 +1108,12 @@ freqs, unit, ports)`, `ModeSet`, `GainResult`/`PhaseMatchingResult`). Nothing is
    intended change.
    `tests/test_harmonic_balance.py` checks `bloch` against a converged JosephsonCircuits.jl HB gain of the holotype
    (`tests/data/hb_holotype_gain.csv`, 111 signals 2-13 GHz, pump 15.8 GHz; HB truncation 6/4 vs 12/8 differs
-   by < 3e-6 dB). The test uses `kappa_cutoff=0.2`: median 0.02 dB, <= 0.10 dB in band, flanks within ~30 MHz,
-   one known miss (12.9 GHz, a ripple near the stopband shifted ~50 MHz, 0.6 dB). With the default 0.1 the signal/idler
-   pair 5.4/10.4 GHz (edge mode p+i active) is 2.0/2.4 dB off; `convergence_threshold=1e-3` and 40 passes change
-   nothing. Cost of 0.2: 2.2 s vs 1.4 s for 111 signals (9 modes). Open question: default kappa_cutoff back to 0.2?
+   by < 3e-6 dB). With the default settings: median 0.02 dB, <= 0.10 dB in band, flanks within ~30 MHz, one
+   known miss (12.9 GHz, a ripple near the stopband shifted ~50 MHz, 0.6 dB).
+   - **`kappa_cutoff` default 0.1 -> 0.2 (2026-11-09).** At 0.1 the signal/idler pair 5.4/10.4 GHz (edge mode p+i
+     active) is 2.0/2.4 dB off HB; 0.2 and 0.25 both fix it, `convergence_threshold=1e-3` and 40 passes change
+     nothing. Cost with modes up to p3 (8 threads): uniform 40 signals 1.1 -> 1.6 s, 4 segments 0.9 -> 1.4 s,
+     40 segments 3.1 -> 3.6 s, passes unchanged. With p4 in the mode set the 4-segment sweep goes 1.4 -> 5.1 s
+     (p4 is an edge mode at every point there; its terms enter at 0.2 and its residual holds the stopping test at
+     ~13 passes while the gain settles in 2-6), so keep pump harmonics to p3. The regression test now uses p3.
    Regenerate with `notebooks/jc_comparison` (`twpa_to_jc.py --fp 15.8 --signal 2 13 0.1`, `run_jc_gain.jl`).

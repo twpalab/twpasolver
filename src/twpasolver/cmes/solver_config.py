@@ -65,7 +65,7 @@ class BlochSolverConfig(BaseModel):
         default=30, ge=1, description="Maximum number of forward-backward passes."
     )
     kappa_cutoff: float = Field(
-        default=0.1,
+        default=0.2,
         gt=0,
         description="Phase-mismatch cutoff used to filter 3WM/4WM terms: a term is"
         " kept when its residual mismatch ``|dk + G_m|`` after a reciprocal vector is"

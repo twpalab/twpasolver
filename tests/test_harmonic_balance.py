@@ -10,7 +10,6 @@ from pathlib import Path
 import numpy as np
 
 from twpasolver import ModeSet, TWPAnalysis
-from twpasolver.cmes.solver_config import BlochSolverConfig
 
 DATA = Path(__file__).resolve().parent / "data"
 # Error ceilings (dB) at points the CMEs are known to miss: 12.9 GHz is a narrow
@@ -25,17 +24,8 @@ def test_bloch_matches_harmonic_balance():
     modes = ModeSet.extended_3wm(
         n_pump_harmonics=2, n_frequency_conversion=2, n_signal_harmonics=0
     )
-    # kappa_cutoff 0.1 (default) drops terms that matter where the edge mode p+i
-    # is active (5.4/10.4 GHz: 2 dB off); 0.2 brings them within 0.1 dB.
-    r = an.gain(
-        fs,
-        pump=15.8,
-        Ip0=1e-4,
-        Is0=1e-9,
-        model="bloch",
-        modes=modes,
-        bloch_config=BlochSolverConfig(kappa_cutoff=0.2),
-    )
+    # Default settings; kappa_cutoff 0.1 would miss 5.4/10.4 GHz (edge mode p+i) by 2 dB.
+    r = an.gain(fs, pump=15.8, Ip0=1e-4, Is0=1e-9, model="bloch", modes=modes)
     assert r.converged.all()
 
     err = np.abs(r.gain_db - g_hb)

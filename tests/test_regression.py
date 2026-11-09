@@ -19,7 +19,7 @@ REF = DATA / "regression_gains.npz"
 HOLOTYPE = DATA / "imskit_v3_holotype.json"
 SIG = np.array([2.0, 6.0, 9.188, 9.196, 10.5, 12.0])
 EXT2 = ModeSet.extended_3wm(
-    n_pump_harmonics=3, n_frequency_conversion=2, n_signal_harmonics=0
+    n_pump_harmonics=2, n_frequency_conversion=2, n_signal_harmonics=0
 )
 CELL_U = {"name": "LCLfBaseCell", "N": 30, "L": 49.9e-12, "C": 24.2e-15, "Lf": 0.87e-9}
 CELL_L = {"name": "LCLfBaseCell", "N": 6, "L": 48.6e-12, "C": 8.2e-15, "Lf": 0.28e-9}
