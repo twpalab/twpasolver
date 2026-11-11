@@ -1,24 +1,24 @@
 """Direct composition between models."""
 
 from twpasolver.models.oneport import OnePortArray, OnePortModel
-from twpasolver.models.twoportarrays import AnyModel, TwoPortArray
+from twpasolver.models.twoportarrays import TwoPortArray
+from twpasolver.twoport import TwoPortModel
 
 
 def compose(
-    *args: AnyModel, parallel=False, **kwargs  # type:ignore
+    *args: TwoPortModel, parallel=False, **kwargs
 ) -> TwoPortArray | OnePortArray:
     """
-    Directly compose any number of OnePortModel or TwoPortModels into a ModelArray.
+    Compose any number of OnePortModels or TwoPortModels into a ModelArray.
 
-    If all the provided instances are OnePortModels with the same parallel/series configuration
-    in a two-port circuit, the resulting composition will be given by a OnePortArray.
-    Otherwise a TwoPortArray will be returned.
+    Returns a OnePortArray if all inputs are OnePortModels with the same
+    ``twoport_parallel`` setting, otherwise a TwoPortArray.
 
     Args:
-        *args (AnyModel): Any number of OnePortModel or TwoPortModel instances to be composed.
-        parallel (bool, optional): Indicates if the OnePortModels should be composed in parallel.
-                                   Defaults to False. Applies only if a composition to OnePortModel is possible.
-        **kwargs: Additional keyword arguments to pass to the OnePortArray or TwoPortArray constructors.
+        *args (TwoPortModel): Models to compose.
+        parallel (bool, optional): Compose the OnePortModels in parallel (OnePortArray
+            result only). Defaults to False.
+        **kwargs: Passed to the OnePortArray or TwoPortArray constructor.
     """
     if not args:
         raise RuntimeError("Provide at least one Model to insert into the array.")

@@ -3,8 +3,18 @@
 
 Tutorials
 =========
-These tutorials showcase the basic functionalities of the package, providing step-by-step guides and examples to start using ``twpasolver``. If you wish to run or modify the notebooks of these tutorials, they can be found in the `docs/source/notebooks <https://github.com/twpalab/twpasolver/tree/main/docs/source/notebooks>`_ directory of the repository.
 
+The tutorials build up from circuit models to the gain of complete devices:
+
+1. **Circuit models**: components, their ABCD and S-parameters, and how they combine.
+2. **Building a TWPA**: unit cells, the nonlinearity and the linear response of a kinetic-inductance TWPA.
+3. **Phase matching and gain**: ``TWPAnalysis``, the ``simple`` model, bandwidth, sweeps and compression.
+4. **Generalized coupled mode equations**: mode sets, the ``bloch`` model, reflections and connectors.
+5. **Other TWPAs**: a resonantly phase-matched 4WM line with a custom cell, and a Floquet-mode TWPA built from
+   segments.
+
+The notebooks are in the `docs/source/notebooks <https://github.com/twpalab/twpasolver/tree/main/docs/source/notebooks>`_
+directory of the repository.
 
 .. toctree::
    :maxdepth: 4
@@ -13,3 +23,4 @@ These tutorials showcase the basic functionalities of the package, providing ste
    notebooks/02_twpas
    notebooks/03_analysis
    notebooks/04_generalized_cmes
+   notebooks/05_other_twpas

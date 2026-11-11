@@ -2,9 +2,11 @@
 
 import numpy as np
 import pytest
+import skrf as rf
 
 from twpasolver.mathutils import s2a
 from twpasolver.matrices_arrays import ABCDArray
+from twpasolver.models import LCLfBaseCell, LosslessTL
 from twpasolver.models.rf_functions import inductance, series_impedance_abcd
 from twpasolver.twoport import TwoPortCell
 
@@ -79,6 +81,15 @@ def test_interpolate():
     assert np.allclose(cell_interp_polar.abcd.B, L_interp)
 
 
+def test_interpolate_default_handles_sign_changes():
+    """Cartesian default: A = cos(beta l) of a lossless line changes sign."""
+    line = LosslessTL.from_z_vp(50, 1e8, 0.015)
+    coarse, fine = np.linspace(1e9, 10e9, 31), np.linspace(1e9, 10e9, 301)
+    A_interp = line.get_cell(coarse).interpolate(fine).abcd.A
+    assert np.max(np.abs(A_interp - line.get_cell(fine).abcd.A)) < 0.02
+    assert np.all(A_interp.imag == 0)
+
+
 def test_model_update(random_model):
     """Test generation of random cell from model."""
     random_model.update(mu=2, sigma=5)
@@ -102,3 +113,47 @@ def test_model_mul(random_model):
     N_before = random_model.N
     mod_multiplied = random_model * 3
     assert mod_multiplied.N == 3 * N_before
+
+
+def test_stub_cell_line_abcd():
+    """StubBaseCell(line=True) is [L/2][stubs][L/2] with qp loss on the halves."""
+    from twpasolver.models.rf_functions import get_stub_cell
+    from twpasolver.models.twpa_cells import StubBaseCell
+
+    f = np.linspace(1e9, 20e9, 7)
+    L, C, Lf, l1, qp, delta = 1e-10, 2e-15, 3e-10, 10, 1e-12, 1e-4
+    cell = StubBaseCell(L=L, C=C, Lf=Lf, l1=l1, qp_loss=qp, delta=delta, line=True)
+    half = np.asarray(series_impedance_abcd(inductance(f, L / 2) * (1 - 1j * qp * f)))
+    stubs = np.asarray(get_stub_cell(f, C * (1 - 1j * delta), Lf, l1, 0))
+    np.testing.assert_allclose(
+        np.asarray(cell.single_abcd(f)), half @ stubs @ half, rtol=1e-12
+    )
+
+
+def test_s_and_z_against_skrf_for_complex_z0():
+    f = np.array([1e9, 5e9])
+    z0 = 30 + 20j
+    cell = LCLfBaseCell(L=49.9e-12, C=24.2e-15, Lf=0.87e-9, Z0_ref=z0).get_cell(f)
+    net = rf.Network(
+        frequency=rf.Frequency.from_f(f, unit="hz"),
+        z=np.asarray(cell.z),
+        z0=z0,
+        s_def="pseudo",
+    )
+    np.testing.assert_allclose(np.asarray(cell.s), net.s, atol=1e-12)
+
+
+def test_interpolate_needs_increasing_freqs_and_copies():
+    model = LosslessTL(l=1e-3, L=4e-7, C=1.6e-10)
+    with pytest.raises(ValueError, match="increasing"):
+        model.get_cell(np.linspace(5e9, 1e9, 4)).interpolate(np.array([2e9, 3e9]))
+    cell = model.get_cell(np.linspace(1e9, 5e9, 4))
+    same = cell.interpolate(cell.freqs.copy())
+    same.abcd[0] = 0
+    assert np.any(np.asarray(cell.abcd[0]) != 0)
+
+
+def test_cell_json_dump_raises(tmp_path):
+    cell = LosslessTL(l=1e-3, L=4e-7, C=1.6e-10).get_cell(np.array([1e9, 2e9]))
+    with pytest.raises(ValueError, match="hdf5"):
+        cell.dump_to_file(str(tmp_path / "c.json"), writer="json")

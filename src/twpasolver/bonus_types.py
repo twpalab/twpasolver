@@ -4,41 +4,25 @@ from typing import Any, Callable, TypeAlias
 
 import numba as nb
 import numpy as np
-from pydantic import GetJsonSchemaHandler, NonNegativeFloat, NonNegativeInt
+from pydantic import (
+    GetJsonSchemaHandler,
+    NonNegativeFloat,
+    PositiveFloat,
+)
 from pydantic.functional_validators import BeforeValidator
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 from typing_extensions import Annotated
 
 
-def all_subclasses(cls) -> list:
-    """
-    Recursively get all subclasses of a given class.
-
-    Args:
-        cls: The class for which to find all subclasses.
-
-    Returns:
-        list: A list of all subclasses of the given class.
-    """
-    return cls.__subclasses__() + [
-        s for c in cls.__subclasses__() for s in all_subclasses(c)
-    ]
-
-
 def validate_impedance(Z: complex | float | str) -> complex | float:
-    """
-    Validate impedance value.
-
-    Args:
-        Z (complex | float | str): Input impedance value.
-    """
+    """Convert impedance to complex with positive real part; purely real values become float."""
     try:
         Z = complex(Z)
     except Exception as exc:
         raise ValueError(f"Cannot convert {type(Z)} {Z} to complex number.") from exc
-    if np.real(Z) < 0:
-        raise ValueError("Real part of impedance {Z} must be non-negative.")
+    if np.real(Z) <= 0:
+        raise ValueError(f"Real part of impedance {Z} must be positive.")
     if np.imag(Z) == 0:
         Z = Z.real
     return Z
@@ -80,13 +64,13 @@ Impedance = Annotated[
     complex | float, _Impedance2PydanticAnnotation, BeforeValidator(validate_impedance)
 ]
 FrequencyList = list[NonNegativeFloat]
-FrequencyArange = tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat]
-FrequencyLinspace = tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeInt]
+FrequencyArange = tuple[NonNegativeFloat, NonNegativeFloat, PositiveFloat]
 
 ComplexArray: TypeAlias = np.ndarray[Any, np.dtype[np.complex128]]
 FloatArray: TypeAlias = np.ndarray[Any, np.dtype[np.float64]]
 
-nb_complex3d = nb.complex128[:, :, :]
 nb_complex1d = nb.complex128[:]
+nb_complex2d = nb.complex128[:, :]
 nb_float1d = nb.float64[:]
+nb_float2d = nb.float64[:, :]
 nb_int2d = nb.int64[:, :]

@@ -82,6 +82,14 @@ html_static_path = ["_static"]
 
 intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
 autodoc_member_order = "bysource"
+# Package pages list their own members only, not the classes they re-export.
+autodoc_default_options = {"ignore-module-all": True}
+# ``Attributes:`` sections become field lists, not duplicates of documented fields.
+napoleon_use_ivar = True
+
+# Tutorial notebooks are stored without outputs and executed at every build.
+nbsphinx_execute = "always"
+nbsphinx_timeout = 900
 
 
 def run_apidoc(_):

@@ -1,11 +1,4 @@
-"""
-Functions for saving to json and hdf5 files.
-
-This module provides functions to read from and write to JSON and HDF5 files. It includes utility
-functions to ensure file extensions and directories are correctly handled, as well as recursive
-functions to handle nested dictionaries when working with HDF5 files.
-
-"""
+"""Read and write nested dictionaries as JSON or HDF5 files."""
 
 import json
 import os
@@ -16,16 +9,13 @@ import numpy as np
 from h5py import Group
 
 
-def read_file(savename: str, writer: str = "json") -> Dict[str, Any]:
+def read_file(savename: str | os.PathLike, writer: str = "json") -> Dict[str, Any]:
     """
-    Read data from a file and return it as a dictionary.
+    Read a dictionary from a file.
 
     Args:
-        savename (str): The name of the file to read.
-        writer (str): The file format to use (default is "json").
-
-    Returns:
-        Dict[str, Any]: Dictionary containing the read data.
+        savename (str): File name; the extension is added if missing.
+        writer (str): ``"json"`` or ``"hdf5"``.
     """
     savename = add_extension(savename, writer)
     if not os.path.exists(savename):
@@ -33,43 +23,32 @@ def read_file(savename: str, writer: str = "json") -> Dict[str, Any]:
     return {"hdf5": read_hdf5, "json": read_json}.get(writer, read_hdf5)(savename)
 
 
-def save_to_file(savename: str, d: Dict[str, Any], writer: str = "json") -> None:
+def save_to_file(
+    savename: str | os.PathLike, d: Dict[str, Any], writer: str = "json"
+) -> None:
     """
-    Save data to a file in the specified format.
+    Save a dictionary to a file, creating its directory if needed.
 
     Args:
-        savename (str): The name of the file to save.
-        d (Dict[str, Any]): Dictionary containing data to be saved.
-        writer (str): The file format to use (default is "json").
+        savename (str): File name; the extension is added if missing.
+        d (Dict[str, Any]): Data to save.
+        writer (str): ``"json"`` or ``"hdf5"``.
     """
     savename = add_extension(savename, writer)
     ensure_directory_exists(savename)
     {"hdf5": save_to_hdf5, "json": save_to_json}.get(writer, save_to_hdf5)(savename, d)
 
 
-def add_extension(filename: str, extension: str) -> str:
-    """
-    Add the specified extension to the filename if not already present.
-
-    Args:
-        filename (str): The name of the file.
-        extension (str): The extension to add.
-
-    Returns:
-        str: Filename with the specified extension.
-    """
+def add_extension(filename: str | os.PathLike, extension: str) -> str:
+    """Add ``.extension`` to the filename if not already present."""
+    filename = os.fspath(filename)
     if not filename.endswith(f".{extension}"):
         return f"{filename}.{extension}"
     return filename
 
 
 def ensure_directory_exists(filename: str) -> None:
-    """
-    Ensure that the directory for the given filename exists; create it if necessary.
-
-    Args:
-        filename (str): The name of the file.
-    """
+    """Create the parent directory of ``filename`` if it does not exist."""
     directory = os.path.dirname(filename)
     if directory:
         if not os.path.exists(directory):
@@ -77,77 +56,77 @@ def ensure_directory_exists(filename: str) -> None:
 
 
 def read_hdf5(savename: str) -> Dict[str, Any]:
-    """
-    Read data from an HDF5 file and return it as a dictionary.
-
-    Args:
-        savename (str): The name of the HDF5 file to read.
-
-    Returns:
-        Dict[str, Any]: Dictionary containing the read data.
-    """
+    """Read a dictionary from an HDF5 file."""
     with h5py.File(savename, "r") as f:
         return _recursively_load_dict_contents_from_group(f)
 
 
 def read_json(savename: str) -> Dict[str, Any]:
-    """
-    Read data from a JSON file and return it as a dictionary.
-
-    Args:
-        savename (str): The name of the JSON file to read.
-
-    Returns:
-        Dict[str, Any]: Dictionary containing the read data.
-    """
+    """Read a dictionary from a JSON file."""
     with open(savename) as f:
         return json.load(f)
 
 
 def save_to_hdf5(savename: str, d: Dict[str, Any]) -> None:
-    """
-    Save data to an HDF5 file.
-
-    Args:
-        savename (str): The name of the HDF5 file to save.
-        d (Dict[str, Any]): Dictionary containing data to be saved.
-    """
+    """Save a dictionary to an HDF5 file; a failed save keeps the previous file."""
     if not isinstance(d, dict):
         return
 
-    with h5py.File(savename, "w") as f:
-        _recursively_save_dict_contents_to_group(f, d)
+    # Write to a temporary file so that a failed save keeps the previous one.
+    tmp = savename + ".tmp"
+    try:
+        with h5py.File(tmp, "w") as f:
+            _recursively_save_dict_contents_to_group(f, d)
+        os.replace(tmp, savename)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise
 
 
 def save_to_json(savename: str, d: Dict[str, Any]) -> None:
-    """
-    Save data to a JSON file.
+    """Save a dictionary to a JSON file, encoding NumPy types; a failed save keeps the previous file."""
+    tmp = savename + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as fp:
+            json.dump(d, fp, cls=NpEncoder, indent=4)
+        os.replace(tmp, savename)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise
 
-    Args:
-        savename (str): The name of the JSON file to save.
-        d (Dict[str, Any]): Dictionary containing data to be saved.
-    """
-    with open(savename, "w", encoding="utf-8") as fp:
-        json.dump(d, fp, cls=NpEncoder, indent=4)
 
-
-def _recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> None:
-    """
-    Recursively save dictionary contents to an HDF5 group.
-
-    Args:
-        f (Group): The HDF5 group.
-        d (Dict[str, Any]): The dictionary to save.
-    """
+def _recursively_save_dict_contents_to_group(f: Group, d: Dict[Any, Any]) -> None:
+    """Recursively save a dictionary to an HDF5 group; ``None`` values are skipped."""
+    if d and all(isinstance(key, (int, np.integer)) for key in d):
+        f.attrs["int_keys"] = True
     for key, item in d.items():
         key = str(key)
+        if item is None:  # e.g. no stopband in the grid; read back as missing
+            continue
+
+        if isinstance(item, (list, tuple)):
+            array = None
+            if not any(isinstance(i, dict) for i in item):
+                try:
+                    array = np.array(item)
+                except ValueError:  # ragged
+                    pass
+            if array is None or array.dtype.kind in "OU":
+                # Lists of dicts, strings or ragged items: one entry per index.
+                subgroup = f.create_group(key)
+                subgroup.attrs["list"] = True
+                _recursively_save_dict_contents_to_group(
+                    subgroup, dict(enumerate(item))
+                )
+                continue
+            item = array
 
         if isinstance(item, dict):
             subgroup = f.create_group(key)
             _recursively_save_dict_contents_to_group(subgroup, item)
         else:
-            if isinstance(item, (list, tuple)):
-                item = np.array(item)
             if isinstance(item, str):
                 dtype = h5py.special_dtype(vlen=str)
             elif isinstance(item, np.ndarray):
@@ -157,24 +136,20 @@ def _recursively_save_dict_contents_to_group(f: Group, d: Dict[str, Any]) -> Non
             f.create_dataset(key, data=item, dtype=dtype)
 
 
-def _recursively_load_dict_contents_from_group(f: Group) -> Dict[str, Any]:
-    """
-    Recursively load dictionary contents from an HDF5 group.
-
-    Args:
-        f (Group): The HDF5 group.
-
-    Returns:
-        Dict[str, Any]: The loaded dictionary.
-    """
-    ans = {}
+def _recursively_load_dict_contents_from_group(f: Group) -> Dict[Any, Any]:
+    """Recursively load a dictionary from an HDF5 group."""
+    ans: Dict[Any, Any] = {}
+    int_keys = bool(f.attrs.get("int_keys", False))
     for key, item in f.items():
         if isinstance(item, h5py.Dataset):
-            ans[key] = (
+            value = (
                 item[()].decode("utf-8") if isinstance(item[()], bytes) else item[()]
             )
         elif isinstance(item, Group):
-            ans[key] = _recursively_load_dict_contents_from_group(f[key])
+            value = _recursively_load_dict_contents_from_group(item)
+            if item.attrs.get("list", False):
+                value = [value[i] for i in range(len(value))]
+        ans[int(key) if int_keys else key] = value
     return ans
 
 
@@ -182,15 +157,7 @@ class NpEncoder(json.JSONEncoder):
     """JSON encoder for handling NumPy types."""
 
     def default(self, o: Any) -> int | float | List[Any] | str:
-        """
-        Return default encoding for NumPy types.
-
-        Args:
-            o (Any): The object to encode.
-
-        Returns:
-            int | float | List[Any] | str: The encoded object.
-        """
+        """Encode NumPy scalars and arrays; complex numbers become strings."""
         if isinstance(o, np.integer):
             return int(o)
         if isinstance(o, np.floating):

@@ -1,17 +1,23 @@
 name: Lint-Test-Mypy
 
-on: [push]
+on:
+  push:
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Compiled CME kernels, cached across runs until the sources change.
+      NUMBA_CACHE_DIR: ${{ github.workspace }}/.numba_cache
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install and configure poetry
@@ -24,25 +30,25 @@ jobs:
       uses: actions/cache@v4
       with:
         path: .venv
-        key: pydeps-${{ hashFiles('**/poetry.lock') }}
+        key: pydeps-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+    - name: cache compiled kernels
+      uses: actions/cache@v4
+      with:
+        path: .numba_cache
+        key: numba-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('src/**/*.py', 'poetry.lock') }}
 
     - name: install_dependencies_only
       run: poetry install --no-interaction --no-root --with analysis
 
     - name: install_project
-      run: poetry install --no-interaction
+      run: poetry install --no-interaction --with analysis
 
-    - name: Analysing the code with pylint
-      run: |
-        source $VENV
-        pylint src/ || pylint-exit $?
+    - name: Pylint (errors only)
+      run: poetry run pylint --errors-only src/twpasolver
 
-    - name: Running tests
-      run: |
-        source $VENV
-        pytest tests/
+    - name: Mypy
+      run: poetry run mypy src/
 
-    - name: Running Mypy analysis
-      run: |
-        source $VENV
-        mypy src/
+    - name: Tests with coverage
+      run: poetry run pytest tests/ --cov=twpasolver --cov-report=term-missing:skip-covered
