@@ -8,6 +8,7 @@ from test_bloch import EXT2, HOLOTYPE, _holotype_analysis
 from twpasolver.cmes.bloch import (
     edge_basis_tables,
     edge_reference_frequency,
+    gap_ahead,
     logm_unimodular_2x2,
     lossless_copy,
     supercell_matrix,
@@ -678,6 +679,15 @@ def test_folding_point_is_not_an_edge():
     )
     assert not flag[0, 0] and flag[0, 1]
     assert list(ent["outside"]) == [0]
+
+
+def test_gap_ahead_separates_folding_points_from_edges():
+    """gap_ahead: no gap past a folding point, a gap past a real edge (both sides, inside)."""
+    tw = lossless_copy(_unfolded_holotype().twpa)
+    # folding point (k D = 5 pi) and its neighbours; passband side of the 26.253 GHz
+    # edge, from below and from above the gap (26.253-28.17 GHz); inside the gap
+    f = np.array([22.736, 22.70, 22.77, 26.25, 28.19, 27.0]) * 1e9
+    assert gap_ahead(tw, f).tolist() == [False, False, False, True, True, True]
 
 
 def test_folding_point_modes_match_native_basis():

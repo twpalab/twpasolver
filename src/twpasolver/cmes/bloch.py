@@ -47,6 +47,7 @@ import numpy as np
 
 from twpasolver.bonus_types import ComplexArray, FloatArray
 from twpasolver.logger import log
+from twpasolver.matrices_arrays import matmul_2x2
 from twpasolver.models.twoportarrays import TwoPortArray
 from twpasolver.models.twpa_cells import PORT_IN, PORT_OUT, LCLfBaseCell, StubBaseCell
 
@@ -347,10 +348,10 @@ def supercell_matrix(twpa: TwoPortArray, freqs_hz: FloatArray) -> np.ndarray:
     T = None
     for cell, n in expand_unit_cells(twpa):
         with np.errstate(over="ignore", invalid="ignore"):
-            Tc = np.linalg.matrix_power(
-                np.asarray(cell.single_abcd(freqs_hz), dtype=np.complex128), n
-            )
-            T = Tc if T is None else T @ Tc
+            Tc = np.asarray(cell.single_abcd(freqs_hz), dtype=np.complex128)
+            if n != 1:
+                Tc = np.linalg.matrix_power(Tc, n)
+            T = Tc if T is None else matmul_2x2(T, Tc)
     if T is None:
         return np.broadcast_to(
             np.eye(2, dtype=np.complex128), (len(freqs_hz), 2, 2)
@@ -407,6 +408,36 @@ def in_stopband(twpa_ll: TwoPortArray, f_hz: FloatArray) -> np.ndarray:
     """True where ``|tr T / 2| > 1 + STOPBAND_TOL`` for the (lossless) supercell."""
     T = supercell_matrix(twpa_ll, np.atleast_1d(np.asarray(f_hz, dtype=np.float64)))
     return np.abs(0.5 * (T[:, 0, 0] + T[:, 1, 1]).real) > 1.0 + STOPBAND_TOL
+
+
+def gap_ahead(
+    twpa_ll: TwoPortArray, f_hz: FloatArray, n_sample: int = 16
+) -> np.ndarray:
+    """
+    Whether a stopband starts close to each frequency, toward increasing ``|tr T / 2|``.
+
+    Next to a real edge ``|h|`` (``h = tr T / 2``) crosses 1 almost linearly; at a
+    zone-folding point it only touches 1 (``1 - c (f - f0)^2``). ``|h|`` is
+    sampled from ``f`` to three times the distance at which its linear
+    extrapolation reaches 1: past a real edge it exceeds ``1 + STOPBAND_TOL``,
+    past a folding point it falls back. Two supercell evaluations for all
+    frequencies, so the edge search can skip the folding points.
+    """
+    f = np.atleast_1d(np.asarray(f_hz, dtype=np.float64))
+    df = 1e-6 * f
+    h = np.abs(_half_trace(twpa_ll, np.concatenate([f, f + df, f - df]))).reshape(3, -1)
+    slope = (h[1] - h[2]) / (2 * df)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        dist = (1.0 - h[0]) / np.abs(slope)
+    # flat, or already at |h| = 1: look up to 3 MHz on both sides instead
+    flat = ~np.isfinite(dist) | (dist < 1e3)
+    dist = np.where(flat, 1e6, np.minimum(dist, 1e9))
+    direction = np.where(flat, 1.0, np.sign(slope))
+    offs = (direction * dist)[:, None] * np.linspace(1.0 / n_sample, 3.0, n_sample)
+    offs[flat, 1::2] *= -1
+    pts = np.clip(f[:, None] + offs, 1.0, None)
+    a = np.abs(_half_trace(twpa_ll, pts.ravel())).reshape(pts.shape)
+    return (a > 1.0 + STOPBAND_TOL).any(axis=1)
 
 
 def _half_trace(twpa_ll: TwoPortArray, f) -> np.ndarray:

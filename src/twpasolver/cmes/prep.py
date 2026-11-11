@@ -10,6 +10,7 @@ from twpasolver.cmes.bloch import (
     bloch_mode_tables,
     edge_basis_tables,
     edge_reference_frequency,
+    gap_ahead,
     in_stopband,
     lossless_copy,
     process_weights,
@@ -233,7 +234,9 @@ def _edge_basis_entries(
     par_q = np.zeros(len(f_mode), dtype=np.int64)
     todo = np.ones(len(f_mode), dtype=bool)
     gap_entry = in_stopband(twpa_ll, f_mode)
-    outside = np.zeros(len(f_mode), dtype=bool)
+    # Entries with no stopband just ahead sit at folding points: no edge search.
+    outside = ~gap_entry & ~gap_ahead(twpa_ll, f_mode)
+    todo &= ~outside
     for span in (1.0e9, 4.0e9, 8.0e9):
         if not todo.any():
             break
@@ -248,6 +251,8 @@ def _edge_basis_entries(
         par_q[idx[ok]] = par_tab[near[ok]]
         todo[idx[ok]] = False
     for q, f in enumerate(f_mode):
+        if outside[q]:
+            continue
         if not todo[q]:
             parity = int(par_q[q])
         else:
