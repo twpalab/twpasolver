@@ -1,13 +1,13 @@
 [project]
 name = "twpasolver"
 version = "0.1.0"
-description = "Simulation of traveling-wave parametric amplifiers: circuit models, Bloch-mode coupled mode equations, gain and phase matching."
+description = "Simulation of kinetic-inductance traveling-wave parametric amplifiers: circuit models, Bloch-mode coupled mode equations, gain and phase matching."
 authors = [{ name = "twpalab" }]
 maintainers = [{ name = "Pietro Campana", email = "p.campana1@campus.unimib.it" }]
 license = "Apache-2.0"
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
-keywords = ["TWPA", "parametric amplifier", "coupled mode equations", "superconducting circuits", "Bloch modes"]
+keywords = ["TWPA", "KI-TWPA", "kinetic inductance", "parametric amplifier", "coupled mode equations", "superconducting circuits", "Bloch modes"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",

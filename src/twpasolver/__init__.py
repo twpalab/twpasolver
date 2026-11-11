@@ -5,6 +5,10 @@ Twpasolver: TWPA Analysis and Simulation Library
 ``twpasolver`` is a Python library for analyzing and simulating Traveling Wave
 Parametric Amplifiers (TWPAs) by solving systems of Coupled Mode Equations (CMEs).
 
+This release simulates kinetic-inductance TWPAs (KI-TWPAs): the cells of the line
+can be any linear circuit, but the only nonlinearity is that of a kinetic
+inductance. Josephson-junction and SNAIL TWPAs are not supported yet.
+
 Key Features
 ------------
 
@@ -31,7 +35,7 @@ Key Features
 
 **Circuit Modeling:**
     - Hierarchical composition of one-port and two-port network elements
-    - Pre-built KITWPA cell models (lumped or distributed elements)
+    - Pre-built KI-TWPA cell models (lumped or distributed elements)
     - Custom circuit elements with automatic ABCD matrix computation
 
 **Analysis Tools:**
