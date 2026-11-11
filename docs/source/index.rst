@@ -1,7 +1,7 @@
 Welcome to twpasolver's documentation!
 ======================================
 
-``twpasolver`` is an open-source library designed for analyzing and simulating the behavior of Traveling Wave Parametric Amplifiers (TWPAs) by solving systems of differential equations known as Coupled Mode Equations (CMEs).
+``twpasolver`` simulates traveling-wave parametric amplifiers (TWPAs): circuit models of the line, linear response, phase matching, and gain from coupled mode equations (CMEs).
 
 .. caution:: ``twpasolver`` is in beta: the API may still change between minor versions (see the changelog in the repository).
 

@@ -1,7 +1,7 @@
 Implementing New Models
 =======================
 
-This guide explains how users can define their own network models by extending the provided ``TwoPortModel`` and ``OnePortModel`` base classes. For detailed information about the functionalities of these classes, refer to the API documentation and the examples.
+User models extend the ``TwoPortModel`` and ``OnePortModel`` base classes. The API reference documents these classes, and notebook 05 of the :doc:`tutorials` builds a complete custom cell.
 
 Adding a New TwoPortModel
 -------------------------
@@ -27,7 +27,7 @@ Example:
 Adding a New OnePortModel
 -------------------------
 
-All network models in ``twpasolver`` are derived from the ``TwoPortModel`` class, with ``OnePortModel`` being a specialization of it. In this case, the ``single_abcd()`` method is already implemented in the class, which constructs the ABCD matrix of the circuit element by inserting it in series or in parallel into a two-port network according to the ``twoport_parallel`` attribute.
+``OnePortModel`` is a ``TwoPortModel`` whose ``single_abcd()`` is already implemented: it inserts the element in series, or in parallel if ``twoport_parallel``, into a two-port network.
 
 To add a new one-port model, implement the **Z(freqs: numpy.ndarray) -> numpy.ndarray** method. It takes a 1-D array of frequencies in Hz and returns the impedance of the component. ``OnePortArray`` accepts only one-port models.
 
