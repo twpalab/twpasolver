@@ -32,8 +32,8 @@ class CMEProblem:
         freqs_hz: ``|freqs|`` in Hz.
         gammas: Kernel propagation constants ``-alpha - j k`` per unit cell,
             (n_freq, n_modes, n_seg).
-        reflections, Zb: Reflection coefficient against ``twpa.Z0_ref`` and Bloch
-            impedance, (n_freq, n_modes, n_seg).
+        reflections: Reflection coefficient against ``twpa.Z0_ref``,
+            (n_freq, n_modes, n_seg).
         relations_3wm, relations_4wm: Mode-index relations, (n_rel, 3) / (n_rel, 4).
         unit_3wm, unit_4wm: Relation coefficients for unit epsilon / xi, (n_rel,).
         coeffs_3wm, coeffs_4wm: Coefficients of every segment, (n_rel, n_seg).
@@ -46,7 +46,6 @@ class CMEProblem:
     freqs_hz: np.ndarray
     gammas: np.ndarray
     reflections: np.ndarray
-    Zb: np.ndarray
     relations_3wm: np.ndarray
     relations_4wm: np.ndarray
     unit_3wm: np.ndarray

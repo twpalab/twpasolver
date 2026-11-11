@@ -87,31 +87,6 @@ def _drop_segment_axis(bloch: dict[str, Any], n_freq: int) -> dict[str, Any]:
     return out
 
 
-def _phase_carrier(problem: CMEProblem, x: np.ndarray) -> np.ndarray:
-    """
-    ``exp(i Phi_m(x))``, ``Phi_m = int Im(gamma_m) dx = -int k_m dx``, of the
-    ``simple`` kernel, shape (n_freq, n_modes, n_x).
-
-    ``k_m(x)`` is piecewise-linear on the segment midpoints (constant for one
-    segment); the cumulative trapezoid rule is exact for that interpolant.
-    """
-    kappa = problem.gammas.imag
-    kappa_at_x = np.array(
-        [
-            [
-                np.interp(x, problem.seg_midpoints, kappa[i, j])
-                for j in range(kappa.shape[1])
-            ]
-            for i in range(kappa.shape[0])
-        ]
-    )
-    dphi = 0.5 * (kappa_at_x[..., :-1] + kappa_at_x[..., 1:]) * np.diff(x)
-    phi = np.concatenate(
-        [np.zeros((*kappa.shape[:2], 1)), np.cumsum(dphi, axis=-1)], -1
-    )
-    return np.exp(1j * phi)
-
-
 def solve_simple(
     problem: CMEProblem,
     y0: np.ndarray,
@@ -134,8 +109,8 @@ def solve_simple(
         problem.coeffs_4wm,
         segment_midpoints=problem.seg_midpoints,
         rk_config=rk_config,
-    ) * _phase_carrier(problem, x)
-    ports = {
+    )
+    ports: dict[str, Any] = {
         "a_in": y0,
         "a_out": np.zeros_like(y0),
         "b_in": np.full_like(y0, np.nan),
@@ -150,7 +125,7 @@ def solve_simple(
         I_bwd=np.zeros_like(I_fwd),
         **ports,
         **port_gains(*(ports[k][:, s] for k in ("a_in", "a_out", "b_in", "b_out"))),
-        converged=np.isfinite(I_fwd).all(axis=(1, 2)),
+        converged=np.asarray(np.isfinite(I_fwd).all(axis=(1, 2))),
         **meta,
     )
 

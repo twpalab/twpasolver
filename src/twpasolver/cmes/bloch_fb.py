@@ -122,7 +122,6 @@ from twpasolver.cmes.bloch_common import (
     _interp_rows,
     _mode_scales,
     _relative_residual,
-    _rows_with_targets,
     _stencil_value,
 )
 from twpasolver.cmes.rk45 import rk45_solve
@@ -215,7 +214,24 @@ def build_segment_grid(
     return x_int, offsets, take
 
 
-def segmented_phase(kappas: FloatArray, seg_bounds: FloatArray, x: FloatArray):
+def segment_phases(kappas: FloatArray, seg_bounds: FloatArray) -> FloatArray:
+    """
+    Accumulated forward phase at the segment boundaries, shape (..., n_seg + 1).
+
+    ``kappas`` (..., n_seg): kernel wavenumbers of every segment. The kernel
+    and :func:`segmented_phase` both use this table.
+    """
+    kappas = np.asarray(kappas, dtype=np.float64)
+    lengths = np.diff(np.asarray(seg_bounds, dtype=np.float64))
+    return np.concatenate(
+        [np.zeros(kappas.shape[:-1] + (1,)), np.cumsum(kappas * lengths, axis=-1)],
+        axis=-1,
+    )
+
+
+def segmented_phase(
+    kappas: FloatArray, cum: FloatArray, seg_bounds: FloatArray, x: FloatArray
+):
     """
     Exact cumulative propagation phase for piecewise-constant wavenumbers.
 
@@ -223,6 +239,8 @@ def segmented_phase(kappas: FloatArray, seg_bounds: FloatArray, x: FloatArray):
     ----------
     kappas : (..., n_seg) float
         Kernel wavenumbers (``Im`` of the kernel gammas) of every segment.
+    cum : (..., n_seg + 1) float
+        Their :func:`segment_phases`.
     seg_bounds : (n_seg + 1,) float
     x : (n_x,) float
 
@@ -236,10 +254,6 @@ def segmented_phase(kappas: FloatArray, seg_bounds: FloatArray, x: FloatArray):
     seg_bounds = np.asarray(seg_bounds, dtype=np.float64)
     L = seg_bounds[-1]
     lengths = np.diff(seg_bounds)
-    cum = np.concatenate(
-        [np.zeros(kappas.shape[:-1] + (1,)), np.cumsum(kappas * lengths, axis=-1)],
-        axis=-1,
-    )
 
     def phi(xv):
         s = np.clip(
@@ -500,22 +514,47 @@ def _take_rows(rows, coeffs_f, coeffs_b, gs, mask):
 
 
 @nb.njit(cache=True)
+def _segment_slice(sel, s):
+    """Rows, coefficients and reciprocal vectors of segment ``s`` of an :func:`_edge_rows` selection."""
+    rows, off, cf, cb, gs = sel
+    a, b = off[s], off[s + 1]
+    return rows[a:b], cf[a:b], cb[a:b], gs[a:b]
+
+
+@nb.njit(cache=True)
+def _edge_rows(rows, off, cf, cb, gs, is_flag, n_modes, linear):
+    """
+    Rows targeting an edge mode (``is_flag > 0``) that are (``linear``) or are
+    not linear in their target, per segment like ``rows`` (offsets ``off``).
+
+    Returns ``(rows, offsets, forward coeffs, backward coeffs, reciprocal
+    vectors)``; the order of ``rows`` is kept.
+    """
+    n_seg = off.shape[0] - 1
+    lin = _self_linear_rows(rows, n_modes)
+    mask = np.zeros(rows.shape[0], dtype=np.bool_)
+    off_out = np.zeros(n_seg + 1, dtype=np.int64)
+    for s in range(n_seg):
+        count = 0
+        for r in range(off[s], off[s + 1]):
+            mask[r] = is_flag[rows[r, 0]] > 0.0 and lin[r] == linear
+            if mask[r]:
+                count += 1
+        off_out[s + 1] = off_out[s] + count
+    r_out, cf_out, cb_out, g_out = _take_rows(rows, cf, cb, gs, mask)
+    return r_out, off_out, cf_out, cb_out, g_out
+
+
+@nb.njit(cache=True)
 def _edge_sources_segmented(
     xs,
     sub_off,
     flag_idx,
-    is_flag,
     kappas_seg,
-    r3,
-    r4,
-    off3,
-    off4,
-    g3,
-    g4,
-    c3f,
-    c4f,
-    c3b,
-    c4b,
+    src3,
+    src4,
+    lin3,
+    lin4,
     x_int,
     s_int,
     offsets,
@@ -532,7 +571,8 @@ def _edge_sources_segmented(
     Segment ``s`` owns ``xs[sub_off[s]:sub_off[s+1]]`` (both ends included).
     ``S+`` is the forward-solve derivative of ``c+`` and ``S- = -exp(j Phi_f(L))
     dB/ds`` the physical derivative of ``c-``; only rows targeting an edge mode
-    are evaluated, with the segment's own rows, coefficients and phases.
+    are evaluated, with the segment's own rows, coefficients and phases:
+    ``src3``/``src4`` and ``lin3``/``lin4`` from :func:`_edge_rows`.
 
     Rows linear in the edge mode itself (cross-phase modulation and
     pump-induced coupling of its two directions) are left out of ``S`` and
@@ -554,36 +594,10 @@ def _edge_sources_segmented(
         b = offsets[s + 1]
         ca = n_int - offsets[s + 1]
         cb = n_int - offsets[s]
-        r3f, c3ff, g3f = _rows_with_targets(
-            r3[off3[s] : off3[s + 1]],
-            c3f[off3[s] : off3[s + 1]],
-            g3[off3[s] : off3[s + 1]],
-            is_flag,
-        )
-        r4f, c4ff, g4f = _rows_with_targets(
-            r4[off4[s] : off4[s + 1]],
-            c4f[off4[s] : off4[s + 1]],
-            g4[off4[s] : off4[s + 1]],
-            is_flag,
-        )
-        _, c3bf, _ = _rows_with_targets(
-            r3[off3[s] : off3[s + 1]],
-            c3b[off3[s] : off3[s + 1]],
-            g3[off3[s] : off3[s + 1]],
-            is_flag,
-        )
-        _, c4bf, _ = _rows_with_targets(
-            r4[off4[s] : off4[s + 1]],
-            c4b[off4[s] : off4[s + 1]],
-            g4[off4[s] : off4[s + 1]],
-            is_flag,
-        )
-        lin3 = _self_linear_rows(r3f, n_modes)
-        lin4 = _self_linear_rows(r4f, n_modes)
-        sr3, sc3f, sc3b, sg3 = _take_rows(r3f, c3ff, c3bf, g3f, ~lin3)
-        sr4, sc4f, sc4b, sg4 = _take_rows(r4f, c4ff, c4bf, g4f, ~lin4)
-        lr3, lc3f, lc3b, lg3 = _take_rows(r3f, c3ff, c3bf, g3f, lin3)
-        lr4, lc4f, lc4b, lg4 = _take_rows(r4f, c4ff, c4bf, g4f, lin4)
+        sr3, sc3f, sc3b, sg3 = _segment_slice(src3, s)
+        sr4, sc4f, sc4b, sg4 = _segment_slice(src4, s)
+        lr3, lc3f, lc3b, lg3 = _segment_slice(lin3, s)
+        lr4, lc4f, lc4b, lg4 = _segment_slice(lin4, s)
         seg_x = np.ascontiguousarray(x_int[a:b])
         seg_s = np.ascontiguousarray(s_int[ca:cb])
         Af = np.ascontiguousarray(A_fwd[:, a:b])
@@ -963,8 +977,13 @@ def _bloch_fb_solve_segmented(
     rk,
     edge_K_table,
     edge_mode_table,
+    phase_table,
 ):
-    """Forward/backward Bloch CME solve for all frequency points (segmented)."""
+    """
+    Forward/backward Bloch CME solve for all frequency points (segmented).
+
+    ``phase_table`` (n_freq, n_modes, n_seg + 1): :func:`segment_phases`.
+    """
     n_freq = gammas_seg.shape[0]
     n_seg = gammas_seg.shape[1]
     n_modes = gammas_seg.shape[2]
@@ -985,18 +1004,13 @@ def _bloch_fb_solve_segmented(
         alphas_seg = np.ascontiguousarray(gammas_seg[i].real)  # (n_seg, n_modes)
         kappas_seg = np.ascontiguousarray(gammas_seg[i].imag)
 
-        # Accumulated phases at segment starts (length n_seg + 1).
-        Phi_f_b = np.zeros((n_modes, n_seg + 1), dtype=np.float64)
-        Phi_b_b = np.zeros((n_modes, n_seg + 1), dtype=np.float64)
-        for s in range(n_seg):
-            ln = seg_bounds[s + 1] - seg_bounds[s]
+        # Accumulated phases at segment starts (length n_seg + 1); backward in
+        # the mirrored coordinate, as segmented_phase.
+        Phi_f_b = np.ascontiguousarray(phase_table[i])
+        Phi_b_b = np.empty((n_modes, n_seg + 1), dtype=np.float64)
+        for q in range(n_seg + 1):
             for j in range(n_modes):
-                Phi_f_b[j, s + 1] = Phi_f_b[j, s] + kappas_seg[s, j] * ln
-        for q in range(n_seg):
-            s = n_seg - 1 - q
-            ln = seg_bounds[s + 1] - seg_bounds[s]
-            for j in range(n_modes):
-                Phi_b_b[j, q + 1] = Phi_b_b[j, q] + kappas_seg[s, j] * ln
+                Phi_b_b[j, q] = Phi_f_b[j, n_seg] - Phi_f_b[j, n_seg - q]
         phase_end = np.empty(n_modes, dtype=np.complex128)
         for j in range(n_modes):
             phase_end[j] = np.exp(1j * Phi_f_b[j, n_seg])
@@ -1078,6 +1092,11 @@ def _bloch_fb_solve_segmented(
                 seg_bounds[s], seg_bounds[s + 1], sub_off[s + 1] - sub_off[s]
             )
         own_bwd = np.zeros((n_modes, n_int), dtype=np.complex128)
+        # Rows of the edge sources (S) and of their Jacobian (J); fixed over the passes.
+        src3 = _edge_rows(r3, off3, c3f, c3b, g3, is_flag, n_modes, False)
+        src4 = _edge_rows(r4, off4, c4f, c4b, g4, is_flag, n_modes, False)
+        lin3 = _edge_rows(r3, off3, c3f, c3b, g3, is_flag, n_modes, True)
+        lin4 = _edge_rows(r4, off4, c4f, c4b, g4, is_flag, n_modes, True)
 
         converged = False
         depth = anderson_depth
@@ -1173,18 +1192,11 @@ def _bloch_fb_solve_segmented(
                     xs_edge,
                     sub_off,
                     flag_idx,
-                    is_flag,
                     kappas_seg,
-                    r3,
-                    r4,
-                    off3,
-                    off4,
-                    g3,
-                    g4,
-                    c3f,
-                    c4f,
-                    c3b,
-                    c4b,
+                    src3,
+                    src4,
+                    lin3,
+                    lin4,
                     x_int,
                     s_int,
                     offsets,
@@ -1487,6 +1499,8 @@ def bloch_fb_segmented_cmes_solve(
     if edge_K is None:
         edge_K = np.zeros((n_freq, n_seg, n_modes, 2, 2), dtype=np.complex128)
 
+    kappas_mf = np.transpose(gammas_seg.imag, (0, 2, 1))  # (n_freq, n_modes, n_seg)
+    phase_table = segment_phases(kappas_mf, seg_bounds)
     c = np.ascontiguousarray
     # One point per chunk: the cost per point varies with the passes it needs.
     with nb.parallel_chunksize(1):
@@ -1538,6 +1552,7 @@ def bloch_fb_segmented_cmes_solve(
             (rk_config if rk_config is not None else RKSolverConfig()).kernel_args(),
             c(edge_K, dtype=np.complex128),
             c(edge_mode_f),
+            c(phase_table),
         )
     if not np.all(converged):
         bad = np.flatnonzero(~converged)
@@ -1560,9 +1575,7 @@ def bloch_fb_segmented_cmes_solve(
 
     n_saved = passes if save_all_passes else 1
     raw = I_out.reshape((2, n_saved, n_freq, n_modes, len(x_array)))
-    Phi_f, Phi_b = segmented_phase(
-        np.transpose(gammas_seg.imag, (0, 2, 1)), seg_bounds, x_array
-    )
+    Phi_f, Phi_b = segmented_phase(kappas_mf, phase_table, seg_bounds, x_array)
     # In place: with save_all_passes the buffer holds every pass.
     raw[0] *= np.exp(1j * Phi_f)
     raw[1] *= np.exp(1j * Phi_b)

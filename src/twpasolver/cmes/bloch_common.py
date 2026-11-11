@@ -256,26 +256,6 @@ def _bloch_row_coeffs(
     return out
 
 
-@nb.njit(cache=True)
-def _rows_with_targets(rows, coeffs, gs, is_target):
-    """Subset of kept rows whose target mode has ``is_target > 0``."""
-    keep = 0
-    for r in range(rows.shape[0]):
-        if is_target[rows[r, 0]] > 0.0:
-            keep += 1
-    rows_out = np.empty((keep, rows.shape[1]), dtype=rows.dtype)
-    c_out = np.empty(keep, dtype=np.complex128)
-    g_out = np.empty(keep, dtype=np.float64)
-    q = 0
-    for r in range(rows.shape[0]):
-        if is_target[rows[r, 0]] > 0.0:
-            rows_out[q] = rows[r]
-            c_out[q] = coeffs[r]
-            g_out[q] = gs[r]
-            q += 1
-    return rows_out, c_out, g_out
-
-
 # --------------------------------------------------------------------------- #
 # Linear algebra
 # --------------------------------------------------------------------------- #

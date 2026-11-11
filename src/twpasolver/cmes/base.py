@@ -158,14 +158,14 @@ def _no_reflections_solve_segmented(
     coeffs_4wm_table,
     segment_midpoints,
     rk,
+    phi_tables,
 ):
     """
     Parallel solve for segmented device; gammas_array shape (n_freq, n_modes, n_segments).
 
-    For each frequency the cumulative phase Phi_m(x[k]) is precomputed on the
-    output grid (trapezoid rule on kappa_m linearly interpolated from
-    segment_midpoints, exact for that interpolant) and passed to the RHS, which
-    interpolates it at every integrator step.
+    ``phi_tables`` (n_freq, n_modes, n_x): the cumulative phase on the output
+    grid (:func:`cumulative_phase`), which the RHS interpolates at every
+    integrator step.
     """
     n_freq = y0_broadcast.shape[0]
     n_modes = y0_broadcast.shape[1]
@@ -178,32 +178,7 @@ def _no_reflections_solve_segmented(
         alphas_i = np.ascontiguousarray(gammas_array[i].real)
         kappas_i = np.ascontiguousarray(gammas_array[i].imag)
 
-        # Precompute cumulative phase on the output grid: phi_table[m, k] = Phi_m(x[k]).
-        # kappa_m(x) is piecewise-linear between segment_midpoints, so the
-        # trapezoid rule on the interpolated values is exact for that interpolant.
-        # Both x_array and segment_midpoints are sorted. For each pair (x[k-1], x[k])
-        # we compute the segment bracket once and reuse it across all modes.
-        phi_table = np.zeros((n_modes, n_x), dtype=nb.float64)
-        for k in range(1, n_x):
-            lo_l, hi_l = _sorted_interp_bracket(segment_midpoints, x_array[k - 1])
-            fl = (
-                0.0
-                if lo_l == hi_l
-                else (x_array[k - 1] - segment_midpoints[lo_l])
-                / (segment_midpoints[hi_l] - segment_midpoints[lo_l])
-            )
-            lo_r, hi_r = _sorted_interp_bracket(segment_midpoints, x_array[k])
-            fr = (
-                0.0
-                if lo_r == hi_r
-                else (x_array[k] - segment_midpoints[lo_r])
-                / (segment_midpoints[hi_r] - segment_midpoints[lo_r])
-            )
-            dx = x_array[k] - x_array[k - 1]
-            for m in range(n_modes):
-                kl = kappas_i[m, lo_l] + fl * (kappas_i[m, hi_l] - kappas_i[m, lo_l])
-                kr = kappas_i[m, lo_r] + fr * (kappas_i[m, hi_r] - kappas_i[m, lo_r])
-                phi_table[m, k] = phi_table[m, k - 1] + 0.5 * (kl + kr) * dx
+        phi_table = np.ascontiguousarray(phi_tables[i])
 
         I_tuples[i] = rk45_solve(
             no_reflections_cmes_segmented,
@@ -230,6 +205,31 @@ def _no_reflections_solve_segmented(
     return I_tuples
 
 
+def cumulative_phase(
+    gammas_array: ComplexArray, segment_midpoints: FloatArray, x_array: FloatArray
+) -> FloatArray:
+    """
+    ``Phi_m(x) = int Im(gamma_m) dx`` on ``x_array``, shape (n_freq, n_modes, n_x).
+
+    ``Im(gamma_m)`` is piecewise-linear on the segment midpoints (constant for
+    one segment); the cumulative trapezoid rule is exact for that interpolant.
+    """
+    kappa = gammas_array.imag
+    kappa_at_x = np.array(
+        [
+            [
+                np.interp(x_array, segment_midpoints, kappa[i, j])
+                for j in range(kappa.shape[1])
+            ]
+            for i in range(kappa.shape[0])
+        ]
+    ).reshape(*kappa.shape[:2], len(x_array))
+    dphi = 0.5 * (kappa_at_x[..., :-1] + kappa_at_x[..., 1:]) * np.diff(x_array)
+    return np.concatenate(
+        [np.zeros((*kappa.shape[:2], 1)), np.cumsum(dphi, axis=-1)], -1
+    )
+
+
 def no_reflections_cmes_solve(
     x_array: FloatArray,
     y0_broadcast: ComplexArray,
@@ -250,10 +250,10 @@ def no_reflections_cmes_solve(
 
     Returns
     -------
-    I_tuples : (n_freq, n_modes, n_positions)
-        Slow-envelope amplitudes (no propagation phase).  Apply
-        ``_apply_phase_carrier`` in the caller to recover the full-phase field.
+    I : (n_freq, n_modes, n_positions)
+        Mode currents with their propagation phase ``exp(i Phi_m(x))``.
     """
+    phi = cumulative_phase(gammas_array, segment_midpoints, x_array)
     rk = (rk_config if rk_config is not None else RKSolverConfig()).kernel_args()
     I_tuples = _no_reflections_solve_segmented(
         np.ascontiguousarray(x_array),
@@ -265,6 +265,7 @@ def no_reflections_cmes_solve(
         np.ascontiguousarray(coeffs_4wm),
         np.ascontiguousarray(segment_midpoints),
         rk,
+        np.ascontiguousarray(phi),
     )
     bad = np.flatnonzero(~np.isfinite(I_tuples).all(axis=(1, 2)))
     if bad.size:
@@ -275,4 +276,4 @@ def no_reflections_cmes_solve(
             len(I_tuples),
             bad[:20].tolist(),
         )
-    return I_tuples
+    return I_tuples * np.exp(1j * phi)

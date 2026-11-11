@@ -53,7 +53,6 @@ def build_problem(
         freqs_hz=np.abs(freqs) * unit_multiplier,
         gammas=-table("alpha") - 1j * table("k"),
         reflections=table("gamma"),
-        Zb=table("Zb"),
         relations_3wm=rel3,
         relations_4wm=rel4,
         unit_3wm=unit3,
