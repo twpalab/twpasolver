@@ -412,7 +412,9 @@ def test_plots_render():
     r.plot_currents()
     r.plot_currents(backward=True, log_scale=False)
     an.phase_matching([3.0, 5.0], [11.0, 12.0]).plot()
-    ModeSet.extended_3wm(1, 1, 0).plot_relations(tones={"p": PUMP, "s": 5.0})
+    modes = ModeSet.extended_3wm(2, 2, 1)  # edges that skip levels get waypoints
+    for layout in ("hierarchical", "circular", "spring"):
+        modes.plot_relations(tones={"p": PUMP, "s": 5.0}, layout=layout)
     plt.close("all")
 
 

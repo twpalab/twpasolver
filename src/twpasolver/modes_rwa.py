@@ -240,103 +240,161 @@ class ModeSet:
             layout: Graph layout ('hierarchical', 'circular' or 'spring').
         """
         G = nx.DiGraph()
-        for m in self.labels:
-            G.add_node(m)
-        edge_labels: dict[Tuple[str, str], str] = {}
+        G.add_nodes_from(self.labels)
         for result, expr in self.relations:
-            for dep, coeff in _parse(expr):
-                G.add_edge(dep, result, color="blue" if coeff > 0 else "red")
-                c = f"+{coeff}" if coeff > 0 else str(coeff)
-                key = (dep, result)
-                edge_labels[key] = (
-                    f"{edge_labels[key]}, {c}" if key in edge_labels else c
-                )
+            coeffs: Counter = Counter()
+            for dep, c in _parse(expr):
+                coeffs[dep] += c
+            for dep, c in coeffs.items():
+                if c:
+                    G.add_edge(dep, result, coeff=c)
 
         fig, (ax1, ax2) = plt.subplots(
             1, 2, figsize=figsize, gridspec_kw={"width_ratios": [3, 1]}
         )
+        H: nx.DiGraph = G
         if layout == "hierarchical":
-            pos = self._hierarchical_layout(G)
+            pos, H = self._hierarchical_layout(G)
         elif layout == "circular":
             pos = nx.circular_layout(G)
         else:
-            pos = nx.spring_layout(G, k=2, iterations=50)
+            pos = nx.spring_layout(G, k=2, iterations=50, seed=0)
 
-        node_colors = [
-            "lightgreen" if m in self.independent else "lightblue" for m in G.nodes()
-        ]
         nx.draw_networkx_nodes(
-            G, pos, node_color=node_colors, node_size=node_size, ax=ax1
+            G,
+            pos,
+            nodelist=list(self.labels),
+            node_color=[
+                "lightgreen" if m in self.independent else "lightblue"
+                for m in self.labels
+            ],
+            edgecolors="0.3",
+            node_size=node_size,
+            ax=ax1,
         )
-        for color, style in (("blue", "-"), ("red", "--")):
-            edges = [(u, v) for u, v, d in G.edges(data=True) if d["color"] == color]
-            if edges:
-                nx.draw_networkx_edges(
-                    G,
-                    pos,
-                    edgelist=edges,
-                    edge_color=color,
-                    style=style,
-                    arrows=True,
-                    arrowsize=20,
-                    ax=ax1,
-                )
-        labels = {m: m for m in G.nodes()}
+        # Waypoints (tuples) have no size, so segments join there without a gap;
+        # only the segment that reaches a mode gets the arrowhead.
+        nodes = list(H.nodes())
+        sizes = [0 if isinstance(n, tuple) else node_size for n in nodes]
+        for positive, color, style in (
+            (True, "tab:blue", "-"),
+            (False, "tab:red", "--"),
+        ):
+            for head in (True, False):
+                edges = [
+                    (u, v)
+                    for u, v, c in H.edges(data="coeff")
+                    if (c > 0) == positive and isinstance(v, tuple) != head
+                ]
+                if edges:
+                    nx.draw_networkx_edges(
+                        H,
+                        pos,
+                        edgelist=edges,
+                        nodelist=nodes,
+                        node_size=sizes,
+                        edge_color=color,
+                        style=style,
+                        width=1.5,
+                        arrows=True,
+                        arrowstyle="-|>" if head else "-",
+                        arrowsize=18,
+                        ax=ax1,
+                    )
+        labels = {m: m for m in self.labels}
         if tones is not None:
             freqs = self.frequencies(tones)
-            labels = {m: f"{m}\n({freqs[self.index(m)]:.1f})" for m in G.nodes()}
+            labels = {m: f"{m}\n{freqs[self.index(m)]:.3g}" for m in self.labels}
         nx.draw_networkx_labels(G, pos, labels, font_size=font_size, ax=ax1)
-        nx.draw_networkx_edge_labels(
-            G, pos, edge_labels, font_size=font_size - 2, ax=ax1
-        )
-        ax1.set_title("Mode Relationships", fontsize=font_size + 2, fontweight="bold")
+        # The sign is in the line style; only multiplicities need a label (on the
+        # first segment of an edge).
+        multiples = {
+            (u, v): f"\u00d7{abs(c)}"
+            for u, v, c in H.edges(data="coeff")
+            if abs(c) > 1 and not isinstance(u, tuple)
+        }
+        if multiples:
+            nx.draw_networkx_edge_labels(
+                H,
+                pos,
+                multiples,
+                font_size=font_size - 1,
+                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none"),
+                ax=ax1,
+            )
+        ax1.set_title("Mode relations", fontsize=font_size + 2, fontweight="bold")
         ax1.axis("off")
-        ax1.legend(
-            handles=[
-                mpatches.Patch(color="lightgreen", label="Independent modes"),
-                mpatches.Patch(color="lightblue", label="Dependent modes"),
-                plt.Line2D([0], [0], color="blue", lw=2, label="Positive contribution"),
-                plt.Line2D(
-                    [0],
-                    [0],
-                    color="red",
-                    lw=2,
-                    linestyle="--",
-                    label="Negative contribution",
-                ),
-            ],
-            loc="upper right",
-        )
+        ax1.margins(0.12)
+
         ax2.axis("off")
-        ax2.set_title("Relations", fontsize=font_size + 1, fontweight="bold")
         ax2.text(
-            0.05,
-            0.95,
-            f"Frequencies:\n\n{self}",
+            0.0,
+            1.0,
+            str(self),
             transform=ax2.transAxes,
             fontsize=font_size - 1,
+            family="monospace",
             verticalalignment="top",
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8),
+        )
+        ax2.legend(
+            handles=[
+                mpatches.Patch(
+                    facecolor="lightgreen", edgecolor="0.3", label="Independent"
+                ),
+                mpatches.Patch(
+                    facecolor="lightblue", edgecolor="0.3", label="Dependent"
+                ),
+                plt.Line2D([0], [0], color="tab:blue", lw=2, label="Added"),
+                plt.Line2D(
+                    [0], [0], color="tab:red", lw=2, ls="--", label="Subtracted"
+                ),
+            ],
+            loc="lower left",
+            frameon=False,
+            fontsize=font_size - 1,
         )
         fig.tight_layout()
         return fig
 
-    def _hierarchical_layout(self, G: nx.DiGraph) -> Dict[str, Tuple[float, float]]:
-        """Independent modes at the bottom, every mode one level above its inputs."""
-        levels = {m: 0 for m in self.independent}
+    def _hierarchical_layout(
+        self, G: nx.DiGraph
+    ) -> Tuple[Dict[Any, Tuple[float, float]], nx.DiGraph]:
+        """
+        Layered layout of the mode graph ``G``.
+
+        Independent modes on top, every mode one level below its lowest input. An
+        edge that skips levels is split at a waypoint ``(u, v, level)`` in every
+        level in between, so that it is drawn around the modes there. Within a
+        level, modes and waypoints are ordered by the mean position of their inputs.
+
+        Returns the positions of modes and waypoints, and ``G`` with the split edges.
+        """
+        levels: dict[Any, int] = {m: 0 for m in self.independent}
         for m in nx.topological_sort(G):
             if m not in levels:
                 levels[m] = (
                     max((levels.get(p, 0) for p in G.predecessors(m)), default=0) + 1
                 )
+        H = nx.DiGraph()
+        H.add_nodes_from(self.labels)
+        for u, v, c in G.edges(data="coeff"):
+            chain = [u, *((u, v, k) for k in range(levels[u] + 1, levels[v])), v]
+            for w in chain[1:-1]:
+                levels[w] = w[2]
+            for x, y in zip(chain, chain[1:]):
+                H.add_edge(x, y, coeff=c)
         max_level = max(levels.values(), default=0)
-        counts = Counter(levels.values())
-        placed: dict[int, int] = defaultdict(int)
-        pos: dict[str, tuple[float, float]] = {}
-        for m, level in levels.items():
-            pos[m] = (placed[level] - (counts[level] - 1) / 2, max_level - level)
-            placed[level] += 1
-        return pos
+        rows: dict[int, list[Any]] = defaultdict(list)
+        for n in H.nodes():
+            rows[levels[n]].append(n)
+        pos: dict[Any, tuple[float, float]] = {}
+        for level in sorted(rows):
+            row = rows[level]
+            if level:
+                row.sort(key=lambda n: np.mean([pos[q][0] for q in H.predecessors(n)]))
+            for j, n in enumerate(row):
+                pos[n] = (j - (len(row) - 1) / 2, max_level - level)
+        return pos, H
 
 
 @lru_cache(maxsize=None)
