@@ -125,32 +125,52 @@ class ModeSet:
         cls,
         n_pump_harmonics: int = 1,
         n_frequency_conversion: int = 1,
-        n_signal_harmonics: int = 1,
+        n_signal_harmonics: int = 0,
+        n_sideband_conversion: int = 0,
     ) -> "ModeSet":
         """
-        3WM pump, signal and idler with pump harmonics and conversion terms.
+        3WM pump, signal and idler with pump harmonics, conversion terms and sidebands.
+
+        Every signal order ``m`` gives the harmonic ``m s`` and its 3WM idler
+        ``p - m s``, labelled ``s{m}`` and ``i{m}``, and their conversion chain
+        ``n p + m s`` and ``(n + 1) p - m s``, labelled ``p{n}s{m}`` and
+        ``p{n}i{m}`` (``m`` and ``n`` are left out when 1). Order ``m = 1`` is the
+        signal and idler themselves: ``s``, ``i``, ``ps``, ``pi``, ``p2s``, ...; order
+        2 gives ``s2`` (2s), ``i2`` (p - 2s), ``ps2`` (p + 2s), ``pi2`` (2p - 2s), ...
+
+        The sidebands (``m >= 2``) are second or higher order in the signal: they
+        leave the small-signal gain unchanged and matter in compression. The idler
+        ``p - m s`` crosses 0 Hz at ``s = p / m``, so keep the signals on one side of
+        it (a mode below the frequency grid raises).
 
         Args:
             n_pump_harmonics: Number of pump harmonics (p2, p3, ...).
-            n_frequency_conversion: Number of up-conversion pairs (ps/pi, p2s/p2i, ...).
-            n_signal_harmonics: Number of signal and idler harmonics (s2/i2, ...).
+            n_frequency_conversion: Largest pump order ``n`` of the conversion chain
+                of the signal and idler (ps/pi, p2s/p2i, ...).
+            n_signal_harmonics: Number of sideband orders ``m = 2, 3, ...`` (s2/i2,
+                s3/i3, ...).
+            n_sideband_conversion: Largest pump order ``n`` of the conversion chain
+                of every sideband order (ps2/pi2, p2s2/p2i2, ...).
         """
-        labels = ["p", "s", "i"]
-        relations = [("i", "p-s")]
-        for n in range(1, n_frequency_conversion + 1):
-            s, i = ("ps", "pi") if n == 1 else (f"p{n}s", f"p{n}i")
-            labels += [s, i]
-            relations += [(s, "p+" * (n - 1) + "p+s"), (i, "p+" * (n - 1) + "p+i")]
-        for n in range(2, n_pump_harmonics + 2):
-            labels.append(f"p{n}")
-            relations.append((f"p{n}", "p+" * (n - 1) + "p"))
-        for n in range(2, n_signal_harmonics + 2):
-            labels += [f"s{n}", f"i{n}"]
-            relations += [
-                (f"s{n}", "s+" * (n - 1) + "s"),
-                (f"i{n}", "i+" * (n - 1) + "i"),
-            ]
-        return cls(tuple(labels), tuple(relations))
+
+        def chain(m: int, n_max: int) -> list[tuple[str, str]]:
+            """Modes of signal order ``m``: harmonic, idler, then their conversions."""
+            sm, im = ("s", "i") if m == 1 else (f"s{m}", f"i{m}")
+            modes = [] if m == 1 else [(sm, "+".join("s" * m))]
+            modes.append((im, "p-" + "-".join("s" * m)))
+            for n in range(1, n_max + 1):
+                pn = "p" if n == 1 else f"p{n}"
+                modes += [(pn + sm, "p+" * n + sm), (pn + im, "p+" * n + im)]
+            return modes
+
+        relations = chain(1, n_frequency_conversion)
+        relations += [
+            (f"p{n}", "+".join("p" * n)) for n in range(2, n_pump_harmonics + 2)
+        ]
+        for m in range(2, n_signal_harmonics + 2):
+            relations += chain(m, n_sideband_conversion)
+        labels = ("p", "s", *(label for label, _ in relations))
+        return cls(labels, tuple(relations))
 
     def index(self, label: str) -> int:
         """Position of ``label`` among the modes."""
@@ -224,7 +244,7 @@ class ModeSet:
     def plot_relations(
         self,
         tones: Optional[Mapping[str, float]] = None,
-        figsize: Tuple[float, float] = (12, 8),
+        figsize: Optional[Tuple[float, float]] = None,
         node_size: int = 3000,
         font_size: int = 12,
         layout: str = "hierarchical",
@@ -234,7 +254,7 @@ class ModeSet:
 
         Args:
             tones: Independent tones; if given, nodes show the mode frequencies.
-            figsize: Figure size (width, height).
+            figsize: Figure size (width, height); None sizes it to the graph.
             node_size: Size of mode nodes.
             font_size: Font size for labels.
             layout: Graph layout ('hierarchical', 'circular' or 'spring').
@@ -249,9 +269,6 @@ class ModeSet:
                 if c:
                     G.add_edge(dep, result, coeff=c)
 
-        fig, (ax1, ax2) = plt.subplots(
-            1, 2, figsize=figsize, gridspec_kw={"width_ratios": [3, 1]}
-        )
         H: nx.DiGraph = G
         if layout == "hierarchical":
             pos, H = self._hierarchical_layout(G)
@@ -259,6 +276,16 @@ class ModeSet:
             pos = nx.circular_layout(G)
         else:
             pos = nx.spring_layout(G, k=2, iterations=50, seed=0)
+        if figsize is None:
+            # About 1.7 in per unit of the layout keeps the nodes apart.
+            xs, ys = np.array(list(pos.values())).T
+            figsize = (
+                max(10.0, 1.7 * (np.ptp(xs) + 1) / 0.75),
+                max(5.0, 2.2 * (np.ptp(ys) + 1)),
+            )
+        fig, (ax1, ax2) = plt.subplots(
+            1, 2, figsize=figsize, gridspec_kw={"width_ratios": [3, 1]}
+        )
 
         nx.draw_networkx_nodes(
             G,
@@ -392,8 +419,11 @@ class ModeSet:
             row = rows[level]
             if level:
                 row.sort(key=lambda n: np.mean([pos[q][0] for q in H.predecessors(n)]))
-            for j, n in enumerate(row):
-                pos[n] = (j - (len(row) - 1) / 2, max_level - level)
+            # A waypoint takes half the room of a mode.
+            widths = np.array([0.5 if isinstance(n, tuple) else 1.0 for n in row])
+            x = np.cumsum(widths) - widths / 2
+            for n, xn in zip(row, x - (x[0] + x[-1]) / 2):
+                pos[n] = (float(xn), max_level - level)
         return pos, H
 
 

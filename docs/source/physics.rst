@@ -103,7 +103,11 @@ Mode sets
 
 The CMEs describe only the modes in the :class:`~twpasolver.modes_rwa.ModeSet`. Pump harmonics and
 frequency-conversion products take power from the pump and the signal when they are phase matched, so check a
-result by adding them (``ModeSet.extended_3wm``, or a custom set) until the gain stops changing. Lines with little
+result by adding them (``ModeSet.extended_3wm``, or a custom set) until the gain stops changing. Sidebands of two or
+more signal photons (``2 fs``, ``fp - 2 fs`` and their conversion products, ``n_signal_harmonics`` and
+``n_sideband_conversion``) are second order in the signal: they matter in compression, not for the small-signal
+gain. The idler ``fp - m fs`` of order ``m`` crosses 0 Hz at ``fs = fp / m``, so the signals must stay on one side
+of it. Lines with little
 dispersion at high frequency, such as kinetic-inductance lines far below their cutoff, need particular care: their
 pump harmonics and up-conversion products stay nearly phase matched (see :doc:`notebooks/05_other_twpas`).
 

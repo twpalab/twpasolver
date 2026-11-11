@@ -12,7 +12,10 @@ tutorials for the new workflow).
   gains `gain_db` (S21), `gain_db_12`, `gain_db_11`, `gain_db_22` with the external currents `a_in`, `a_out`,
   `b_in`, `b_out`.
 - `ModeSet`: modes and frequency relations with any number of independent tones (`tones=` in `gain` and
-  `phase_matching`); exact RWA terms on integer frequency vectors.
+  `phase_matching`); exact RWA terms on integer frequency vectors. `ModeSet.extended_3wm` builds the signal
+  sidebands like the signal chain: for every order `m` the harmonic `s{m}` (`m s`) and its idler `i{m}`
+  (`p - m s`, so `i2` is `p - 2s`, not `2i`), then their conversion products up to `n_sideband_conversion`;
+  `n_signal_harmonics` now defaults to 0.
 - `GainResult` and `PhaseMatchingResult`: the same fields for every model, `save`/`load` to HDF5, `plot`,
   `GainResult.bandwidth()`, `plot_currents()`, `mode(label)`.
 - `TWPAnalysis.linear` (`LinearData`): Bloch parameters per segment, all stopbands in the grid, `k_star`; computed

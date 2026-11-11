@@ -411,7 +411,7 @@ def test_per_mode_harmonic_limits_in_filter():
     from twpasolver.cmes.prep import prepare_relations_coefficients
     from twpasolver.modes_rwa import ModeSet
 
-    ma = ModeSet.extended_3wm(n_pump_harmonics=1, n_frequency_conversion=1)
+    ma = ModeSet.extended_3wm(1, 1, n_signal_harmonics=1)
     rel3, rel4, _, _ = prepare_relations_coefficients(
         ma.rwa_terms(2), ma.rwa_terms(3), 1.0, 1.0
     )
@@ -491,7 +491,7 @@ def test_mismatch_cutoff_capped_at_zone_edge():
     from twpasolver.cmes.prep import prepare_relations_coefficients
     from twpasolver.modes_rwa import ModeSet
 
-    ma = ModeSet.extended_3wm(n_pump_harmonics=1, n_frequency_conversion=1)
+    ma = ModeSet.extended_3wm(1, 1, n_signal_harmonics=1)
     rels = prepare_relations_coefficients(ma.rwa_terms(2), ma.rwa_terms(3), 1.0, 1.0)[
         :2
     ]

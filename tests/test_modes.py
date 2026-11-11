@@ -42,5 +42,23 @@ def test_expressions_and_dependents():
     modes = ModeSet.extended_3wm(n_pump_harmonics=1, n_frequency_conversion=1)
     assert modes.expression("i") == "p - s"
     assert modes.expression("p2") == "2*p"
-    assert modes.dependents("s") == {"i", "ps", "pi", "s2", "i2"}
+    assert modes.dependents("s") == {"i", "ps", "pi"}
     assert modes.independent == ("p", "s")
+
+
+def test_extended_3wm_sideband_chains():
+    """Order m: m s and p - m s, then n p + m s and (n + 1) p - m s up to n_max."""
+    modes = ModeSet.extended_3wm(2, 2, n_signal_harmonics=2, n_sideband_conversion=1)
+    assert modes.labels[:9] == ("p", "s", "i", "ps", "pi", "p2s", "p2i", "p2", "p3")
+    expected = {
+        "s2": "2*s",
+        "i2": "p - 2*s",
+        "ps2": "p + 2*s",
+        "pi2": "2*p - 2*s",
+        "s3": "3*s",
+        "i3": "p - 3*s",
+        "ps3": "p + 3*s",
+        "pi3": "2*p - 3*s",
+    }
+    assert modes.labels[9:] == tuple(expected)
+    assert all(modes.expression(m) == e for m, e in expected.items())

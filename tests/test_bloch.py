@@ -315,7 +315,7 @@ def test_mismatch_filter_keeps_partner_terms_together():
     from twpasolver.cmes.bloch_common import _filter_wm_terms_bloch
     from twpasolver.cmes.prep import prepare_relations_coefficients
 
-    modes = ModeSet.extended_3wm(n_pump_harmonics=1, n_frequency_conversion=1)
+    modes = ModeSet.extended_3wm(1, 1, n_signal_harmonics=1)
     rel3, rel4, _, _ = prepare_relations_coefficients(
         modes.rwa_terms(2), modes.rwa_terms(3), 1.0, 1.0
     )
