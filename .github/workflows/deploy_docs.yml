@@ -1,6 +1,7 @@
 name: Docs
 
-# Built on every push and pull request; published to gh-pages only for version tags.
+# Built on every push and pull request; published to gh-pages for version tags, and
+# from main when run by hand (Actions > Docs > Run workflow), e.g. for docs-only fixes.
 on:
   push:
   pull_request:
@@ -44,7 +45,9 @@ jobs:
         poetry run make -C docs html
 
     - name: Deploy
-      if: startsWith(github.ref, 'refs/tags/v')
+      if: >-
+        startsWith(github.ref, 'refs/tags/v') ||
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
       uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
