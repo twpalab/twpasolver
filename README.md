@@ -4,8 +4,8 @@ Simulation of traveling-wave parametric amplifiers (TWPAs): circuit models of th
 matching and gain from coupled mode equations (CMEs).
 
 > **Scope:** this release simulates **kinetic-inductance TWPAs (KI-TWPAs)**. The cells of the line can be any linear
-> circuit, but the only nonlinearity is that of a kinetic inductance (three-wave mixing with a dc bias, four-wave
-> mixing without). Josephson-junction and SNAIL TWPAs are not supported yet.
+> circuit, but the only nonlinearity is that of a kinetic inductance. Josephson-junction and SNAIL TWPAs are not
+> supported yet.
 
 - **Circuit models**: lumped and distributed elements, composed into unit cells, supercells and segmented devices;
   ABCD/S/Z parameters of any network, and user-defined models.
