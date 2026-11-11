@@ -15,12 +15,14 @@ function body, and by being ``inline="always"`` with a statically known
 the caller's compiled code.
 """
 
+import sys
 from typing import Tuple
 
 import numba as nb
 import numpy as np
 
-EPS = float(np.finfo(np.float64).eps)
+# float64 machine epsilon (np.finfo(...).eps trips pylint with numpy >= 2.4).
+EPS = sys.float_info.epsilon
 
 # Multiply steps computed from asymptotic behaviour of errors by this.
 SAFETY = 0.9
