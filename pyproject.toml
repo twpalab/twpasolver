@@ -76,6 +76,10 @@ all = true
 # Physics symbols: circuit elements, currents, matrices and Greek-letter names.
 good-names-rgxs = ["^[A-Z][A-Za-z0-9_]{0,15}$", "^[a-z][a-z0-9]?(_[A-Za-z0-9]+)*$"]
 
+[tool.pylint.typecheck]
+# Pydantic fields with Field(default=...) are inferred as FieldInfo, not their value.
+ignored-classes = ["FieldInfo"]
+
 [tool.pylint.format]
 max-line-length = 100
 
