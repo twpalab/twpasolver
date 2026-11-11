@@ -629,9 +629,12 @@ def _unfolded_holotype(q=3, nl_scale=None, delta=None):
     ``nl_scale`` (length 34 q) scales the nonlinear inductance of each cell only;
     ``delta`` overrides the loss tangent.
     """
+    from typing import Literal
+
     from twpasolver.models.twpa_cells import LCLfBaseCell
 
     class _NLCell(LCLfBaseCell):
+        name: Literal["_NLCell"] = "_NLCell"  # type: ignore[assignment]
         nl: float = 1.0
 
         def bloch_nl_elements(self):

@@ -166,7 +166,11 @@ class TwoPortCell:
         return {"freqs": self.freqs, "abcd": np.asarray(self.abcd), "Z0": self.Z0}
 
     def dump_to_file(self, filename: str, writer="hdf5") -> None:
-        """Dump cell to file (``writer`` is the file format)."""
+        """Dump cell to file (``writer`` is the file format; complex matrices need ``"hdf5"``)."""
+        if writer == "json":
+            raise ValueError(
+                "JSON cannot store the complex ABCD matrices; use writer='hdf5'."
+            )
         save_to_file(filename, self.as_dict(), writer=writer)
 
     def interpolate(self, freqs: np.ndarray, polar: bool = False) -> TwoPortCell:
@@ -177,8 +181,12 @@ class TwoPortCell:
             freqs (numpy.ndarray): Frequencies in Hz.
             polar (bool): Interpolate magnitude and unwrapped phase instead of real and imaginary part.
         """
+        if not np.all(np.diff(self.freqs) > 0):
+            raise ValueError(
+                "Interpolation needs the cell frequencies strictly increasing."
+            )
         if np.array_equal(freqs, self.freqs):
-            return self
+            return self.__class__(self.freqs.copy(), np.array(self.abcd), self.Z0)
         if freqs[0] < self.freqs[0] or freqs[-1] > self.freqs[-1]:
             log.warning("Interpolation out of predefined range might be imprecise.")
 
@@ -214,10 +222,25 @@ class TwoPortModel(BaseModel, ABC):
 
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
-        """Register a subclass that declares its own ``name`` field (default = key)."""
+        """
+        Register a subclass that declares its own ``name`` field (default = key).
+
+        A subclass that inherits a registered ``name`` is saved and loaded as that
+        model, so it may not add fields (they would be lost on loading).
+        """
         super().__pydantic_init_subclass__(**kwargs)
         if "name" in inspect.get_annotations(cls):
             TwoPortModel.registry[cls.model_fields["name"].default] = cls
+        elif "name" in cls.model_fields:
+            parent = TwoPortModel.registry.get(cls.model_fields["name"].default)
+            added = set(cls.model_fields) - set(parent.model_fields if parent else ())
+            if parent is not None and added:
+                raise TypeError(
+                    f"{cls.__name__} adds fields {sorted(added)} but inherits the name "
+                    f"{parent.__name__!r}, so it would load back as {parent.__name__} "
+                    f'without them; declare name: Literal["{cls.__name__}"] = '
+                    f'"{cls.__name__}".'
+                )
 
     @staticmethod
     def validate_cell(cell: Any, base: type) -> TwoPortModel:

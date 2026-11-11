@@ -121,6 +121,12 @@ def test_failed_save_keeps_previous_file(tmp_path):
         save_to_file(name, {"bad": object()}, writer="hdf5")
     np.testing.assert_array_equal(read_file(name, writer="hdf5")["x"], np.arange(3))
     assert not os.path.exists(name + ".tmp")
+    name = str(tmp_path / "keep.json")
+    save_to_file(name, {"x": [1, 2]}, writer="json")
+    with pytest.raises(TypeError):
+        save_to_file(name, {"x": [3], "bad": object()}, writer="json")
+    assert read_file(name, writer="json") == {"x": [1, 2]}
+    assert not os.path.exists(name + ".tmp")
 
 
 # Base data state, k_star guard
@@ -320,7 +326,9 @@ def test_log_does_not_reach_root_handler():
 
 def test_twpanalysis_rejects_unknown_fields():
     with pytest.raises(ValidationError):
-        TWPAnalysis(twpa=_small_twpa(), freqs=(0, 9, 1e-3), freqs_arange=(0, 9, 1e-3))
+        TWPAnalysis(
+            twpa=_small_twpa(), freqs=(0.05, 9, 1e-3), freqs_arange=(0, 9, 1e-3)
+        )
 
 
 def test_port_must_be_a_model():
@@ -329,10 +337,19 @@ def test_port_must_be_a_model():
 
 
 def test_twpanalysis_json_round_trip_keeps_grid(tmp_path):
-    an = TWPAnalysis(twpa=_small_twpa(), freqs=(0.05, 20, 1e-2), unit="GHz")
+    from twpasolver.models import Inductance
+
+    an = TWPAnalysis(
+        twpa=_small_twpa(),
+        freqs=(0.05, 20, 1e-2),
+        unit="GHz",
+        ports=Ports(input=Inductance(L=3e-10)),
+    )
     path = str(tmp_path / "analysis.json")
     an.dump_to_file(path)
-    np.testing.assert_array_equal(TWPAnalysis.from_file(path).f, an.f)
+    back = TWPAnalysis.from_file(path)
+    np.testing.assert_array_equal(back.f, an.f)
+    assert back.ports.input == an.ports.input and back.ports.output is None
 
 
 def test_warmup_runs():
@@ -406,6 +423,9 @@ def test_frequencies_validation():
         TWPAnalysis(twpa=_small_twpa(), freqs=(2, 1, 0.5))
     with pytest.raises(ValidationError):
         TWPAnalysis(twpa=_small_twpa())
+    for bad in ([5.0, 4.0, 6.0], [5.0], (0, 9, 1e-2)):
+        with pytest.raises(ValidationError, match="increasing frequencies > 0"):
+            TWPAnalysis(twpa=_small_twpa(), freqs=bad)
 
 
 def test_impedance_must_have_positive_real_part():
@@ -473,3 +493,32 @@ def test_resistance_on_integer_freqs():
 def test_cyclic_relations_raise():
     with pytest.raises(ValueError, match="cyclic"):
         ModeSet(["a", "b", "c"], [["a", "b+c"], ["b", "a-c"]])
+
+
+def test_frequency_inputs(analysis):
+    pm = analysis.phase_matching([5.0, 6.0], pump_freqs=12.0)
+    np.testing.assert_array_equal(pm.pump_freqs, [12.0])
+    with pytest.raises(ValueError, match="explicit frequencies"):
+        analysis.phase_matching([5.0, 6.0], pump_freqs=(11.0, 12.0, 13.0))
+    with pytest.raises(ValueError, match="non-empty"):
+        analysis.phase_matching([], pump_freqs=[12.0])
+    with pytest.raises(ValueError, match="thin"):
+        analysis.gain(SIGNALS, pump=PUMP, thin=0)
+    signals = np.array([6.0, 5.0])
+    r = analysis.gain(signals, pump=PUMP)
+    r.signal_freqs[0] = 99.0
+    assert signals[0] == 6.0
+    one = analysis.gain(5.0, pump=PUMP)
+    assert one.signal_freqs.shape == (1,) and one.bandwidth()["total_bw"] == 0.0
+
+
+def test_bandwidth_does_not_depend_on_signal_order(analysis):
+    up = analysis.gain(np.arange(4.0, 6.01, 0.5), pump=PUMP).bandwidth(3.0)
+    down = analysis.gain(np.arange(6.0, 3.99, -0.5), pump=PUMP).bandwidth(3.0)
+    assert down["total_bw"] == up["total_bw"] > 0
+    assert down["bandwidth_edges"] == up["bandwidth_edges"]
+
+
+def test_result_does_not_keep_the_pass_history(analysis):
+    r = _bloch_gain(analysis)
+    assert r.I_fwd.base is None and r.I_bwd.base is None

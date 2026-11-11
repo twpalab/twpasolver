@@ -8,7 +8,7 @@ Adding a New TwoPortModel
 
 To define a new two-port model by subclassing ``TwoPortModel``, implement the **single_abcd(freqs: numpy.ndarray) -> ABCDArray** method. It takes a 1-D array of frequencies in Hz and returns the ABCD matrix of a single iteration of the model (``N`` repetitions are applied by the base class).
 
-Give the model a **name: Literal["ClassName"] = "ClassName"** field. Every subclass that declares its own ``name`` is registered when it is defined, so arrays (``TwoPortArray``, ``TWPA``) accept it as an instance or as a dict with that ``name``, for example when a model is loaded from JSON. This works for models defined after importing ``twpasolver`` too. Names must be unique; a later class with the same name replaces the earlier one. A subclass that does not declare its own ``name`` can still be used as an instance, but is saved and loaded as its parent.
+Give the model a **name: Literal["ClassName"] = "ClassName"** field. Every subclass that declares its own ``name`` is registered when it is defined, so arrays (``TwoPortArray``, ``TWPA``) accept it as an instance or as a dict with that ``name``, for example when a model is loaded from JSON. This works for models defined after importing ``twpasolver`` too. Names must be unique; a later class with the same name replaces the earlier one. A subclass that does not declare its own ``name`` can still be used as an instance, but is saved and loaded as its parent, so it may not add fields (defining one that does raises ``TypeError``).
 
 Example:
 

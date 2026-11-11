@@ -53,6 +53,17 @@ tutorials for the new workflow).
 ### Fixed
 
 - `TWPAnalysis(twpa=...)`, `TWPA.from_file`, `read_file` and `save_to_file` accept `pathlib.Path` file names.
+- A `TWPAnalysis` with connectors loads back from its JSON file; a failed JSON save keeps the previous file;
+  `TwoPortCell.dump_to_file(writer="json")` raises instead of writing a file that cannot be loaded.
+- Frequency inputs are validated: a single number is one frequency, a tuple is always `(start, stop, step)` and
+  raises when it gives a single frequency (e.g. explicit pumps `(11, 12, 13)`), empty inputs raise, and the
+  analysis grid needs at least two increasing frequencies > 0. `gain` copies `signal_freqs` and accepts a tuple;
+  `thin` must be >= 1.
+- `GainResult.bandwidth()` is independent of the order of the signal frequencies and works for a single one.
+- A subclass of a model that adds fields without declaring its own `name` raises `TypeError` (it would load back
+  as its parent without them).
+- `TwoPortCell.interpolate` raises on non-increasing cell frequencies and always returns a new cell.
+- `save_all_passes` no longer keeps extra copies of the pass history.
 - Base data no longer goes stale after editing the model or the grid; `gain(Ip0=...)` no longer changes the model.
 - Stopband detection independent of where the frequency grid ends; HDF5 saves no longer destroy the previous file
   on failure; complex `Z0` handled consistently in S-parameters; NaN results reported instead of passed silently.

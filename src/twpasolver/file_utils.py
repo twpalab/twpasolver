@@ -85,9 +85,16 @@ def save_to_hdf5(savename: str, d: Dict[str, Any]) -> None:
 
 
 def save_to_json(savename: str, d: Dict[str, Any]) -> None:
-    """Save a dictionary to a JSON file, encoding NumPy types."""
-    with open(savename, "w", encoding="utf-8") as fp:
-        json.dump(d, fp, cls=NpEncoder, indent=4)
+    """Save a dictionary to a JSON file, encoding NumPy types; a failed save keeps the previous file."""
+    tmp = savename + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as fp:
+            json.dump(d, fp, cls=NpEncoder, indent=4)
+        os.replace(tmp, savename)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise
 
 
 def _recursively_save_dict_contents_to_group(f: Group, d: Dict[Any, Any]) -> None:

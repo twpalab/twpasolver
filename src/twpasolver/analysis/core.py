@@ -20,7 +20,7 @@ from twpasolver.analysis.ports import Ports
 from twpasolver.analysis.problem import build_problem
 from twpasolver.analysis.results import GainResult, PhaseMatchingResult
 from twpasolver.basemodel import BaseModel
-from twpasolver.bonus_types import FloatArray, FrequencyArange, FrequencyList
+from twpasolver.bonus_types import FrequencyArange, FrequencyList
 from twpasolver.cmes.prep import CMEProblem
 from twpasolver.cmes.solver_config import BlochSolverConfig, RKSolverConfig
 from twpasolver.logger import log
@@ -35,10 +35,27 @@ Grid = Union[Tuple[float, float, float], List[float], np.ndarray]
 
 
 def _grid(spec: Grid) -> np.ndarray:
-    """A tuple ``(start, stop, step)`` through ``numpy.arange``, else the explicit values."""
+    """
+    A tuple ``(start, stop, step)`` through ``numpy.arange``, else the explicit
+    values (a number is one frequency); always a new 1-D float array, not empty.
+    """
+    out: np.ndarray
     if isinstance(spec, tuple):
-        return np.arange(*spec)
-    return np.asarray(spec, dtype=float)
+        arange: tuple[float, float, float] = TypeAdapter(
+            FrequencyArange
+        ).validate_python(spec)
+        start, stop, step = arange
+        if start < stop < start + step:
+            raise ValueError(
+                f"{spec} is read as (start, stop, step) and gives one frequency; "
+                "pass explicit frequencies as a list or array."
+            )
+        out = np.arange(start, stop, step, dtype=np.float64)
+    else:
+        out = np.atleast_1d(np.array(spec, dtype=np.float64))
+    if out.ndim != 1 or out.size == 0:
+        raise ValueError(f"Expected a non-empty 1-D list of frequencies, got {spec!r}.")
+    return out
 
 
 class TWPAnalysis(BaseModel):
@@ -83,15 +100,15 @@ class TWPAnalysis(BaseModel):
     @field_validator("freqs", mode="before")
     @classmethod
     def _expand_grid(cls, v):
-        """Expand an arange tuple and accept arrays; reject an empty grid."""
-        if isinstance(v, tuple):
-            start, stop, step = TypeAdapter(FrequencyArange).validate_python(v)
-            v = np.arange(start, stop, step, dtype=np.float64)
-        if isinstance(v, np.ndarray):
-            v = v.tolist()
-        if isinstance(v, list) and not v:
-            raise ValueError("The frequency grid is empty.")
-        return v
+        """Expand an arange tuple and accept arrays; at least two increasing frequencies > 0."""
+        if not isinstance(v, (tuple, list, np.ndarray)):
+            return v  # left to the field types
+        f = _grid(v)
+        if f.size < 2 or not np.all(np.diff(f) > 0) or f[0] <= 0:
+            raise ValueError(
+                "The frequency grid needs at least two strictly increasing frequencies > 0."
+            )
+        return f.tolist()
 
     @property
     def unit_multiplier(self) -> float:
@@ -215,7 +232,7 @@ class TWPAnalysis(BaseModel):
 
     def gain(
         self,
-        signal_freqs: FloatArray,
+        signal_freqs: Grid,
         pump: float,
         Is0: float = 1e-7,
         Ip0: Optional[float] = None,
@@ -234,7 +251,9 @@ class TWPAnalysis(BaseModel):
         Gain of the TWPA from the coupled mode equations.
 
         Args:
-            signal_freqs: Signal frequencies, in ``unit``.
+            signal_freqs: Signal frequencies, in ``unit``: a tuple
+                ``(start, stop, step)`` passed to ``numpy.arange``, or the explicit
+                frequencies.
             pump: Pump frequency. There is no automatic choice; for an estimate use
                 ``phase_matching(...).optimal_pump_freq``.
             Is0: Signal current amplitude injected at x=0 (A).
@@ -259,6 +278,8 @@ class TWPAnalysis(BaseModel):
             bloch_config: Settings of ``"bloch"`` (default ``BlochSolverConfig()``).
             rk_config: Settings of the RK45 integrator (default ``RKSolverConfig()``).
         """
+        if thin < 1:
+            raise ValueError(f"thin must be >= 1, got {thin}.")
         try:
             model = GainModel(model)
         except ValueError:
@@ -279,7 +300,7 @@ class TWPAnalysis(BaseModel):
             self.ports.input is not None or self.ports.output is not None
         ):
             log.warning("Model 'simple' ignores the connectors in ports; use 'bloch'.")
-        signal_freqs = np.asarray(signal_freqs, dtype=float)
+        signal_freqs = _grid(signal_freqs)
         pr = self.problem(
             modes, {**(tones or {}), pump_mode: pump, signal_mode: signal_freqs}
         )

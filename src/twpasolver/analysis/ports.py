@@ -32,9 +32,11 @@ class Ports(BaseModel):
     @field_validator("input", "output", mode="before")
     @classmethod
     def _accept_model_as_is(cls, v):
-        """Pass TwoPortModel instances through without Pydantic coercion."""
+        """Pass TwoPortModel instances through without Pydantic coercion; build dicts (JSON)."""
         if v is None or isinstance(v, TwoPortModel):
             return v
+        if isinstance(v, dict):
+            return TwoPortModel.validate_cell(v, TwoPortModel)
         raise ValueError(f"A port must be a TwoPortModel instance, got {type(v)}.")
 
     def tables(self, freqs_hz: np.ndarray) -> tuple[np.ndarray, ...]:

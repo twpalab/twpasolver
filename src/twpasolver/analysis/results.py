@@ -96,13 +96,14 @@ class GainResult(_Saveable):
         ``total_bw``, ``max_gain``, ``reduced_gain``, ``mean_gain`` (over the band)
         and ``bw_freqs``.
         """
-        gain_db, freqs = self.gain_db, self.signal_freqs
+        order = np.argsort(self.signal_freqs)
+        gain_db, freqs = self.gain_db[order], self.signal_freqs[order]
         if np.all(np.isnan(gain_db)):
             raise ValueError("Gain is NaN at every frequency.")
         max_g = gain_db[np.nanargmax(gain_db)]
         ok_idx = np.where(gain_db >= max_g - gain_reduction)[0]
         ok_freqs = freqs[ok_idx]
-        df = freqs[1] - freqs[0]
+        df = freqs[1] - freqs[0] if len(freqs) > 1 else 0.0
         edges = [ok_freqs[0]]
         for idx in np.where(np.diff(ok_freqs) >= 2 * df)[0]:
             edges += [ok_freqs[idx], ok_freqs[idx + 1]]

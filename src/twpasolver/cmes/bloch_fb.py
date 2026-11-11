@@ -1563,9 +1563,12 @@ def bloch_fb_segmented_cmes_solve(
     Phi_f, Phi_b = segmented_phase(
         np.transpose(gammas_seg.imag, (0, 2, 1)), seg_bounds, x_array
     )
-    I_fwd = raw[0] * np.exp(1j * Phi_f)
+    # In place: with save_all_passes the buffer holds every pass.
+    raw[0] *= np.exp(1j * Phi_f)
+    raw[1] *= np.exp(1j * Phi_b)
+    I_fwd = raw[0]
     # Backward envelopes are solved on s = L - x; x_array is symmetric.
-    I_bwd = (raw[1] * np.exp(1j * Phi_b))[..., ::-1]
+    I_bwd = raw[1][..., ::-1]
 
     a_in = np.asarray(y0_array_fwd, dtype=np.complex128)
     a_out = np.asarray(y0_array_bwd, dtype=np.complex128)

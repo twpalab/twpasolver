@@ -2,10 +2,11 @@
 
 import numpy as np
 import pytest
+import skrf as rf
 
 from twpasolver.mathutils import s2a
 from twpasolver.matrices_arrays import ABCDArray
-from twpasolver.models import LosslessTL
+from twpasolver.models import LCLfBaseCell, LosslessTL
 from twpasolver.models.rf_functions import inductance, series_impedance_abcd
 from twpasolver.twoport import TwoPortCell
 
@@ -127,3 +128,32 @@ def test_stub_cell_line_abcd():
     np.testing.assert_allclose(
         np.asarray(cell.single_abcd(f)), half @ stubs @ half, rtol=1e-12
     )
+
+
+def test_s_and_z_against_skrf_for_complex_z0():
+    f = np.array([1e9, 5e9])
+    z0 = 30 + 20j
+    cell = LCLfBaseCell(L=49.9e-12, C=24.2e-15, Lf=0.87e-9, Z0_ref=z0).get_cell(f)
+    net = rf.Network(
+        frequency=rf.Frequency.from_f(f, unit="hz"),
+        z=np.asarray(cell.z),
+        z0=z0,
+        s_def="pseudo",
+    )
+    np.testing.assert_allclose(np.asarray(cell.s), net.s, atol=1e-12)
+
+
+def test_interpolate_needs_increasing_freqs_and_copies():
+    model = LosslessTL(l=1e-3, L=4e-7, C=1.6e-10)
+    with pytest.raises(ValueError, match="increasing"):
+        model.get_cell(np.linspace(5e9, 1e9, 4)).interpolate(np.array([2e9, 3e9]))
+    cell = model.get_cell(np.linspace(1e9, 5e9, 4))
+    same = cell.interpolate(cell.freqs.copy())
+    same.abcd[0] = 0
+    assert np.any(np.asarray(cell.abcd[0]) != 0)
+
+
+def test_cell_json_dump_raises(tmp_path):
+    cell = LosslessTL(l=1e-3, L=4e-7, C=1.6e-10).get_cell(np.array([1e9, 2e9]))
+    with pytest.raises(ValueError, match="hdf5"):
+        cell.dump_to_file(str(tmp_path / "c.json"), writer="json")

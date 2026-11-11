@@ -95,3 +95,10 @@ def test_mul_copies_and_validates():
     assert tripled.N == 6 and cell.N == 2 and tripled is not cell
     with pytest.raises(ValidationError):
         cell * -1
+
+
+def test_unnamed_subclass_with_new_fields_raises():
+    with pytest.raises(TypeError, match="declare name"):
+
+        class Extra(LCLfBaseCell):  # pylint: disable=unused-variable
+            extra: float = 1.0

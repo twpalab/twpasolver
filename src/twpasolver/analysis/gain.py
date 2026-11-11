@@ -219,15 +219,19 @@ def solve_bloch(
 
     s = problem.mode_labels.index(meta["signal_mode"])
     a_in, a_out = out["a_in"], out["a_out"]
+    # Copies of the last pass, so the result does not keep the pass history alive.
+    I_fwd, I_bwd, b_in, b_out = (
+        out[key][-1].copy() for key in ("I_fwd", "I_bwd", "b_in", "b_out")
+    )
     history: dict[str, Any] = {}
     if bloch_config.save_all_passes:
-        # The kernel repeats the last pass of a point that stopped early; blank it.
+        # The kernel repeats the last pass of a point that stopped early; blank it
+        # (in place: the history is the kernel buffer).
         unused = np.arange(len(out["I_fwd"]))[:, None] >= diag["passes_used"][None, :]
         history = {}
         for key in ("I_fwd", "I_bwd", "b_in", "b_out"):
-            arr = out[key].copy()
-            arr[unused] = np.nan
-            history[key] = arr
+            out[key][unused] = np.nan
+            history[key] = out[key]
         history.update(
             port_gains(
                 a_in[:, s],
@@ -236,13 +240,12 @@ def solve_bloch(
                 history["b_out"][..., s],
             )
         )
-    b_in, b_out = out["b_in"][-1], out["b_out"][-1]
     return GainResult(
         model=GainModel.BLOCH.value,
         x=x,
         mode_labels=problem.mode_labels,
-        I_fwd=out["I_fwd"][-1],
-        I_bwd=out["I_bwd"][-1],
+        I_fwd=I_fwd,
+        I_bwd=I_bwd,
         a_in=a_in,
         a_out=a_out,
         b_in=b_in,
