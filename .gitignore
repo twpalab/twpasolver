@@ -166,6 +166,7 @@ docs/source/api-reference/
 *.npz
 !tests/data/*.npz
 Claude outputs/
+RELEASE_PLAN.md
 
 # Numba cache directory used in CI
 .numba_cache/
