@@ -541,7 +541,7 @@ def stopband_edges(
             continue
         h = _half_trace(twpa_ll, g)
         inband = passband_mask(h)
-        for j in np.flatnonzero(inband[1:] != inband[:-1]):
+        for j in np.flatnonzero(inband[1:] != inband[:-1]).tolist():
             f_edge, f_ref, parity = _refine_edge(twpa_ll, g, h, inband, j, h_ref)
             edges.append(f_edge)
             refs.append(f_ref)

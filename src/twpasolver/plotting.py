@@ -1,6 +1,6 @@
 """Collection of plot functions."""
 
-from typing import List, Optional
+from typing import Any, List, Optional, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,8 +41,11 @@ def plot_mode_currents(
     if line_styles is None:
         line_styles = ["-", "--", "-.", ":", "-", "--", "-."] * 3
 
-    if colors is None:
-        colors = plt.get_cmap("tab10")(np.linspace(0, 1, n_modes))
+    palette: Sequence[Any] = (
+        colors
+        if colors is not None
+        else plt.get_cmap("tab10")(np.linspace(0, 1, n_modes)).tolist()
+    )
 
     for i in range(n_modes):
         if log_scale:
@@ -52,7 +55,7 @@ def plot_mode_currents(
                 currents_db,
                 label=mode_names[i],
                 linestyle=line_styles[i % len(line_styles)],
-                color=colors[i % len(colors)],
+                color=palette[i % len(palette)],
                 lw=lw,
             )
         else:
@@ -61,7 +64,7 @@ def plot_mode_currents(
                 mean_currents[i],
                 label=mode_names[i],
                 linestyle=line_styles[i % len(line_styles)],
-                color=colors[i % len(colors)],
+                color=palette[i % len(palette)],
                 lw=lw,
             )
 

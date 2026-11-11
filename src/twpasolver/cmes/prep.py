@@ -492,7 +492,7 @@ def apply_edge_basis_segmented(
     # Native segments of a mode solved exactly: decoupled directions with
     # the kernel attenuation (forward decays along +x, backward along -x).
     for i, n in zip(*np.nonzero(edge_mode)):
-        for s in np.flatnonzero(~flag[i, :, n]):
+        for s in np.flatnonzero(~flag[i, :, n]).tolist():
             a = gammas_k[i, n, s].real
             edge_K[i, s, n] = np.array([[a, 0.0], [0.0, -a]], dtype=np.complex128)
     omegas = 2 * np.pi * freqs_hz
