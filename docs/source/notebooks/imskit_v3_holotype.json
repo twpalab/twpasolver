@@ -1,0 +1,48 @@
+{ "name"      : "TWPA",
+  "Lk"        : 25,
+  "t"         : 10,
+  "d"         : 0,
+  "s"         : 1,
+  "nonlinear" : 0,
+  "repetition": "30-4",
+  "cells": [
+  {
+	"name": "LCLfBaseCell",
+	"l"   : 2,
+	"Z"   : 50,
+	"N"   : 15,
+	"L"  : 55.5e-12,
+	"C"   : 21.9e-15,
+	"Lf"  : 0.12e-9,
+    "centered": true,
+    "delta": 2e-4
+    },
+    {
+	"name": "LCLfBaseCell",
+	"l"   : 2,
+	"Z"   : 80,
+	"N"   : 4,
+	"L"  : 55.2e-12,
+	"C"   : 8.3e-15,
+	"Lf"  : 0.039e-9,
+    "centered": true,
+    "delta": 2e-4
+    },
+    {
+	"name": "LCLfBaseCell",
+	"l"   : 2,
+	"Z"   : 50,
+	"N"   : 15,
+	"L"  : 55.5e-12,
+	"C"   : 21.9e-15,
+	"Lf"  : 0.12e-9,
+    "centered": true,
+    "delta": 2e-4
+    }
+  ],
+  "N"  : 1200,
+  "Istar": 2e-3,
+  "Idc"  : 0.2e-3,
+  "Ip0"  : 0.1e-3,
+  "Is0"  : 0.1e-7
+}

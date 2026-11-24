@@ -1,9 +1,13 @@
 Welcome to twpasolver's documentation!
 ======================================
 
-``twpasolver`` is an open-source library designed for analyzing and simulating the behavior of Traveling Wave Parametric Amplifiers (TWPAs) by solving systems of differential equations known as Coupled Mode Equations (CMEs).
+``twpasolver`` simulates traveling-wave parametric amplifiers (TWPAs): circuit models of the line, linear response, phase matching, and gain from coupled mode equations (CMEs).
 
-.. caution:: Please note that ``twpasolver`` is currently in a very early development stage. This means that the API is subject to significant changes.
+.. note:: This release simulates **kinetic-inductance TWPAs (KI-TWPAs)**. The cells of the line can be any linear
+   circuit, but the only nonlinearity is that of a kinetic inductance. Josephson-junction and SNAIL TWPAs are not
+   supported yet.
+
+.. caution:: ``twpasolver`` is in beta: the API may still change between minor versions (see the changelog in the repository).
 
 .. toctree::
    :maxdepth: 2
@@ -11,6 +15,7 @@ Welcome to twpasolver's documentation!
 
    installation
    tutorials
+   physics
    implementing_models
 
 .. toctree::

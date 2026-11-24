@@ -125,18 +125,6 @@ def lossless_line():
     return LosslessTL(L=6.2e-7, C=4.2e-10, l=10e-6)
 
 
-@pytest.fixture
-def frequency_list():
-    """Return example simple list."""
-    return list(range(0, 10))
-
-
-@pytest.fixture
-def frequency_arange():
-    """Return example arange tuple."""
-    return (0, 1, 10)
-
-
 class RandomModel(TwoPortModel):
     """Generate random normal ABCD matrices."""
 

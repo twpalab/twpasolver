@@ -26,7 +26,7 @@ def test_nested_array(capacitor, inductor):
 
 
 def test_array_creation_from_file(tmpdir, capacitor, inductor, twpa):
-    """Test array creation with nested list."""
+    """Test array creation from file."""
     filename = str(tmpdir.join("array_model"))
     arr = TwoPortArray(cells=[capacitor, [inductor, capacitor], twpa])
     arr.dump_to_file(filename)

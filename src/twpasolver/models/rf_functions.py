@@ -6,54 +6,45 @@ from numba import njit
 from twpasolver.bonus_types import ComplexArray, FloatArray
 
 
-@njit
+@njit(cache=True)
 def inductance(freqs: FloatArray, L: float) -> ComplexArray:
     """
-    Calculate the impedance of an inductance as a function of frequency.
+    Impedance ``2j pi f L`` of an inductance.
 
     Args:
-        freqs (FloatArray): Array of frequencies.
-        L (float): Inductance value.
-
-    Returns:
-        np.ndarray: Impedance of the inductance.
+        freqs (FloatArray): Frequencies in Hz.
+        L (float): Inductance in H.
     """
     assert L >= 0
-    return 2j * np.pi * freqs * L
+    return (2j * np.pi * freqs * L).astype(np.complex128)
 
 
-@njit
+@njit(cache=True)
 def capacitance(freqs: FloatArray, C: float) -> ComplexArray:
     """
-    Calculate the impedance of a capacitor as a function of frequency.
+    Impedance ``-1j / (2 pi f C)`` of a capacitance.
 
     Args:
-        freqs (FloatArray): Array of frequencies.
-        C (float): Capacitance value.
-
-    Returns:
-        np.ndarray: Impedance of the capacitor.
+        freqs (FloatArray): Frequencies in Hz.
+        C (float): Capacitance in F.
     """
     assert np.real(C) >= 0
-    return -1j / (2 * np.pi * freqs * C)
+    return (-1j / (2 * np.pi * freqs * C)).astype(np.complex128)
 
 
-@njit
+@njit(cache=True)
 def stub(
     freqs: FloatArray, L: float, C: complex, length: float, open: bool = True
 ) -> ComplexArray:
     """
-    Calculate the impedance of a stub as a function of frequency.
+    Impedance of an open or shorted stub.
 
     Args:
-        freqs (FloatArray): Array of frequencies.
-        L (float): Inductance value.
-        C (float): Capacitance value.
+        freqs (FloatArray): Frequencies in Hz.
+        L (float): Inductance per unit length.
+        C (float): Capacitance per unit length.
         length (float): Length of the stub.
-        open (bool): If True, calculate for an open stub; otherwise, for a short stub.
-
-    Returns:
-        np.ndarray: Impedance of the stub.
+        open (bool): Open stub if True, shorted stub otherwise.
     """
     beta_l = 2 * np.pi * freqs * np.sqrt(L * C) * length
     Z = np.sqrt(L / C)
@@ -62,16 +53,10 @@ def stub(
     return 1j * Z * np.tan(beta_l)
 
 
-@njit
+@njit(cache=True)
 def parallel_admittance_abcd(Y: ComplexArray) -> ComplexArray:
     """
-    Calculate the ABCD matrix of a parallel admittance.
-
-    Args:
-        Y (ComplexArray): Array of admittance values.
-
-    Returns:
-        np.ndarray: ABCD matrix of the parallel admittance.
+    ABCD matrices ``[[1, 0], [Y, 1]]`` of a shunt admittance, shape (len(Y), 2, 2).
     """
     abcd = np.zeros((len(Y), 2, 2), dtype=np.complex128)
     abcd[:, 0, 0] = 1
@@ -80,16 +65,10 @@ def parallel_admittance_abcd(Y: ComplexArray) -> ComplexArray:
     return abcd
 
 
-@njit
+@njit(cache=True)
 def series_impedance_abcd(Z: ComplexArray) -> ComplexArray:
     """
-    Calculate the ABCD matrix of a series impedance.
-
-    Args:
-        Z (ComplexArray): Array of impedance values.
-
-    Returns:
-        np.ndarray: ABCD matrix of the series impedance.
+    ABCD matrices ``[[1, Z], [0, 1]]`` of a series impedance, shape (len(Z), 2, 2).
     """
     abcd = np.zeros((len(Z), 2, 2), dtype=np.complex128)
     abcd[:, 0, 0] = 1
@@ -98,19 +77,16 @@ def series_impedance_abcd(Z: ComplexArray) -> ComplexArray:
     return abcd
 
 
-@njit
+@njit(cache=True)
 def lossless_line_abcd(freqs: FloatArray, C: float, L: float, l: float) -> ComplexArray:
     """
-    Calculate the ABCD matrix of a lossless transmission line.
+    ABCD matrices of a lossless transmission line.
 
     Args:
-        freqs (FloatArray): Array of frequencies.
+        freqs (FloatArray): Frequencies in Hz.
         C (float): Capacitance per unit length.
         L (float): Inductance per unit length.
         l (float): Length of the transmission line.
-
-    Returns:
-        np.ndarray: ABCD matrix of the lossless transmission line.
     """
     assert np.real(C) >= 0
     assert L >= 0
@@ -126,19 +102,19 @@ def lossless_line_abcd(freqs: FloatArray, C: float, L: float, l: float) -> Compl
     return abcd
 
 
-@njit
-def LCLf_abcd(freqs: FloatArray, C: float, L: float, Lf: float) -> ComplexArray:
+@njit(cache=True)
+def LCLf_abcd(
+    freqs: FloatArray, C: complex, L: float, Lf: float, qp_loss: float = 0.0
+) -> ComplexArray:
     """
-    Calculate the ABCD matrix of an LCLf cell model.
+    ABCD matrices of an LCLf cell.
 
     Args:
-        freqs (FloatArray): Array of frequencies.
-        C (float): Capacitance value.
-        L (float): Inductance value.
-        Lf (float): Additional inductance value.
-
-    Returns:
-        np.ndarray: ABCD matrix of the LCLf cell model.
+        freqs (FloatArray): Frequencies in Hz.
+        C (complex): Capacitance (complex for dielectric loss).
+        L (float): Series inductance.
+        Lf (float): Finger inductance, in series with ``C``.
+        qp_loss (float): Quasiparticle-loss coefficient (units 1/Hz).
     """
     assert np.real(C) >= 0
     assert L >= 0
@@ -147,30 +123,28 @@ def LCLf_abcd(freqs: FloatArray, C: float, L: float, Lf: float) -> ComplexArray:
     abcd = np.empty((n_mat, 2, 2), dtype=np.complex128)
     for i in range(n_mat):
         w = 2 * np.pi * freqs[i]
+        L_eff = L * (1 - 1j * qp_loss * freqs[i])
         den = 2 - Lf * C * w**2
         abcd[i, 0, 0] = 1
-        abcd[i, 0, 1] = 1j * L * w
+        abcd[i, 0, 1] = 1j * L_eff * w
         abcd[i, 1, 0] = 1j * 2 * C * w / den
-        abcd[i, 1, 1] = 1 - 2 * L * C * w**2 / den
+        abcd[i, 1, 1] = 1 - 2 * L_eff * C * w**2 / den
     return abcd
 
 
-@njit
+@njit(cache=True)
 def get_stub_cell(
     freqs: FloatArray, C: complex, L: float, l1: float, l2: float
 ) -> ComplexArray:
     """
-    Calculate the ABCD matrix of a stub cell model.
+    ABCD matrices of a stub cell.
 
     Args:
-        freqs (FloatArray): Array of frequencies.
-        C (float): Capacitance value.
-        L (float): Inductance value.
+        freqs (FloatArray): Frequencies in Hz.
+        C (float): Capacitance per unit length.
+        L (float): Inductance per unit length.
         l1 (float): Length of the first section of the stub.
         l2 (float): Length of the second section of the stub.
-
-    Returns:
-        np.ndarray: ABCD matrix of the stub cell model.
     """
     assert np.real(C) >= 0
     assert L >= 0

@@ -1,7 +1,6 @@
 """Collection of plot functions."""
 
-# mypy: ignore-errors
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,105 +10,64 @@ from twpasolver.mathutils import I_to_dBm
 
 
 def plot_mode_currents(
-    gain_result: Dict[str, Any],
-    mode_names: Optional[List[str]] = None,
+    x: np.ndarray,
+    I_tuples: np.ndarray,
+    mode_names: List[str],
+    pump_freq: Optional[float] = None,
+    freqs_unit: str = "GHz",
     figsize: tuple = (9, 5),
     log_scale: bool = True,
     line_styles: Optional[List[str]] = None,
     colors: Optional[List[str]] = None,
     title: Optional[str] = None,
     ylim: Optional[tuple] = None,
+    lw=2,
 ) -> Axes:
     """
-    Plot the mean current of each mode in dB as a function of cell number.
+    Plot the mean current of each mode over frequency as a function of cell number.
 
     Args:
-        gain_result: Dictionary output from the gain analysis function
-        mode_names: Optional list of mode names for labeling (auto-detected if not provided)
-        figsize: Figure size tuple (width, height)
-        log_scale: Whether to plot in dB scale (True) or linear scale (False)
-        line_styles: Optional list of line styles for different modes
-        colors: Optional list of colors for different modes
-        title: Custom title for the plot
-        ylim: Optional y-axis limits as (min, max)
-
-    Returns:
-        The matplotlib figure object
+        x: Positions in unit cells, shape (n_x,).
+        I_tuples: Mode currents, shape (n_freq, n_modes, n_x).
+        mode_names: Legend labels.
+        log_scale: Plot in dBm (True) or in A (False).
     """
-    # Extract data from gain result
-    x = gain_result["x"]
-    model = gain_result.get("model", "minimal_3wm")
+    n_modes = I_tuples.shape[1]
 
-    # Determine the dimensionality and mode names based on the model
-    if model == "minimal_3wm":
-        # Standard 3WM model with pump, signal, idler
-        I_triplets = gain_result["I_triplets"]
-        n_freqs = I_triplets.shape[0]
-        n_modes = I_triplets.shape[1]
+    mean_currents = np.mean(np.abs(I_tuples), axis=0)
 
-        # Use default mode names for standard model
-        if mode_names is None:
-            mode_names = ["Pump", "Signal", "Idler"]
-
-        # Compute mean current across all frequencies
-        mean_currents = np.mean(np.abs(I_triplets), axis=0)
-
-    else:  # general model
-        # General model with arbitrary number of modes
-        I_triplets = gain_result["I_triplets"]
-        n_freqs = I_triplets.shape[0]
-        n_modes = I_triplets.shape[1]
-
-        # Extract mode names from the result if available
-        if mode_names is None and "mode_info" in gain_result:
-            mode_info = gain_result["mode_info"]
-            reverse_mode_map = mode_info.get("reverse_mode_map", {})
-            if reverse_mode_map:
-                mode_names = [
-                    reverse_mode_map.get(i, f"Mode {i}") for i in range(n_modes)
-                ]
-            else:
-                mode_names = [f"Mode {i}" for i in range(n_modes)]
-        elif mode_names is None:
-            mode_names = [f"Mode {i}" for i in range(n_modes)]
-
-        # Compute mean current across all frequencies
-        mean_currents = np.mean(np.abs(I_triplets), axis=0)
-
-    # Create figure
     fig, ax = plt.subplots(figsize=figsize)
 
-    # Define line styles and colors if not provided
     if line_styles is None:
         line_styles = ["-", "--", "-.", ":", "-", "--", "-."] * 3
 
-    if colors is None:
-        # Use a colormap for many modes
-        colors = plt.cm.tab10(np.linspace(0, 1, n_modes))
+    palette: Sequence[Any] = (
+        colors
+        if colors is not None
+        else plt.get_cmap("tab10")(np.linspace(0, 1, n_modes)).tolist()
+    )
 
-    # Plot each mode
     for i in range(n_modes):
         if log_scale:
-            # Convert to dB
             currents_db = I_to_dBm(mean_currents[i])
             ax.plot(
                 x,
                 currents_db,
                 label=mode_names[i],
                 linestyle=line_styles[i % len(line_styles)],
-                color=colors[i % len(colors)],
+                color=palette[i % len(palette)],
+                lw=lw,
             )
         else:
-            # Linear scale
             ax.plot(
                 x,
                 mean_currents[i],
                 label=mode_names[i],
                 linestyle=line_styles[i % len(line_styles)],
-                color=colors[i % len(colors)],
+                color=palette[i % len(palette)],
+                lw=lw,
             )
 
-    # Set labels and title
     ax.set_xlabel("Cell Number")
 
     if log_scale:
@@ -120,10 +78,8 @@ def plot_mode_currents(
     if title:
         ax.set_title(title)
     else:
-        pump_freq = gain_result.get("pump_freq", "N/A")
-        ax.set_title(
-            f"Mean Mode Currents vs Cell Number\nPump Frequency: {pump_freq} GHz"
-        )
+        pump = "N/A" if pump_freq is None else f"{np.round(pump_freq, 3)} {freqs_unit}"
+        ax.set_title(f"Mean Mode Currents vs Cell Number\nPump Frequency: {pump}")
 
     if ylim:
         ax.set_ylim(ylim)
@@ -143,16 +99,12 @@ def plot_response(
     figsize: tuple[float, float] = (5.0, 6.0),
     **plot_kwargs,
 ) -> Axes:
-    """Plot response of twpa.
+    """Plot ``|S21|`` in dB and the wavenumber k* (rad) versus frequency.
 
     Args:
-        freqs (np.ndarray): Array of frequency values.
-        s21_db (np.ndarray): S21 parameter in dB.
-        k_star (np.ndarray): k* parameter.
-        pump_freq (Optional[float]): Frequency of the pump signal.
-        freqs_unit (str): Unit of the frequency values.
-        figsize (tuple[float, float]): Size of the figure.
-        **plot_kwargs: Additional keyword arguments for the plot.
+        pump_freq (Optional[float]): If given, marked with a vertical line.
+        freqs_unit (str): Unit label for the frequency axis.
+        **plot_kwargs: Passed to ``ax.plot``.
     """
     _, ax = plt.subplots(2, sharex=True, figsize=figsize)
     ax[0].plot(freqs, s21_db, **plot_kwargs)
@@ -172,13 +124,11 @@ def plot_gain(
     freqs_unit: str = "GHz",
     **plot_kwargs,
 ) -> Axes:
-    """Plot gain in dB.
+    """Plot gain in dB versus frequency.
 
     Args:
-        freqs (np.ndarray): Array of frequency values.
-        gain_db (np.ndarray): Gain values in dB.
-        freqs_unit (str): Unit of the frequency values.
-        **plot_kwargs: Additional keyword arguments for the plot.
+        freqs_unit (str): Unit label for the frequency axis.
+        **plot_kwargs: Passed to ``ax.plot``.
     """
     plt.figure()
     ax = plt.axes()
@@ -197,16 +147,14 @@ def plot_phase_matching(
     log_abs=True,
     **plot_kwargs,
 ) -> Axes:
-    """Plot phase matching.
+    """Plot the phase mismatch map over pump and signal frequency.
 
     Args:
-        pump_freqs (np.ndarray): Array of pump frequency values.
-        signal_freqs (np.ndarray): Array of signal frequency values.
-        delta_pm (np.ndarray): Phase mismatch values.
-        freqs_unit (str): Unit of the frequency values.
-        thin (int): Thinning factor for plotting.
-        log_abs (bool): Whether to plot the logarithm of the absolute values.
-        **plot_kwargs: Additional keyword arguments for the plot.
+        delta_pm (np.ndarray): Phase mismatch, shape ``(len(signal_freqs), len(pump_freqs))``.
+        freqs_unit (str): Unit label for the frequency axes.
+        thin (int): Plot every ``thin``-th point along both axes.
+        log_abs (bool): Plot ``log|delta_pm|``.
+        **plot_kwargs: Passed to ``ax.pcolor``.
     """
     plt.figure()
     ax = plt.axes()

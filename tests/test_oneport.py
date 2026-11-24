@@ -7,10 +7,7 @@ from twpasolver.models.oneport import OnePortModel
 
 
 def test_one_port_model_Z_abstractmethod():
-    """
-    Test that the Z method in OnePortModel is an abstract method
-    and cannot be instantiated directly.
-    """
+    """OnePortModel cannot be instantiated: Z is abstract."""
     with pytest.raises(TypeError):
         OnePortModel()
 

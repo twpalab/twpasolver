@@ -1,0 +1,279 @@
+"""Coupled Mode Equations models and solvers optimized for Numba."""
+
+import numba as nb
+import numpy as np
+
+from twpasolver.bonus_types import (
+    ComplexArray,
+    FloatArray,
+    nb_complex1d,
+    nb_complex2d,
+    nb_float1d,
+    nb_float2d,
+    nb_int2d,
+)
+from twpasolver.cmes.rk45 import rk45_solve
+from twpasolver.cmes.solver_config import RKSolverConfig
+from twpasolver.logger import log
+
+
+@nb.njit(
+    nb.types.UniTuple(nb.int64, 2)(nb_float1d, nb.float64),
+    cache=True,
+    inline="always",
+)
+def _sorted_interp_bracket(xp: np.ndarray, x: float):
+    """
+    Return (lo, hi) bracket indices for x in the sorted grid xp.
+
+    Callers compute frac = (x - xp[lo]) / (xp[hi] - xp[lo]) once and apply it
+    to several value arrays.
+
+    Boundary behaviour (matching np.interp):
+      x <= xp[0]       → lo = hi = 0        (frac = 0 → clamp to fp[0])
+      x >= xp[n-1]     → lo = hi = n-1      (frac = 0 → clamp to fp[n-1])
+      interior          → lo = hi - 1,  hi = searchsorted result
+    """
+    n = len(xp)
+    if x <= xp[0]:
+        return nb.int64(0), nb.int64(0)
+    if x >= xp[n - 1]:
+        return nb.int64(n - 1), nb.int64(n - 1)
+    hi = nb.int64(np.searchsorted(xp, x))  # xp[hi-1] < x <= xp[hi]
+    return hi - nb.int64(1), hi
+
+
+@nb.njit(
+    nb_complex1d(
+        nb.float64,
+        nb_complex1d,
+        nb_float2d,
+        nb_float2d,
+        nb_int2d,
+        nb_int2d,
+        nb_complex2d,
+        nb_complex2d,
+        nb_float1d,
+        nb_float1d,
+        nb_float2d,
+    ),
+    cache=True,
+)
+def no_reflections_cmes_segmented(
+    x,
+    currents,
+    alphas_table,
+    kappas_table,
+    relations_3wm,
+    relations_4wm,
+    coeffs_3wm_table,
+    coeffs_4wm_table,
+    segment_midpoints,
+    x_array,
+    phi_table,
+):
+    """
+    RHS of the no-reflections CME system for a segmented (position-dependent) device.
+
+    Parameters
+    ----------
+    alphas_table, kappas_table : ndarray, shape (n_modes, n_segments)
+        Local attenuation and wavenumber, interpolated at ``x`` via
+        ``segment_midpoints``.
+    coeffs_3wm_table, coeffs_4wm_table : ndarray, shape (n_relations, n_segments)
+        Position-dependent nonlinear coupling coefficients, on the same grid.
+    phi_table : ndarray, shape (n_modes, n_x)
+        Cumulative phase per mode, precomputed on the solver output grid
+        ``x_array``.
+    """
+    num_modes = len(currents)
+    derivs = np.zeros(num_modes, nb.complex128)
+
+    # Locate x in both sorted grids via one binary search each.
+    lo, hi = _sorted_interp_bracket(segment_midpoints, x)
+    lo_x, hi_x = _sorted_interp_bracket(x_array, x)
+
+    frac = (
+        0.0
+        if lo == hi
+        else (x - segment_midpoints[lo])
+        / (segment_midpoints[hi] - segment_midpoints[lo])
+    )
+    frac_x = (
+        0.0 if lo_x == hi_x else (x - x_array[lo_x]) / (x_array[hi_x] - x_array[lo_x])
+    )
+
+    # Local alphas (via linear interp) and exact cumulative phase (via phi_table).
+    alphas = np.empty(num_modes, dtype=nb.float64)
+    kappas = np.empty(num_modes, dtype=nb.float64)
+    exp_pos = np.empty(num_modes, dtype=nb.complex128)
+    for i in range(num_modes):
+        alphas[i] = alphas_table[i, lo] + frac * (
+            alphas_table[i, hi] - alphas_table[i, lo]
+        )
+        kappas[i] = kappas_table[i, lo] + frac * (
+            kappas_table[i, hi] - kappas_table[i, lo]
+        )
+        phi = phi_table[i, lo_x] + frac_x * (phi_table[i, hi_x] - phi_table[i, lo_x])
+        exp_pos[i] = np.exp(1j * phi)
+
+    # Local nonlinearity coefficients.
+    n_rel3 = coeffs_3wm_table.shape[0]
+    coeffs_3wm = np.empty(n_rel3, dtype=nb.complex128)
+    for r in range(n_rel3):
+        coeffs_3wm[r] = coeffs_3wm_table[r, lo] + frac * (
+            coeffs_3wm_table[r, hi] - coeffs_3wm_table[r, lo]
+        )
+
+    n_rel4 = coeffs_4wm_table.shape[0]
+    coeffs_4wm = np.empty(n_rel4, dtype=nb.complex128)
+    for r in range(n_rel4):
+        coeffs_4wm[r] = coeffs_4wm_table[r, lo] + frac * (
+            coeffs_4wm_table[r, hi] - coeffs_4wm_table[r, lo]
+        )
+
+    alphas_rhs = np.zeros(2 * num_modes, dtype=np.complex128)
+    for i in range(num_modes):
+        alphas_rhs[i] = currents[i] * exp_pos[i]
+        alphas_rhs[i + num_modes] = np.conj(alphas_rhs[i])
+
+    for i, (idx, idx1, idx2) in enumerate(relations_3wm):
+        derivs[idx] += coeffs_3wm[i] * alphas_rhs[idx1] * alphas_rhs[idx2]
+    for i, (idx, idx1, idx2, idx3) in enumerate(relations_4wm):
+        derivs[idx] += (
+            coeffs_4wm[i] * alphas_rhs[idx1] * alphas_rhs[idx2] * alphas_rhs[idx3]
+        )
+    derivs = (alphas + 1j * kappas) * derivs / exp_pos + alphas * currents
+    return derivs
+
+
+@nb.njit(parallel=True, cache=True)
+def _no_reflections_solve_segmented(
+    x_array,
+    y0_broadcast,
+    gammas_array,
+    relations_3wm,
+    relations_4wm,
+    coeffs_3wm_table,
+    coeffs_4wm_table,
+    segment_midpoints,
+    rk,
+    phi_tables,
+):
+    """
+    Parallel solve for segmented device; gammas_array shape (n_freq, n_modes, n_segments).
+
+    ``phi_tables`` (n_freq, n_modes, n_x): the cumulative phase on the output
+    grid (:func:`cumulative_phase`), which the RHS interpolates at every
+    integrator step.
+    """
+    n_freq = y0_broadcast.shape[0]
+    n_modes = y0_broadcast.shape[1]
+    n_x = len(x_array)
+    x_span = (x_array[0], x_array[-1])
+    I_tuples = np.empty((n_freq, n_modes, n_x), dtype=nb.complex128)
+
+    for i in nb.prange(n_freq):  # pylint: disable=not-an-iterable
+        # gammas_array[i]: (n_modes, n_segments)
+        alphas_i = np.ascontiguousarray(gammas_array[i].real)
+        kappas_i = np.ascontiguousarray(gammas_array[i].imag)
+
+        phi_table = np.ascontiguousarray(phi_tables[i])
+
+        I_tuples[i] = rk45_solve(
+            no_reflections_cmes_segmented,
+            x_span,
+            y0_broadcast[i],
+            args=(
+                alphas_i,
+                kappas_i,
+                relations_3wm,
+                relations_4wm,
+                coeffs_3wm_table,
+                coeffs_4wm_table,
+                segment_midpoints,
+                x_array,
+                phi_table,
+            ),
+            atol=rk[0],
+            rtol=rk[1],
+            t_eval=x_array,
+            first_step=rk[2],
+            max_steps_per_cell=rk[3],
+        )
+
+    return I_tuples
+
+
+def cumulative_phase(
+    gammas_array: ComplexArray, segment_midpoints: FloatArray, x_array: FloatArray
+) -> FloatArray:
+    """
+    ``Phi_m(x) = int Im(gamma_m) dx`` on ``x_array``, shape (n_freq, n_modes, n_x).
+
+    ``Im(gamma_m)`` is piecewise-linear on the segment midpoints (constant for
+    one segment); the cumulative trapezoid rule is exact for that interpolant.
+    """
+    kappa = gammas_array.imag
+    kappa_at_x = np.array(
+        [
+            [
+                np.interp(x_array, segment_midpoints, kappa[i, j])
+                for j in range(kappa.shape[1])
+            ]
+            for i in range(kappa.shape[0])
+        ]
+    ).reshape(*kappa.shape[:2], len(x_array))
+    dphi = 0.5 * (kappa_at_x[..., :-1] + kappa_at_x[..., 1:]) * np.diff(x_array)
+    return np.concatenate(
+        [np.zeros((*kappa.shape[:2], 1)), np.cumsum(dphi, axis=-1)], -1
+    )
+
+
+def no_reflections_cmes_solve(
+    x_array: FloatArray,
+    y0_broadcast: ComplexArray,
+    gammas_array: ComplexArray,
+    relations_3wm,
+    relations_4wm,
+    coeffs_3wm,
+    coeffs_4wm,
+    segment_midpoints: FloatArray,
+    rk_config: RKSolverConfig | None = None,
+) -> ComplexArray:
+    """
+    Solve the no-reflections CME system for every signal frequency in parallel.
+
+    ``gammas_array`` has shape (n_freq, n_modes, n_seg), ``coeffs_*`` shape
+    (n_rel, n_seg) and ``segment_midpoints`` shape (n_seg,); a uniform device is
+    one segment.
+
+    Returns
+    -------
+    I : (n_freq, n_modes, n_positions)
+        Mode currents with their propagation phase ``exp(i Phi_m(x))``.
+    """
+    phi = cumulative_phase(gammas_array, segment_midpoints, x_array)
+    rk = (rk_config if rk_config is not None else RKSolverConfig()).kernel_args()
+    I_tuples = _no_reflections_solve_segmented(
+        np.ascontiguousarray(x_array),
+        y0_broadcast,
+        gammas_array,
+        relations_3wm,
+        relations_4wm,
+        np.ascontiguousarray(coeffs_3wm),
+        np.ascontiguousarray(coeffs_4wm),
+        np.ascontiguousarray(segment_midpoints),
+        rk,
+        np.ascontiguousarray(phi),
+    )
+    bad = np.flatnonzero(~np.isfinite(I_tuples).all(axis=(1, 2)))
+    if bad.size:
+        log.warning(
+            "No-reflections CMEs hit the RK45 step cap (NaN output) for %d of %d "
+            "frequency points (indices %s).",
+            bad.size,
+            len(I_tuples),
+            bad[:20].tolist(),
+        )
+    return I_tuples * np.exp(1j * phi)
