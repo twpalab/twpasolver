@@ -38,9 +38,12 @@ jobs:
     - name: Install
       run: poetry install --no-interaction --with docs
 
+    # Release binary from GitHub: apt mirrors on the runner have failed to resolve.
+    - name: Install pandoc
+      uses: r-lib/actions/setup-pandoc@v2
+
     - name: Build documentation
       run: |
-        sudo apt-get install -y pandoc
         poetry run python -m ipykernel install --user --name twpaenv
         poetry run make -C docs html
 

@@ -184,8 +184,8 @@ def linear_data(twpa: TWPA, f: np.ndarray, unit_multiplier: float) -> LinearData
 
 
 def interpolator(lin: LinearData) -> ParameterInterpolator:
-    """Spline of the per-segment ``k``, ``gamma`` (reflection), ``alpha`` and ``Zb``."""
+    """Spline of the per-segment ``k``, ``gamma`` (reflection) and ``alpha``."""
     return ParameterInterpolator(
         lin.freqs,
-        {"k": lin.k, "gamma": lin.reflection_coeff, "alpha": lin.alpha, "Zb": lin.Zb},
+        {"k": lin.k, "gamma": lin.reflection_coeff, "alpha": lin.alpha},
     )

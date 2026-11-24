@@ -426,8 +426,8 @@ def gap_ahead(
     f = np.atleast_1d(np.asarray(f_hz, dtype=np.float64))
     df = 1e-6 * f
     h = np.abs(_half_trace(twpa_ll, np.concatenate([f, f + df, f - df]))).reshape(3, -1)
-    slope = (h[1] - h[2]) / (2 * df)
-    with np.errstate(divide="ignore", invalid="ignore"):
+    with np.errstate(divide="ignore", invalid="ignore"):  # f = 0: df = 0
+        slope = (h[1] - h[2]) / (2 * df)
         dist = (1.0 - h[0]) / np.abs(slope)
     # flat, or already at |h| = 1: look up to 3 MHz on both sides instead
     flat = ~np.isfinite(dist) | (dist < 1e3)

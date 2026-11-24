@@ -415,6 +415,9 @@ def test_plots_render():
     modes = ModeSet.extended_3wm(2, 2, 1)  # edges that skip levels get waypoints
     for layout in ("hierarchical", "circular", "spring"):
         modes.plot_relations(tones={"p": PUMP, "s": 5.0}, layout=layout)
+    with warnings.catch_warnings():  # a mode with no incoming edge
+        warnings.simplefilter("error")
+        ModeSet(("p", "s", "z"), (("z", "p-p"),)).plot_relations()
     plt.close("all")
 
 
@@ -502,6 +505,10 @@ def test_frequency_inputs(analysis):
     np.testing.assert_array_equal(pm.pump_freqs, [12.0])
     with pytest.raises(ValueError, match="explicit frequencies"):
         analysis.phase_matching([5.0, 6.0], pump_freqs=(11.0, 12.0, 13.0))
+    with pytest.raises(ValueError, match="explicit frequencies"):
+        analysis.phase_matching([5.0, 6.0], pump_freqs=(11.0, 12.0, 1.0))
+    with pytest.raises(ValueError, match="Repeated"):
+        analysis.gain([5.0, 5.0, 6.0], pump=PUMP)
     with pytest.raises(ValueError, match="non-empty"):
         analysis.phase_matching([], pump_freqs=[12.0])
     with pytest.raises(ValueError, match="thin"):

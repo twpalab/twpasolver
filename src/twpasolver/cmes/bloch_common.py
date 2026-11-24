@@ -5,7 +5,7 @@ Numba helpers shared by the forward-backward Bloch CME solver.
   ``_stencil_value``, ``_interp_rows``);
 * selection of the phase-matched mixing terms with their reciprocal vectors
   (``_filter_wm_terms_bloch``) and their Bloch coefficients
-  (``_bloch_row_coeffs``, ``_rows_with_targets``);
+  (``_bloch_row_coeffs``);
 * closed-form exponential of a 2x2 generator (``_expm_2x2``);
 * fixed-point iteration: residual scales, relative residual, Anderson mixing
   (``_mode_scales``, ``_relative_residual``, ``_anderson_mix``).

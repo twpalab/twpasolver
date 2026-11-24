@@ -418,7 +418,13 @@ class ModeSet:
         for level in sorted(rows):
             row = rows[level]
             if level:
-                row.sort(key=lambda n: np.mean([pos[q][0] for q in H.predecessors(n)]))
+                row.sort(
+                    key=lambda n: (
+                        np.mean([pos[q][0] for q in H.predecessors(n)])
+                        if any(H.predecessors(n))
+                        else 0.0
+                    )
+                )
             # A waypoint takes half the room of a mode.
             widths = np.array([0.5 if isinstance(n, tuple) else 1.0 for n in row])
             x = np.cumsum(widths) - widths / 2

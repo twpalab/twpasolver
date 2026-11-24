@@ -37,7 +37,7 @@ Grid = Union[Tuple[float, float, float], List[float], np.ndarray]
 def _grid(spec: Grid) -> np.ndarray:
     """
     A tuple ``(start, stop, step)`` through ``numpy.arange``, else the explicit
-    values (a number is one frequency); always a new 1-D float array, not empty.
+    values (a number is one frequency); always a new 1-D float array, not empty, no repeats.
     """
     out: np.ndarray
     if isinstance(spec, tuple):
@@ -45,7 +45,7 @@ def _grid(spec: Grid) -> np.ndarray:
             FrequencyArange
         ).validate_python(spec)
         start, stop, step = arange
-        if start < stop < start + step:
+        if start < stop <= start + step:
             raise ValueError(
                 f"{spec} is read as (start, stop, step) and gives one frequency; "
                 "pass explicit frequencies as a list or array."
@@ -55,6 +55,8 @@ def _grid(spec: Grid) -> np.ndarray:
         out = np.atleast_1d(np.array(spec, dtype=np.float64))
     if out.ndim != 1 or out.size == 0:
         raise ValueError(f"Expected a non-empty 1-D list of frequencies, got {spec!r}.")
+    if np.unique(out).size != out.size:
+        raise ValueError(f"Repeated frequencies in {spec!r}.")
     return out
 
 
